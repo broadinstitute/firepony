@@ -50,6 +50,24 @@ void device_sort_batch(BAM_alignment_batch_device *batch)
 
 void debug_read(bqsr_context *context, const alignment_batch& batch, int read_index);
 
+void init_cuda(void)
+{
+    cudaDeviceProp prop;
+    int dev;
+    int runtime_version;
+
+    // trigger runtime initialization
+    printf("loading CUDA runtime...\n");
+    cudaFree(0);
+
+    cudaRuntimeGetVersion(&runtime_version);
+    cudaGetDevice(&dev);
+    cudaGetDeviceProperties(&prop, dev);
+
+    printf("CUDA runtime version: %d.%d\n", runtime_version / 1000, runtime_version % 100);
+    printf("device: %s (%d MB)\n", prop.name, prop.totalGlobalMem / (1024 * 1024));
+}
+
 int main(int argc, char **argv)
 {
     // load the reference genome
@@ -60,6 +78,8 @@ int main(int argc, char **argv)
     //const char *vcf_name = "/home/nsubtil/hg96/one-variant.vcf";
     const char *bam_name = "/home/nsubtil/hg96/HG00096.chrom20.ILLUMINA.bwa.GBR.low_coverage.20120522.bam";
 //    const char *bam_name = "/home/nsubtil/hg96/one-read.bam";
+
+    init_cuda();
 
     struct reference_genome reference;
 

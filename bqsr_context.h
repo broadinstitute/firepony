@@ -49,11 +49,6 @@ struct snp_filter_context
     }
 };
 
-struct covariate_context
-{
-
-};
-
 struct bqsr_statistics // host-only
 {
     uint32 total_reads;        // total number of reads processed

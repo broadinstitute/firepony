@@ -33,6 +33,7 @@
 #include "bqsr_context.h"
 #include "filters.h"
 #include "cigar.h"
+#include "covariates.h"
 
 using namespace nvbio;
 
@@ -112,6 +113,9 @@ int main(int argc, char **argv)
 
         // generate cigar events and coordinates
         expand_cigars(&ctx, batch);
+
+        // build covariate tables
+        gather_covariates(&ctx, batch);
 
 #if 0
         H_ReadOffsetList h_read_offset_list = ctx.read_offset_list;

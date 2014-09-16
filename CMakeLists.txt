@@ -9,6 +9,8 @@ bqsr_context.cu
 bqsr_types.h
 cigar.h
 cigar.cu
+covariates.h
+covariates.cu
 filters.h
 filters.cu
 reference.cu

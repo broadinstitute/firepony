@@ -32,10 +32,12 @@ struct bqsr_statistics // host-only
 {
     uint32 total_reads;        // total number of reads processed
     uint32 filtered_reads;     // number of reads filtered out in pre-processing
+    uint32 baq_reads;          // number of reads for which BAQ was computed
 
     bqsr_statistics()
         : total_reads(0),
-          filtered_reads(0)
+          filtered_reads(0),
+          baq_reads(0)
     { }
 };
 

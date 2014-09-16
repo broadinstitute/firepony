@@ -161,7 +161,15 @@ int main(int argc, char **argv)
         break;
     }
 
-    printf("%d reads filtered out of %d (%f%%)\n", context.stats.filtered_reads, context.stats.total_reads, float(context.stats.filtered_reads) / float(context.stats.total_reads) * 100.0);
+    printf("%d reads filtered out of %d (%f%%)\n",
+            context.stats.filtered_reads,
+            context.stats.total_reads,
+            float(context.stats.filtered_reads) / float(context.stats.total_reads) * 100.0);
+
+    printf("computed base alignment quality for %d reads out of %d (%f%%)\n",
+            context.stats.baq_reads,
+            context.stats.total_reads - context.stats.filtered_reads,
+            float(context.stats.baq_reads) / float(context.stats.total_reads - context.stats.filtered_reads) * 100.0);
 
     return 0;
 }

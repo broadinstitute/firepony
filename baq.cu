@@ -604,36 +604,96 @@ struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, u
     }
 };
 
+struct read_needs_baq : public bqsr_lambda
+{
+    read_needs_baq(bqsr_context::view ctx,
+                   const BAM_alignment_batch_device::const_view batch)
+        : bqsr_lambda(ctx, batch)
+    { }
+
+    NVBIO_HOST_DEVICE bool operator() (const uint32 read_index)
+    {
+        if (ctx.cigar.num_errors[read_index] != 0)
+            return true;
+
+        return false;
+    }
+};
+
+struct read_flat_baq : public bqsr_lambda
+{
+    read_flat_baq(bqsr_context::view ctx,
+                  const BAM_alignment_batch_device::const_view batch)
+        : bqsr_lambda(ctx, batch)
+    { }
+
+    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    {
+        if (ctx.baq.qualities.size() == 0)
+        {
+            return;
+        }
+
+        if (ctx.cigar.num_errors[read_index] != 0)
+        {
+            // reads with errors will have BAQ computed explicitly
+            return;
+        }
+
+        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const ushort2& read_window = ctx.baq.read_windows[read_index];
+        const uint32 queryStart = read_window.x;
+        const uint32 queryLen = read_window.y - read_window.x + 1;
+        uint8 *outputQualities = &ctx.baq.qualities[idx.qual_start] + queryStart;
+
+        // xxxnsubtil: GATK uses 64 instead of 0, not sure why
+        memset(outputQualities, 0, queryLen);
+    }
+};
+
 void baq_reads(bqsr_context *context, const reference_genome& reference, const BAM_alignment_batch_device& batch)
 {
     struct baq_context& baq = context->baq;
+    D_VectorU32& active_baq_read_list = context->temp_u32;
+    uint32 num_active;
+
+    // collect the reads that we need to compute BAQ for
+    active_baq_read_list.resize(context->active_read_list.size());
+
+    num_active = nvbio::copy_if(context->active_read_list.size(),
+                                context->active_read_list.begin(),
+                                active_baq_read_list.begin(),
+                                read_needs_baq(*context, batch),
+                                context->temp_storage);
+
+    active_baq_read_list.resize(num_active);
 
     // compute the index and size of the HMM matrices
-    baq.matrix_index.resize(context->active_read_list.size() + 1);
+    baq.matrix_index.resize(num_active + 1);
     // first offset is zero
     thrust::fill_n(baq.matrix_index.begin(), 1, 0);
     // do an inclusive scan to compute all offsets + the total size
-    nvbio::inclusive_scan(context->active_read_list.size(),
-                          thrust::make_transform_iterator(context->active_read_list.begin(),
+    nvbio::inclusive_scan(num_active,
+                          thrust::make_transform_iterator(active_baq_read_list.begin(),
                                                           compute_hmm_matrix_size(*context, batch)),
                           baq.matrix_index.begin() + 1,
                           thrust::plus<uint32>(),
                           context->temp_storage);
 
     // compute the index and size of the HMM scaling factors
-    baq.scaling_index.resize(context->active_read_list.size() + 1);
+    baq.scaling_index.resize(num_active + 1);
     // first offset is zero
     thrust::fill_n(baq.scaling_index.begin(), 1, 0);
-    nvbio::inclusive_scan(context->active_read_list.size(),
-                          thrust::make_transform_iterator(context->active_read_list.begin(),
+    nvbio::inclusive_scan(num_active,
+                          thrust::make_transform_iterator(active_baq_read_list.begin(),
                                                           compute_hmm_scaling_factor_size(*context, batch)),
                           baq.scaling_index.begin() + 1,
                           thrust::plus<uint32>(),
                           context->temp_storage);
 
     // read back the last elements, which contain the size of the buffer required
-    uint32 matrix_len = baq.matrix_index[context->active_read_list.size()];
-    uint32 scaling_len = baq.scaling_index[context->active_read_list.size()];
+    uint32 matrix_len = baq.matrix_index[num_active];
+    uint32 scaling_len = baq.scaling_index[num_active];
 
 //    printf("reads: %u\n", batch.num_reads);
 //    printf("forward len = %u bytes = %lu\n", matrix_len, matrix_len * sizeof(double));
@@ -669,6 +729,7 @@ void baq_reads(bqsr_context *context, const reference_genome& reference, const B
     thrust::fill(baq.qualities.begin(), baq.qualities.end(), uint8(-1));
 
     // compute the alignment frames
+    // note: this is used both for real BAQ and flat BAQ, so we use the full active read list
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
                      compute_hmm_windows(*context, reference.device, batch));
@@ -679,31 +740,38 @@ void baq_reads(bqsr_context *context, const reference_genome& reference, const B
     thrust::fill_n(baq.scaling.begin(), baq.scaling.size(), 0.0);
 
     // run the forward portion
-    thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(context->active_read_list.begin(),
+    thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
                                                                   baq.matrix_index.begin(),
                                                                   baq.scaling_index.begin())),
-                     thrust::make_zip_iterator(thrust::make_tuple(context->active_read_list.end(),
+                     thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
                                                                   baq.matrix_index.end(),
                                                                   baq.scaling_index.end())),
                      hmm_glocal_forward(*context, reference.device, batch));
 
     // run the backward portion
-    thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(context->active_read_list.begin(),
+    thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
                                                                   baq.matrix_index.begin(),
                                                                   baq.scaling_index.begin())),
-                     thrust::make_zip_iterator(thrust::make_tuple(context->active_read_list.end(),
+                     thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
                                                                   baq.matrix_index.end(),
                                                                   baq.scaling_index.end())),
                      hmm_glocal_backward(*context, reference.device, batch));
 
     // use the computed state to map qualities
-    thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(context->active_read_list.begin(),
+    thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
                                                                   baq.matrix_index.begin(),
                                                                   baq.scaling_index.begin())),
-                     thrust::make_zip_iterator(thrust::make_tuple(context->active_read_list.end(),
+                     thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
                                                                   baq.matrix_index.end(),
                                                                   baq.scaling_index.end())),
                      hmm_glocal_map(*context, reference.device, batch));
+
+    // for any reads that we did *not* compute a BAQ, mark the base pairs as having no BAQ uncertainty
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     read_flat_baq(*context, batch));
+
+    context->stats.baq_reads += num_active;
 
 #if 0
     for(uint32 i = 0; i < context->active_read_list.size(); i++)
@@ -742,7 +810,7 @@ void debug_baq(bqsr_context *context, const reference_genome& genome, const BAM_
             reference_window.y - genome.sequence_offsets[batch.alignment_sequence_IDs[read_index]]);
 
     printf("    BAQ state                   = [ ");
-    for(uint32 i = 0; i < idx.read_len; i++)
+    for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
     {
         uint32 s = context->baq.state[i];
 
@@ -756,7 +824,7 @@ void debug_baq(bqsr_context *context, const reference_genome& genome, const BAM_
     printf(" ]\n");
 
     printf("    BAQ quals                   = [ ");
-    for(uint32 i = 0; i < idx.read_len; i++)
+    for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
     {
         uint8 q = context->baq.qualities[i];
         if (q == uint8(-1))

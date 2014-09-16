@@ -37,6 +37,7 @@ void bqsr_context::start_batch(BAM_alignment_batch_device& batch)
 
     stats.total_reads += batch.num_reads;
 }
+#if 0
 
 struct read_active_predicate
 {
@@ -60,3 +61,5 @@ void bqsr_context::compact_active_read_list(void)
 
     active_read_list.resize(num_active);
 }
+
+#endif

@@ -112,42 +112,6 @@ struct DeviceSNPDatabase
     }
 };
 
-/*
-struct DeviceSNPDatabaseView
-{
-    uint32 num_entries;
-
-    uint32 *variant_sequence_ref_ids;
-    uint32 *genome_positions;
-    uint32 *sequence_positions;
-    uint32 *reference_sequences;
-    uint32 *variants;
-    io::SNP_sequence_index *ref_variant_index;
-};
-
-static DeviceSNPDatabaseView plain_view(DeviceSNPDatabase& db)
-{
-    DeviceSNPDatabaseView v;
-
-    v.num_entries = db.sequence_positions.size();
-
-    v.variant_sequence_ref_ids = thrust::raw_pointer_cast(&db.variant_sequence_ref_ids[0]);
-    v.genome_positions = thrust::raw_pointer_cast(&db.genome_positions[0]);
-    v.sequence_positions = thrust::raw_pointer_cast(&db.sequence_positions[0]);
-    v.reference_sequences = thrust::raw_pointer_cast(&db.reference_sequences.m_storage[0]);
-    v.variants = thrust::raw_pointer_cast(&db.variants.m_storage[0]);
-    v.ref_variant_index = thrust::raw_pointer_cast(&db.ref_variant_index[0]);
-
-    return v;
-}
-
-static const DeviceSNPDatabaseView plain_view(const DeviceSNPDatabase& db)
-{
-    return plain_view((DeviceSNPDatabase&)db);
-}
-*/
-
-
 void build_read_offset_list(bqsr_context *context,
                             const BAM_alignment_batch_device& batch);
 

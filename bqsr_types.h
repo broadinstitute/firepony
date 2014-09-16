@@ -18,11 +18,10 @@
 
 #pragma once
 
-#include <nvbio/basic/types.h>
+#include <stdint.h>
+
 #include <nvbio/basic/vector.h>
 #include <nvbio/basic/packed_vector.h>
-
-using namespace nvbio;
 
 // help the eclipse error parser deal with CUDA keywords
 #ifdef __CDT_PARSER__
@@ -35,8 +34,18 @@ using namespace nvbio;
 #define __restrict__
 #endif
 
-//#define RUN_ON_CPU
+typedef uint64_t uint64;
+typedef int64_t int64;
+typedef uint32_t uint32;
+typedef int32_t int32;
+typedef uint16_t uint16;
+typedef int16_t int16;
+typedef uint8_t uint8;
+typedef int8_t int8;
 
+typedef nvbio::host_tag host_tag;
+
+//#define RUN_ON_CPU
 #ifdef RUN_ON_CPU
 #if THRUST_DEVICE_SYSTEM != THRUST_DEVICE_SYSTEM_OMP
 #error must build with -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP

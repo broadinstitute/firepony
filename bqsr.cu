@@ -38,8 +38,6 @@
 #include "covariates.h"
 #include "baq.h"
 
-using namespace nvbio;
-
 /*
 // sort batch by increasing alignment position
 void device_sort_batch(BAM_alignment_batch_device *batch)
@@ -79,7 +77,7 @@ int main(int argc, char **argv)
 
     SNPDatabase_refIDs db;
     printf("loading variant database %s...\n", vcf_name);
-    io::loadVCF(db, vcf_name);
+    nvbio::io::loadVCF(db, vcf_name);
     db.compute_sequence_offsets(reference);
 
     DeviceSNPDatabase dev_db;
@@ -195,7 +193,7 @@ void debug_read(bqsr_context *context, const alignment_batch& batch, int read_id
 
     uint32 read_index = context->active_read_list[read_id];
 
-    io::SequenceDataView view = plain_view(*(context->reference.h_ref));
+    nvbio::io::SequenceDataView view = nvbio::plain_view(*(context->reference.h_ref));
     H_PackedReference reference_stream(view.m_sequence_stream);
     const CRQ_index idx = h_batch.crq_index(read_index);
 

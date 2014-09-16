@@ -28,17 +28,15 @@
 #include "util.h"
 #include "alignment_data.h"
 
-using namespace nvbio;
-
 struct reference_genome_device
 {
-    io::SequenceDataDevice *d_ref;
+    nvbio::io::SequenceDataDevice *d_ref;
     D_VectorU32 sequence_offsets;
 
     reference_genome_device();
     ~reference_genome_device();
 
-    void load(io::SequenceData *h_ref, const H_VectorU32& ref_sequence_offsets);
+    void load(nvbio::io::SequenceData *h_ref, const H_VectorU32& ref_sequence_offsets);
     void transform_alignment_start_positions(alignment_batch_device *batch);
 
     struct const_view
@@ -50,8 +48,8 @@ struct reference_genome_device
     operator const_view() const
     {
         const_view v = {
-                plain_view(*d_ref),
-                plain_view(sequence_offsets)
+                nvbio::plain_view(*d_ref),
+                nvbio::plain_view(sequence_offsets)
         };
 
         return v;
@@ -60,7 +58,7 @@ struct reference_genome_device
 
 struct reference_genome
 {
-    io::SequenceData *h_ref;
+    nvbio::io::SequenceData *h_ref;
     // maps ref sequence name hash to ref sequence ID
     std::map<uint32, uint32> sequence_id_map;
     // maps ref sequence ID to ref sequence offset

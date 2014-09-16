@@ -44,8 +44,8 @@ struct snp_filter_context
     operator view()
     {
         view v = {
-            plain_view(active_read_ids),
-            plain_view(active_vcf_ranges)
+            nvbio::plain_view(active_read_ids),
+            nvbio::plain_view(active_vcf_ranges)
         };
         return v;
     }
@@ -78,7 +78,7 @@ struct DeviceSNPDatabase
     // packed variant sequences
     nvbio::PackedVector<target_system_tag, 4> variants;
     // an index for both references and variants
-    nvbio::vector<target_system_tag, io::SNP_sequence_index> ref_variant_index;
+    nvbio::vector<target_system_tag, nvbio::io::SNP_sequence_index> ref_variant_index;
 
     void load(const SNPDatabase_refIDs& ref);
 
@@ -90,7 +90,7 @@ struct DeviceSNPDatabase
         D_VectorU32_2::plain_view_type sequence_positions;
         D_VectorDNA16::plain_view_type reference_sequences;
         D_VectorDNA16::plain_view_type variants;
-        nvbio::vector<target_system_tag, io::SNP_sequence_index>::plain_view_type ref_variant_index;
+        nvbio::vector<target_system_tag, nvbio::io::SNP_sequence_index>::plain_view_type ref_variant_index;
     };
 
     struct const_view
@@ -101,19 +101,19 @@ struct DeviceSNPDatabase
         D_VectorU32_2::const_plain_view_type sequence_positions;
         D_VectorDNA16::const_plain_view_type reference_sequences;
         D_VectorDNA16::const_plain_view_type variants;
-        nvbio::vector<target_system_tag, io::SNP_sequence_index>::const_plain_view_type ref_variant_index;
+        nvbio::vector<target_system_tag, nvbio::io::SNP_sequence_index>::const_plain_view_type ref_variant_index;
     };
 
     operator view()
     {
         view v = {
-            plain_view(variant_sequence_ref_ids),
-            plain_view(genome_start_positions),
-            plain_view(genome_stop_positions),
-            plain_view(sequence_positions),
-            plain_view(reference_sequences),
-            plain_view(variants),
-            plain_view(ref_variant_index),
+            nvbio::plain_view(variant_sequence_ref_ids),
+            nvbio::plain_view(genome_start_positions),
+            nvbio::plain_view(genome_stop_positions),
+            nvbio::plain_view(sequence_positions),
+            nvbio::plain_view(reference_sequences),
+            nvbio::plain_view(variants),
+            nvbio::plain_view(ref_variant_index),
         };
 
         return v;
@@ -122,13 +122,13 @@ struct DeviceSNPDatabase
     operator const_view() const
     {
         const_view v = {
-            plain_view(variant_sequence_ref_ids),
-            plain_view(genome_start_positions),
-            plain_view(genome_stop_positions),
-            plain_view(sequence_positions),
-            plain_view(reference_sequences),
-            plain_view(variants),
-            plain_view(ref_variant_index),
+            nvbio::plain_view(variant_sequence_ref_ids),
+            nvbio::plain_view(genome_start_positions),
+            nvbio::plain_view(genome_stop_positions),
+            nvbio::plain_view(sequence_positions),
+            nvbio::plain_view(reference_sequences),
+            nvbio::plain_view(variants),
+            nvbio::plain_view(ref_variant_index),
         };
 
         return v;

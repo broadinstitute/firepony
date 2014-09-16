@@ -26,8 +26,6 @@
 #include "util.h"
 #include "reference.h"
 
-using namespace nvbio;
-
 reference_genome_device::reference_genome_device()
     : d_ref(NULL)
 {
@@ -42,9 +40,9 @@ reference_genome_device::~reference_genome_device()
     }
 }
 
-void reference_genome_device::load(io::SequenceData *h_ref, const H_VectorU32& ref_sequence_offsets)
+void reference_genome_device::load(nvbio::io::SequenceData *h_ref, const H_VectorU32& ref_sequence_offsets)
 {
-    d_ref = new io::SequenceDataDevice(*h_ref);
+    d_ref = new nvbio::io::SequenceDataDevice(*h_ref);
     this->sequence_offsets = ref_sequence_offsets;
 }
 
@@ -64,9 +62,9 @@ reference_genome::~reference_genome()
 
 bool reference_genome::load(const char *name)
 {
-    h_ref = io::map_sequence_file(name);
+    h_ref = nvbio::io::map_sequence_file(name);
     if (h_ref == NULL)
-        h_ref = io::load_sequence_file(DNA, name);
+        h_ref = nvbio::io::load_sequence_file(nvbio::Alphabet::DNA, name);
 
     if (!h_ref)
         return false;
@@ -83,7 +81,7 @@ void reference_genome::download(void)
 
 void reference_genome::generate_reference_sequence_map(void)
 {
-    io::SequenceDataView view = plain_view(*h_ref);
+    nvbio::io::SequenceDataView view = nvbio::plain_view(*h_ref);
     sequence_offsets.resize(view.m_n_seqs + 1);
 
     uint32 ref_seq_id = 0;

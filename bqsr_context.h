@@ -27,8 +27,6 @@
 #include "baq.h"
 #include "reference.h"
 
-using namespace nvbio;
-
 struct bqsr_statistics // host-only
 {
     uint32 total_reads;        // total number of reads processed

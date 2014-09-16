@@ -40,8 +40,6 @@
 #include "baq-cpu.h"
 #endif
 
-using namespace nvbio;
-
 #define MAX_PHRED_SCORE 93
 #define EM 0.33333333333
 #define EI 0.25

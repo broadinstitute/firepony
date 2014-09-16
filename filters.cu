@@ -329,10 +329,10 @@ struct filter_non_regular_bases : public bqsr_lambda
         for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
         {
             uint8 bp = batch.reads[i];
-            if (bp != AlphabetTraits<DNA_IUPAC>::A &&
-                bp != AlphabetTraits<DNA_IUPAC>::C &&
-                bp != AlphabetTraits<DNA_IUPAC>::G &&
-                bp != AlphabetTraits<DNA_IUPAC>::T)
+            if (bp != nvbio::AlphabetTraits<nvbio::Alphabet::DNA_IUPAC>::A &&
+                bp != nvbio::AlphabetTraits<nvbio::Alphabet::DNA_IUPAC>::C &&
+                bp != nvbio::AlphabetTraits<nvbio::Alphabet::DNA_IUPAC>::G &&
+                bp != nvbio::AlphabetTraits<nvbio::Alphabet::DNA_IUPAC>::T)
             {
                 ctx.active_location_list[i] = 0;
             }

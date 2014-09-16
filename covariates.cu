@@ -359,7 +359,7 @@ void gather_covariates(bqsr_context *context, const alignment_batch& batch)
     // on the other hand, a large reads_per_thread value will cause divergence due to occasional flushes of the local storage into the mempool
     // the ideal value would cause each thread to run for as long as possible without flushing until the very end
     const uint32 reads_per_thread = 32;
-    const uint32 num_blocks = util::divide_ri(read_lists.source().size(), threads_per_block * reads_per_thread);
+    const uint32 num_blocks = nvbio::util::divide_ri(read_lists.source().size(), threads_per_block * reads_per_thread);
 
     do {
         cv.mempool.clear();

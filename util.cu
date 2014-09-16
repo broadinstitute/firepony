@@ -19,8 +19,6 @@
 #include "bqsr_types.h"
 #include "util.h"
 
-using namespace nvbio;
-
 uint32 bqsr_string_hash(const char* s)
 {
     uint32 h = 0;
@@ -74,7 +72,7 @@ struct pack_uint8_to_1bit_vector
 template<typename D_PackedVector_Dest>
 static void pack_prepare_storage(D_VectorU8& src, uint32 num_elements)
 {
-    src.resize(util::divide_ri(num_elements, D_PackedVector_Dest::SYMBOLS_PER_WORD) * D_PackedVector_Dest::SYMBOLS_PER_WORD);
+    src.resize(nvbio::util::divide_ri(num_elements, D_PackedVector_Dest::SYMBOLS_PER_WORD) * D_PackedVector_Dest::SYMBOLS_PER_WORD);
 }
 
 // prepare temp_storage to store num_elements to be packed into a 1-bit vector
@@ -93,14 +91,14 @@ void pack_to_2bit(D_PackedVector_2b& dest, D_VectorU8& src)
 {
     dest.resize(src.size());
     thrust::for_each(thrust::make_counting_iterator(0),
-                     thrust::make_counting_iterator(0) + util::divide_ri(src.size(), D_PackedVector_2b::SYMBOLS_PER_WORD),
-                     pack_uint8_to_2bit_vector(plain_view(dest), plain_view(src)));
+                     thrust::make_counting_iterator(0) + nvbio::util::divide_ri(src.size(), D_PackedVector_2b::SYMBOLS_PER_WORD),
+                     pack_uint8_to_2bit_vector(nvbio::plain_view(dest), nvbio::plain_view(src)));
 }
 
 void pack_to_1bit(D_PackedVector_1b& dest, D_VectorU8& src)
 {
     dest.resize(src.size());
     thrust::for_each(thrust::make_counting_iterator(0),
-                     thrust::make_counting_iterator(0) + util::divide_ri(src.size(), D_PackedVector_1b::SYMBOLS_PER_WORD),
-                     pack_uint8_to_1bit_vector(plain_view(dest), plain_view(src)));
+                     thrust::make_counting_iterator(0) + nvbio::util::divide_ri(src.size(), D_PackedVector_1b::SYMBOLS_PER_WORD),
+                     pack_uint8_to_1bit_vector(nvbio::plain_view(dest), nvbio::plain_view(src)));
 }

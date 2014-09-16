@@ -22,8 +22,6 @@
 #include "alignment_data.h"
 #include "reference.h"
 
-using namespace nvbio;
-
 struct cigar_event
 {
     // note that this is stored in a packed 2-bit vector

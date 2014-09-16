@@ -224,7 +224,7 @@ void debug_read(bqsr_context *context, const alignment_batch& batch, int read_id
 
     const uint2 alignment_window = context->alignment_windows[read_index];
     printf("  sequence name [%s]\n  sequence base [%lu]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
-            context->reference.host.sequence_names.lookup(h_batch.chromosome[read_index]).c_str(),
+            context->reference.sequence_names.lookup(h_batch.chromosome[read_index]).c_str(),
             context->reference.host.sequence_bp_start[h_batch.chromosome[read_index]],
             h_batch.alignment_start[read_index],
             alignment_window.x,

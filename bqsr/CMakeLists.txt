@@ -20,6 +20,7 @@ gamgee_loader.h
 mmap.h
 mmap.cu
 sequence_data.h
+sequence_data.cu
 serialization.h
 serialization_inl.h
 string_database.h

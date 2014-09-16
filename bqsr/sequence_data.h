@@ -20,6 +20,8 @@
 
 #include "bqsr_types.h"
 #include "string_database.h"
+#include "mmap.h"
+#include "serialization.h"
 
 #include "primitives/cuda.h"
 
@@ -54,24 +56,24 @@ struct sequence_data_storage
     CUDA_HOST sequence_data_storage()
         : num_sequences(0)
     { }
-};
 
-struct sequence_data_device : public sequence_data_storage<target_system_tag>
-{
     struct const_view
     {
-        D_VectorDNA16::const_view bases;
-        D_VectorU8::const_view qualities;
-        D_VectorU32::const_view sequence_id;
-        D_VectorU64::const_view sequence_bp_start;
-        D_VectorU64::const_view sequence_bp_len;
-        D_VectorU64::const_view sequence_qual_start;
-        D_VectorU64::const_view sequence_qual_len;
+        uint32 num_sequences;
+
+        typename PackedVector<4>::const_view bases;
+        typename Vector<uint8>::const_view qualities;
+        typename Vector<uint32>::const_view sequence_id;
+        typename Vector<uint64>::const_view sequence_bp_start;
+        typename Vector<uint64>::const_view sequence_bp_len;
+        typename Vector<uint64>::const_view sequence_qual_start;
+        typename Vector<uint64>::const_view sequence_qual_len;
     };
 
     operator const_view() const
     {
         const_view v = {
+                num_sequences,
                 bases,
                 qualities,
                 sequence_id,
@@ -85,49 +87,27 @@ struct sequence_data_device : public sequence_data_storage<target_system_tag>
     }
 };
 
-struct sequence_data_host : public sequence_data_storage<host_tag>
-{
-    string_database sequence_names;
-};
+typedef sequence_data_storage<host_tag> sequence_data_host;
+typedef sequence_data_storage<target_system_tag> sequence_data_device;
 
 struct sequence_data
 {
     uint32 data_mask;
+    string_database sequence_names;
 
-    sequence_data_host host;
+    // the const_view that wraps all sequence data
+    // this will be populated either from malloc-backed storage or from a memory-mapped file
+    sequence_data_host::const_view host;
+
+    // the containers that store the actual data
+    // only one of these is used
+    sequence_data_host host_malloc_container;
+    shared_memory_file host_mmap_container;
+
     sequence_data_device device;
 
-    void download(void)
-    {
-        uint64 num_bytes = 0;
-
-        device.num_sequences = host.num_sequences;
-
-        if (data_mask & SequenceDataMask::BASES)
-        {
-            device.bases = host.bases;
-            device.sequence_bp_start = host.sequence_bp_start;
-            device.sequence_bp_len = host.sequence_bp_len;
-
-            num_bytes += host.bases.size() / 2 + host.sequence_bp_start.size() * 8 + host.sequence_bp_len.size() * 8;
-        }
-
-        if (data_mask & SequenceDataMask::QUALITIES)
-        {
-            device.qualities = host.qualities;
-            device.sequence_qual_start = host.sequence_qual_start;
-            device.sequence_qual_len = host.sequence_qual_len;
-
-            num_bytes += host.qualities.size() + host.sequence_qual_start.size() * 8 + host.sequence_qual_len.size() * 8;
-        }
-
-        if (data_mask & SequenceDataMask::NAMES)
-        {
-            device.sequence_id = host.sequence_id;
-
-            num_bytes += host.sequence_id.size() * 4;
-        }
-
-        printf("downloaded %lu MB of sequence data\n", num_bytes / (1024 * 1024));
-    }
+    size_t serialized_size(void);
+    void *serialize(void *out);
+    void unserialize(shared_memory_file& shm);
+    void download(void);
 };

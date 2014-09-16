@@ -31,6 +31,8 @@
 #include "alignment_data.h"
 #include "sequence_data.h"
 #include "variant_data.h"
+#include "mmap.h"
+#include "serialization.h"
 
 #include "from_nvbio/dna.h"
 
@@ -247,9 +249,24 @@ struct iupac16 : public thrust::unary_function<char, uint8>
 };
 
 // loader for sequence data
-bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 data_mask)
+bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 data_mask, bool try_mmap)
 {
-    sequence_data_host& h = output->host;
+    if (try_mmap)
+    {
+        shared_memory_file shmem;
+        bool ret;
+
+        ret = shared_memory_file::open(&shmem, filename);
+        if (ret == true)
+        {
+            printf("loading %s from shared memory region (%lu MB)...\n", filename, shmem.size / (1024 * 1024));
+            output->unserialize(shmem);
+
+            return true;
+        }
+    }
+
+    sequence_data_host& h = output->host_malloc_container;
     output->data_mask = data_mask;
 
     printf("loading %s...\n", filename);
@@ -285,11 +302,12 @@ bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 d
 
         if (data_mask & SequenceDataMask::NAMES)
         {
-            uint32 seq_id = h.sequence_names.insert(record.name());
+            uint32 seq_id = output->sequence_names.insert(record.name());
             h.sequence_id.push_back(seq_id);
         }
     }
 
+    output->host = output->host_malloc_container;
     return true;
 }
 

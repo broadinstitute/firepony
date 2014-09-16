@@ -32,7 +32,7 @@ void SNPDatabase_refIDs::compute_sequence_offsets(const sequence_data& genome)
 
     for(unsigned int c = 0; c < reference_sequence_names.size(); c++)
     {
-        uint32 id = genome.host.sequence_names.lookup(reference_sequence_names[c]);
+        uint32 id = genome.sequence_names.lookup(reference_sequence_names[c]);
         assert(id != uint32(-1));
 
         variant_sequence_ref_ids[c] = id;
@@ -180,7 +180,6 @@ void build_alignment_windows(bqsr_context *ctx, const alignment_batch& batch)
 
 struct compute_vcf_ranges : public bqsr_lambda
 {
-
     compute_vcf_ranges(bqsr_context::view ctx,
                        const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)

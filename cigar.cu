@@ -423,7 +423,7 @@ void expand_cigars(bqsr_context *context, const BAM_alignment_batch& batch)
 
     // make sure we have enough room for the expanded cigars
     // note: temporary storage must be padded to a multiple of the word size, since we'll pack whole words at a time
-    context->temp_storage.resize(util::divide_ri(expanded_cigar_len, D_PackedVector_2b::SYMBOLS_PER_WORD) * D_PackedVector_2b::SYMBOLS_PER_WORD);
+    pack_prepare_storage_2bit(context->temp_storage, expanded_cigar_len);
     ctx.cigar_events.resize(expanded_cigar_len);
 
     ctx.cigar_event_reference_coordinates.resize(expanded_cigar_len);
@@ -446,10 +446,7 @@ void expand_cigars(bqsr_context *context, const BAM_alignment_batch& batch)
                      cigar_op_expand(*context, batch.device));
 
     // pack the cigar into a 2-bit vector
-    // the index here is a 32-bit word index to be filled by each thread
-    thrust::for_each(thrust::make_counting_iterator(0),
-                     thrust::make_counting_iterator(0) + util::divide_ri(expanded_cigar_len, ctx.cigar_events.SYMBOLS_PER_WORD),
-                     cigar_op_compact(*context, batch));
+    pack_to_2bit(ctx.cigar_events, context->temp_storage);
 
 #ifdef CUDA_DEBUG
     thrust::for_each(context->active_read_list.begin(),

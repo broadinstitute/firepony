@@ -165,7 +165,7 @@ struct BAM_CRQ_index
     { }
 };
 
-typedef nvbio::vector<device_tag, BAM_CRQ_index> D_VectorCRQIndex;
+typedef nvbio::vector<target_system_tag, BAM_CRQ_index> D_VectorCRQIndex;
 typedef nvbio::vector<host_tag, BAM_CRQ_index> H_VectorCRQIndex;
 
 template <typename system_tag>
@@ -250,7 +250,7 @@ struct BAM_alignment_batch_host : public BAM_alignment_batch_storage<host_tag>
 };
 
 // device version of alignment data
-struct BAM_alignment_batch_device : public BAM_alignment_batch_storage<device_tag>
+struct BAM_alignment_batch_device : public BAM_alignment_batch_storage<target_system_tag>
 {
     void load(BAM_alignment_batch_host& batch)
     {

@@ -24,42 +24,53 @@
 
 using namespace nvbio;
 
+//#define RUN_ON_CPU
+
+#ifdef RUN_ON_CPU
+#if THRUST_DEVICE_SYSTEM != THRUST_DEVICE_SYSTEM_OMP
+#error must build with -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP
+#endif
+typedef nvbio::host_tag target_system_tag;
+#else
+typedef nvbio::device_tag target_system_tag;
+#endif
+
 struct bqsr_context;
 
-typedef nvbio::vector<device_tag, uint8> D_VectorU8;
+typedef nvbio::vector<target_system_tag, uint8> D_VectorU8;
 typedef nvbio::vector<host_tag, uint8> H_VectorU8;
-typedef nvbio::vector<device_tag, uint16> D_VectorU16;
+typedef nvbio::vector<target_system_tag, uint16> D_VectorU16;
 typedef nvbio::vector<host_tag, uint16> H_VectorU16;
-typedef nvbio::vector<device_tag, uint32> D_VectorU32;
+typedef nvbio::vector<target_system_tag, uint32> D_VectorU32;
 typedef nvbio::vector<host_tag, uint32> H_VectorU32;
-typedef nvbio::vector<device_tag, uint64> D_VectorU64;
+typedef nvbio::vector<target_system_tag, uint64> D_VectorU64;
 typedef nvbio::vector<host_tag, uint64> H_VectorU64;
 
-typedef nvbio::vector<device_tag, int32> D_VectorI32;
+typedef nvbio::vector<target_system_tag, int32> D_VectorI32;
 typedef nvbio::vector<host_tag, int32> H_VectorI32;
 
-typedef nvbio::vector<device_tag, double> D_VectorF64;
+typedef nvbio::vector<target_system_tag, double> D_VectorF64;
 typedef nvbio::vector<host_tag, double> H_VectorF64;
 
 //template <typename system_tag> using Vector_DNA16 = nvbio::PackedVector<system_tag, 4>;
 typedef nvbio::PackedVector<host_tag, 4> H_VectorDNA16;
-typedef nvbio::PackedVector<device_tag, 4> D_VectorDNA16;
+typedef nvbio::PackedVector<target_system_tag, 4> D_VectorDNA16;
 typedef H_VectorDNA16::const_stream_type H_StreamDNA16;
 typedef D_VectorDNA16::const_stream_type D_StreamDNA16;
 
 typedef nvbio::PackedVector<host_tag, 1> H_PackedVector_1b;
-typedef nvbio::PackedVector<device_tag, 1> D_PackedVector_1b;
+typedef nvbio::PackedVector<target_system_tag, 1> D_PackedVector_1b;
 
 typedef nvbio::PackedVector<host_tag, 2> H_PackedVector_2b;
-typedef nvbio::PackedVector<device_tag, 2> D_PackedVector_2b;
+typedef nvbio::PackedVector<target_system_tag, 2> D_PackedVector_2b;
 
 // this is evil: endianess between reference data and sequence data doesn't seem to match...
 typedef nvbio::PackedVector<host_tag, 2, true>::const_stream_type H_PackedReference;
-typedef nvbio::PackedVector<device_tag, 2, true>::const_stream_type D_PackedReference;
+typedef nvbio::PackedVector<target_system_tag, 2, true>::const_stream_type D_PackedReference;
 
-typedef nvbio::vector<device_tag, uint2> D_VectorU32_2;
+typedef nvbio::vector<target_system_tag, uint2> D_VectorU32_2;
 typedef nvbio::vector<host_tag, uint2> H_VectorU32_2;
-typedef nvbio::vector<device_tag, ushort2> D_VectorU16_2;
+typedef nvbio::vector<target_system_tag, ushort2> D_VectorU16_2;
 typedef nvbio::vector<host_tag, ushort2> H_VectorU16_2;
 
 // we only use 1 bit per entry on the active location list
@@ -102,5 +113,5 @@ struct cigar_op
     }
 };
 
-typedef nvbio::vector<device_tag, cigar_op> D_VectorCigarOp;
+typedef nvbio::vector<target_system_tag, cigar_op> D_VectorCigarOp;
 typedef nvbio::vector<host_tag, cigar_op> H_VectorCigarOp;

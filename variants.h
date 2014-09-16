@@ -74,11 +74,11 @@ struct DeviceSNPDatabase
     D_VectorU32_2 sequence_positions;
 
     // packed reference sequences
-    nvbio::PackedVector<device_tag, 4> reference_sequences;
+    nvbio::PackedVector<target_system_tag, 4> reference_sequences;
     // packed variant sequences
-    nvbio::PackedVector<device_tag, 4> variants;
+    nvbio::PackedVector<target_system_tag, 4> variants;
     // an index for both references and variants
-    nvbio::vector<device_tag, io::SNP_sequence_index> ref_variant_index;
+    nvbio::vector<target_system_tag, io::SNP_sequence_index> ref_variant_index;
 
     void load(const SNPDatabase_refIDs& ref);
 
@@ -90,7 +90,7 @@ struct DeviceSNPDatabase
         D_VectorU32_2::plain_view_type sequence_positions;
         D_VectorDNA16::plain_view_type reference_sequences;
         D_VectorDNA16::plain_view_type variants;
-        nvbio::vector<device_tag, io::SNP_sequence_index>::plain_view_type ref_variant_index;
+        nvbio::vector<target_system_tag, io::SNP_sequence_index>::plain_view_type ref_variant_index;
     };
 
     struct const_view
@@ -101,7 +101,7 @@ struct DeviceSNPDatabase
         D_VectorU32_2::const_plain_view_type sequence_positions;
         D_VectorDNA16::const_plain_view_type reference_sequences;
         D_VectorDNA16::const_plain_view_type variants;
-        nvbio::vector<device_tag, io::SNP_sequence_index>::const_plain_view_type ref_variant_index;
+        nvbio::vector<target_system_tag, io::SNP_sequence_index>::const_plain_view_type ref_variant_index;
     };
 
     operator view()

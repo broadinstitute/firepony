@@ -47,6 +47,7 @@ struct BAM_header
     // xxxnsubtil: ugly hack, fix!
     D_VectorI32 d_sq_lengths;
 
+    std::vector<std::string> read_group_names;
     // key is a hash of the read group name, value is a sequential ID for the read group
     std::map<uint32, uint32> rg_name_to_id;
     // number of read groups in the map

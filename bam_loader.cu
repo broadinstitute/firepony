@@ -181,6 +181,7 @@ bool BAMfile::init(void)
                 char tmp = *id_end;
                 *id_end = '\0';
 
+                header.read_group_names.push_back(std::string(id));
                 // store the hash and a sequential ID in the map
                 header.rg_name_to_id[bqsr_string_hash(id)] = header.n_read_groups;
                 header.n_read_groups++;

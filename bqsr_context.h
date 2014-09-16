@@ -61,13 +61,18 @@ struct bqsr_context
 
     // temporary storage for CUB calls
     D_VectorU8 temp_storage;
-    // temporary storage for compacting U32 vectors
+
+    // and more temporary storage
     D_VectorU32 temp_u32;
+    D_VectorU32 temp_u32_2;
+    D_VectorU32 temp_u32_3;
+    D_VectorU32 temp_u32_4;
 
     // various pipeline states go here
     snp_filter_context snp_filter;
     cigar_context cigar;
     baq_context baq;
+    covariates_context covariates;
 
     // --- everything below this line is host-only and not available on the device
     bqsr_statistics stats;
@@ -92,9 +97,13 @@ struct bqsr_context
         D_VectorU16::plain_view_type            read_offset_list;
         D_VectorU8::plain_view_type             temp_storage;
         D_VectorU32::plain_view_type            temp_u32;
+        D_VectorU32::plain_view_type            temp_u32_2;
+        D_VectorU32::plain_view_type            temp_u32_3;
+        D_VectorU32::plain_view_type            temp_u32_4;
         snp_filter_context::view                snp_filter;
         cigar_context::view                     cigar;
         baq_context::view                       baq;
+        covariates_context::view                covariates;
     };
 
     operator view()
@@ -110,9 +119,13 @@ struct bqsr_context
             plain_view(read_offset_list),
             plain_view(temp_storage),
             plain_view(temp_u32),
+            plain_view(temp_u32_2),
+            plain_view(temp_u32_3),
+            plain_view(temp_u32_4),
             snp_filter,
             cigar,
             baq,
+            covariates,
         };
 
         return v;

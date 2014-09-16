@@ -14,6 +14,9 @@ bqsr_types.h
 cigar.h
 cigar.cu
 covariates.h
+covariates_bit_packing.h
+covariates_table.h
+covariates_table.cu
 covariates.cu
 filters.h
 filters.cu

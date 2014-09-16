@@ -19,12 +19,30 @@
 #pragma once
 
 #include "bqsr_types.h"
+#include "covariates_table.h"
 
-struct bqsr_table_entry
+struct covariates_context
 {
-    uint64 key;
-    uint32 count_matches;
-    uint32 count_mismatches;
+    D_CovariatePool mempool;
+
+    D_CovariateTable recal_table_1;
+
+    struct view
+    {
+        D_CovariatePool::view mempool;
+        D_CovariateTable::view recal_table_1;
+    };
+
+    operator view()
+    {
+        view v = {
+            mempool,
+            recal_table_1,
+        };
+
+        return v;
+    }
 };
 
-void gather_covariates(bqsr_context *context, const BAM_alignment_batch_device& batch);
+void gather_covariates(bqsr_context *context, const BAM_alignment_batch& batch);
+void output_covariates(bqsr_context *context);

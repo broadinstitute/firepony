@@ -163,6 +163,8 @@ int main(int argc, char **argv)
         break;
     }
 
+    output_covariates(&context);
+
     printf("%d reads filtered out of %d (%f%%)\n",
             context.stats.filtered_reads,
             context.stats.total_reads,

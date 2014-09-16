@@ -27,6 +27,13 @@ gamgee_file::gamgee_file(const char *fname)
     : file(std::string(fname))
 {
     gamgee_header = file.header();
+
+    for(uint32 i = 0; i < gamgee_header.n_sequences(); i++)
+    {
+        header.chromosome_lengths.push_back(gamgee_header.sequence_length(i));
+    }
+    header.d_chromosome_lengths = header.chromosome_lengths;
+
     iterator = file.begin();
 }
 
@@ -114,12 +121,12 @@ bool gamgee_file::next_batch(alignment_batch *batch, uint32 data_mask, const uin
 
         if (data_mask & ALIGNMENT_START)
         {
-            h_batch->alignment_start.push_back(record.alignment_start());
+            h_batch->alignment_start.push_back(record.alignment_start() - 1);
         }
 
         if (data_mask & ALIGNMENT_STOP)
         {
-            h_batch->alignment_stop.push_back(record.alignment_stop());
+            h_batch->alignment_stop.push_back(record.alignment_stop() - 1);
         }
 
         if (data_mask & MATE_CHROMOSOME)
@@ -129,14 +136,14 @@ bool gamgee_file::next_batch(alignment_batch *batch, uint32 data_mask, const uin
 
         if (data_mask & MATE_ALIGNMENT_START)
         {
-            h_batch->mate_alignment_start.push_back(record.mate_alignment_start());
+            h_batch->mate_alignment_start.push_back(record.mate_alignment_start() - 1);
         }
 
         if (data_mask & CIGAR)
         {
             gamgee::Cigar cigar = record.cigar();
 
-            h_batch->cigar_start.push_back(h_batch->cigar.size());
+            h_batch->cigar_start.push_back(h_batch->cigars.size());
             h_batch->cigar_len.push_back(cigar.size());
 
             for(uint32 i = 0; i < cigar.size(); i++)
@@ -146,7 +153,7 @@ bool gamgee_file::next_batch(alignment_batch *batch, uint32 data_mask, const uin
                 op.op = gamgee_to_bqsr_cigar_op(cigar[i]);
                 op.len = gamgee::Cigar::cigar_oplen(cigar[i]);
 
-                h_batch->cigar.push_back(op);
+                h_batch->cigars.push_back(op);
             }
         }
 
@@ -189,7 +196,7 @@ bool gamgee_file::next_batch(alignment_batch *batch, uint32 data_mask, const uin
 
         if (data_mask & MAPQ)
         {
-            h_batch->mapq.push_back(record.mapq());
+            h_batch->mapq.push_back(record.mapping_qual());
         }
 
         if (data_mask & READ_GROUP)

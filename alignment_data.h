@@ -29,11 +29,28 @@
 // xxxnsubtil: a better name might be in order
 struct alignment_header
 {
+    // the length of each chromosome in the reference
+    // xxxnsubtil: this is an ugly hack
+    H_Vector<uint32> chromosome_lengths;
+    D_Vector<uint32> d_chromosome_lengths;
+
     std::vector<std::string> read_group_names;
     // key is a hash of the read group name, value is a sequential ID for the read group
     std::map<uint32, uint32> rg_name_to_id;
-    // number of read groups in the map
-    uint32 n_read_groups;
+
+    struct const_view
+    {
+        nvbio::vector<target_system_tag, uint32>::const_plain_view_type chromosome_lengths;
+    };
+
+    operator const_view() const
+    {
+        const_view v = {
+                plain_view(d_chromosome_lengths),
+        };
+
+        return v;
+    }
 };
 
 enum AlignmentFlags
@@ -80,6 +97,25 @@ enum BatchDataMask
 
     // list of tags that we require
     READ_GROUP           = 0x800,
+};
+
+// CRQ: cigars, reads, qualities
+struct CRQ_index
+{
+    const uint32& cigar_start, cigar_len;
+    const uint32& read_start, read_len;
+    const uint32& qual_start, qual_len;
+
+    NVBIO_HOST_DEVICE CRQ_index(const uint32& cigar_start, const uint32& cigar_len,
+                                const uint32& read_start, const uint32& read_len,
+                                const uint32& qual_start, const uint32& qual_len)
+        : cigar_start(cigar_start),
+          cigar_len(cigar_len),
+          read_start(read_start),
+          read_len(read_len),
+          qual_start(qual_start),
+          qual_len(qual_len)
+    { }
 };
 
 template <typename system_tag>
@@ -129,9 +165,80 @@ struct alignment_batch_storage
 
     // prevent storage creation on the device
     NVBIO_HOST alignment_batch_storage() { }
+
+    NVBIO_HOST_DEVICE const CRQ_index crq_index(uint32 read_id) const
+    {
+        return CRQ_index(cigar_start[read_id],
+                         cigar_len[read_id],
+                         read_start[read_id],
+                         read_len[read_id],
+                         qual_start[read_id],
+                         qual_len[read_id]);
+    }
 };
 
-typedef alignment_batch_storage<target_system_tag> alignment_batch_device;
+struct alignment_batch_device : public alignment_batch_storage<target_system_tag>
+{
+    struct const_view
+    {
+        uint32 num_reads;
+
+        D_Vector<uint32>::const_plain_view_type chromosome;
+        D_Vector<uint32>::const_plain_view_type alignment_start;
+        D_Vector<uint32>::const_plain_view_type alignment_stop;
+        D_Vector<uint32>::const_plain_view_type mate_chromosome;
+        D_Vector<uint32>::const_plain_view_type mate_alignment_start;
+        D_Vector<cigar_op>::const_plain_view_type cigars;
+        D_Vector<uint32>::const_plain_view_type cigar_start;
+        D_Vector<uint32>::const_plain_view_type cigar_len;
+        D_PackedVector<4>::const_plain_view_type reads;
+        D_Vector<uint32>::const_plain_view_type read_start;
+        D_Vector<uint32>::const_plain_view_type read_len;
+        D_Vector<uint8>::const_plain_view_type qualities;
+        D_Vector<uint32>::const_plain_view_type qual_start;
+        D_Vector<uint32>::const_plain_view_type qual_len;
+        D_Vector<uint16>::const_plain_view_type flags;
+        D_Vector<uint8>::const_plain_view_type mapq;
+        D_Vector<uint32>::const_plain_view_type read_group;
+
+        NVBIO_HOST_DEVICE const CRQ_index crq_index(uint32 read_id) const
+        {
+            return CRQ_index(cigar_start[read_id],
+                             cigar_len[read_id],
+                             read_start[read_id],
+                             read_len[read_id],
+                             qual_start[read_id],
+                             qual_len[read_id]);
+        }
+    };
+
+    operator const_view() const
+    {
+        const_view v = {
+                num_reads,
+
+                plain_view(chromosome),
+                plain_view(alignment_start),
+                plain_view(alignment_stop),
+                plain_view(mate_chromosome),
+                plain_view(mate_alignment_start),
+                plain_view(cigars),
+                plain_view(cigar_start),
+                plain_view(cigar_len),
+                plain_view(reads),
+                plain_view(read_start),
+                plain_view(read_len),
+                plain_view(qualities),
+                plain_view(qual_start),
+                plain_view(qual_len),
+                plain_view(flags),
+                plain_view(mapq),
+                plain_view(read_group),
+        };
+
+        return v;
+    }
+};
 
 struct alignment_batch_host : public alignment_batch_storage<host_tag>
 {
@@ -149,7 +256,7 @@ struct alignment_batch_host : public alignment_batch_storage<host_tag>
         mate_chromosome.clear();
         mate_alignment_start.clear();
 
-        cigar.clear();
+        cigars.clear();
         cigar_start.clear();
         cigar_len.clear();
 
@@ -198,7 +305,7 @@ struct alignment_batch_host : public alignment_batch_storage<host_tag>
 
         if (data_mask & CIGAR)
         {
-            cigar.reserve(batch_size * 32);
+            cigars.reserve(batch_size * 32);
             cigar_start.reserve(batch_size);
             cigar_len.reserve(batch_size);
         }
@@ -288,11 +395,11 @@ struct alignment_batch
 
         if (data_mask & CIGAR)
         {
-            device.cigar = host.cigar;
+            device.cigars = host.cigars;
             device.cigar_start = host.cigar_start;
             device.cigar_len = host.cigar_len;
         } else {
-            device.cigar.clear();
+            device.cigars.clear();
             device.cigar_start.clear();
             device.cigar_len.clear();
         }

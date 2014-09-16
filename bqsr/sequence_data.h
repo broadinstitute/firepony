@@ -69,7 +69,7 @@ struct sequence_data_storage
         typename Vector<uint64>::const_view sequence_qual_len;
     };
 
-    operator const_view() const
+    CUDA_HOST operator const_view() const
     {
         const_view v = {
                 num_sequences,

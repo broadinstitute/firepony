@@ -86,6 +86,41 @@ bool BAMfile::readData(void *output, unsigned int len, int line)
     }
 }
 
+// note: tag must include the ':'
+// start_ptr points to the start of the string to parse
+// end_ptr points at the end of the string
+// len contains the length of the string
+char *BAMfile::parse_header_tag(uint32 *len, const char *tag, char *start_ptr, char *end_ptr)
+{
+    char *tag_id = strstr(start_ptr, tag);
+    if (tag_id == NULL)
+    {
+        // tag not found
+        return NULL;
+    }
+
+    tag_id += 3;
+
+    // ID:string is followed either by
+    // - other tags (separated by spaces or tabs)
+    // - a line break
+    // - the end of the header string
+
+    // search for the tab first
+    char *id_end = strchr(tag_id, '\t');
+
+    if (id_end == NULL)
+        // not found? try a space
+        id_end = strchr(tag_id, ' ');
+
+    if (id_end == NULL)
+        // not found? try the line break
+        id_end = end_ptr;
+
+    *len = id_end - tag_id;
+    return tag_id;
+}
+
 bool BAMfile::init(void)
 {
     int c;
@@ -127,45 +162,31 @@ bool BAMfile::init(void)
 
         if (start_ptr[0] == 'R' && start_ptr[1] == 'G')
         {
-            // parse this RG looking for the ID: tag
-            char *id = strstr(start_ptr, "ID:");
+            char *id;
+            uint32 len;
+
+            // search for the platform unit first; if found, use that as the read group
+            id = parse_header_tag(&len, "PU:", start_ptr, end_ptr);
+            if (!id)
+            {
+                // no PU tag, search for ID
+                id = parse_header_tag(&len, "ID:", start_ptr, end_ptr);
+            }
+
             if (id)
             {
-                id += 3;
+                char *id_end = id + len;
 
-                char tmp;
-
-                // ID:string is followed either by
-                // - other tags (separated by spaces or tabs)
-                // - a line break
-                // - the end of the header string
-
-                // search for the tab first
-                char *id_end = strchr(id, '\t');
-
-                if (id_end == NULL)
-                    // not found? try a space
-                    id_end = strchr(id, ' ');
-
-                if (id_end == NULL)
-                    // not found? try the line break
-                    id_end = end_ptr;
-
-                // if we didn't find any delimiters, then id must run until the end of the string
-
-                if (id_end != NULL)
-                {
-                    // if we did find a space or line break, store it and null out the corresponding byte
-                    tmp = *id_end;
-                    *id_end = '\0';
-                }
+                // null out the end of the string
+                char tmp = *id_end;
+                *id_end = '\0';
 
                 // store the hash and an ID in the map
                 header.rg_name_to_id[bqsr_string_hash(id)] = read_group_id;
                 read_group_id++;
 
-                if (id_end != NULL)
-                    *id_end = tmp;
+                // restore the nulled-out character
+                *id_end = tmp;
             }
         }
 
@@ -304,6 +325,9 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
         batch->qualities.resize(crq_index.read_start + align.l_seq);
         readData(&batch->qualities[crq_index.read_start], align.l_seq, __LINE__);
 
+        // store the flags for each
+        batch->flags.push_back(align.flags());
+
         // compute auxiliary data size
         const uint32 aux_len = align.block_size - (gztell(fp) - read_block_start);
 
@@ -320,7 +344,7 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
         char *aux_ptr = &batch->aux_data[aux_start];
         while(aux_ptr < &batch->aux_data[aux_start + aux_len])
         {
-            BAM_tag *tag = (BAM_tag *) aux_ptr;
+            BAM_alignment_tag *tag = (BAM_alignment_tag *) aux_ptr;
             aux_ptr += 3;
 
             // compute tag length

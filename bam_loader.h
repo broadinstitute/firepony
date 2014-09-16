@@ -91,7 +91,7 @@ struct BAM_alignment_header
     }
 };
 
-struct BAM_tag
+struct BAM_alignment_tag
 {
     char tag[2];
     char val_type;
@@ -182,6 +182,7 @@ struct BAM_alignment_batch_storage
     nvbio::vector<system_tag, BAM_cigar_op> cigars;
     nvbio::PackedVector<system_tag, 4> reads; //VectorDNA16<system_tag> reads;
     nvbio::vector<system_tag, uint8> qualities;
+    nvbio::vector<system_tag, uint16> flags;
     nvbio::vector<system_tag, uint32> read_groups;
     nvbio::vector<system_tag, uint32> alignment_positions; // relative to the sequence!
     nvbio::vector<system_tag, uint32> alignment_sequence_IDs;
@@ -218,6 +219,7 @@ struct BAM_alignment_batch_host : public BAM_alignment_batch_storage<host_tag>
         cigars.clear();
         reads.clear();
         qualities.clear();
+        flags.clear();
         alignment_positions.clear();
         alignment_sequence_IDs.clear();
 
@@ -238,6 +240,7 @@ struct BAM_alignment_batch_host : public BAM_alignment_batch_storage<host_tag>
             cigars.reserve(batch_size * 32);
             reads.reserve(batch_size * 350);
             qualities.reserve(batch_size * 350);
+            flags.reserve(batch_size);
             alignment_positions.reserve(batch_size);
             alignment_sequence_IDs.reserve(batch_size);
         }
@@ -252,6 +255,7 @@ struct BAM_alignment_batch_device : public BAM_alignment_batch_storage<device_ta
         cigars = batch.cigars;
         reads = batch.reads;
         qualities = batch.qualities;
+        flags = batch.flags;
         alignment_positions = batch.alignment_positions;
         alignment_sequence_IDs = batch.alignment_sequence_IDs;
         read_groups = batch.read_groups;
@@ -266,6 +270,7 @@ struct BAM_alignment_batch_device : public BAM_alignment_batch_storage<device_ta
         D_VectorCigarOp::const_plain_view_type cigars;
         D_VectorDNA16::const_plain_view_type reads;
         D_VectorU8::const_plain_view_type qualities;
+        D_VectorU16::const_plain_view_type flags;
         D_VectorU32::const_plain_view_type read_groups;
         D_VectorU32::const_plain_view_type alignment_positions;
         D_VectorU32::const_plain_view_type alignment_sequence_IDs;
@@ -278,6 +283,7 @@ struct BAM_alignment_batch_device : public BAM_alignment_batch_storage<device_ta
                 plain_view(cigars),
                 plain_view(reads),
                 plain_view(qualities),
+                plain_view(flags),
                 plain_view(read_groups),
                 plain_view(alignment_positions),
                 plain_view(alignment_sequence_IDs),
@@ -344,5 +350,5 @@ public:
 private:
     bool readData(void *output, unsigned int len, int line);
     bool init(void);
+    char *parse_header_tag(uint32 *len, const char *tag, char *start_ptr, char *end_ptr);
 };
-

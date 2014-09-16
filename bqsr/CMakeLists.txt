@@ -2,7 +2,6 @@ set(bqsr_sources
 alignment_data.h
 baq.cu
 baq.h
-bqsr.cu
 bqsr_context.h
 bqsr_context.cu
 bqsr_types.h
@@ -48,6 +47,13 @@ primitives/util.h
 primitives/vector.h
 )
 
-cuda_add_executable(bqsr ${bqsr_sources})
-target_link_libraries(bqsr rt ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+cuda_add_library(bqsr-common ${bqsr_sources})
+add_dependencies(bqsr-common gamgee zlib)
+
+cuda_add_executable(bqsr bqsr.cu)
+target_link_libraries(bqsr bqsr-common rt ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
 add_dependencies(bqsr gamgee zlib)
+
+cuda_add_executable(bqsr-loader bqsr-loader.cu)
+target_link_libraries(bqsr-loader bqsr-common rt ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+add_dependencies(bqsr-loader gamgee zlib)

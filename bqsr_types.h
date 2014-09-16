@@ -53,41 +53,40 @@ template <typename T> using H_Vector = nvbio::vector<host_tag, T>;
 template <uint32 bits> using D_PackedVector = nvbio::PackedVector<target_system_tag, bits>;
 template <uint32 bits> using H_PackedVector = nvbio::PackedVector<host_tag, bits>;
 
-typedef nvbio::vector<target_system_tag, uint8> D_VectorU8;
-typedef nvbio::vector<host_tag, uint8> H_VectorU8;
-typedef nvbio::vector<target_system_tag, uint16> D_VectorU16;
-typedef nvbio::vector<host_tag, uint16> H_VectorU16;
-typedef nvbio::vector<target_system_tag, uint32> D_VectorU32;
-typedef nvbio::vector<host_tag, uint32> H_VectorU32;
-typedef nvbio::vector<target_system_tag, uint64> D_VectorU64;
-typedef nvbio::vector<host_tag, uint64> H_VectorU64;
+typedef D_Vector<uint8> D_VectorU8;
+typedef H_Vector<uint8> H_VectorU8;
+typedef D_Vector<uint16> D_VectorU16;
+typedef H_Vector<uint16> H_VectorU16;
+typedef D_Vector<uint32> D_VectorU32;
+typedef H_Vector<uint32> H_VectorU32;
+typedef D_Vector<uint64> D_VectorU64;
+typedef H_Vector<uint64> H_VectorU64;
 
-typedef nvbio::vector<target_system_tag, int32> D_VectorI32;
-typedef nvbio::vector<host_tag, int32> H_VectorI32;
+typedef D_Vector<int32> D_VectorI32;
+typedef H_Vector<int32> H_VectorI32;
 
-typedef nvbio::vector<target_system_tag, double> D_VectorF64;
-typedef nvbio::vector<host_tag, double> H_VectorF64;
+typedef D_Vector<double> D_VectorF64;
+typedef H_Vector<double> H_VectorF64;
 
-//template <typename system_tag> using Vector_DNA16 = nvbio::PackedVector<system_tag, 4>;
-typedef nvbio::PackedVector<host_tag, 4> H_VectorDNA16;
-typedef nvbio::PackedVector<target_system_tag, 4> D_VectorDNA16;
+typedef H_PackedVector<4> H_VectorDNA16;
+typedef D_PackedVector<4> D_VectorDNA16;
 typedef H_VectorDNA16::const_stream_type H_StreamDNA16;
 typedef D_VectorDNA16::const_stream_type D_StreamDNA16;
 
-typedef nvbio::PackedVector<host_tag, 1> H_PackedVector_1b;
-typedef nvbio::PackedVector<target_system_tag, 1> D_PackedVector_1b;
+typedef H_PackedVector<1> H_PackedVector_1b;
+typedef D_PackedVector<1> D_PackedVector_1b;
 
-typedef nvbio::PackedVector<host_tag, 2> H_PackedVector_2b;
-typedef nvbio::PackedVector<target_system_tag, 2> D_PackedVector_2b;
+typedef H_PackedVector<2> H_PackedVector_2b;
+typedef D_PackedVector<2> D_PackedVector_2b;
 
 // this is evil: endianess between reference data and sequence data doesn't seem to match...
 typedef nvbio::PackedVector<host_tag, 2, true>::const_stream_type H_PackedReference;
 typedef nvbio::PackedVector<target_system_tag, 2, true>::const_stream_type D_PackedReference;
 
-typedef nvbio::vector<target_system_tag, uint2> D_VectorU32_2;
-typedef nvbio::vector<host_tag, uint2> H_VectorU32_2;
-typedef nvbio::vector<target_system_tag, ushort2> D_VectorU16_2;
-typedef nvbio::vector<host_tag, ushort2> H_VectorU16_2;
+typedef D_Vector<uint2> D_VectorU32_2;
+typedef H_Vector<uint2> H_VectorU32_2;
+typedef D_Vector<ushort2> D_VectorU16_2;
+typedef H_Vector<ushort2> H_VectorU16_2;
 
 // we only use 1 bit per entry on the active location list
 // however, because we write to this using multiple threads that are scanning reads concurrently,
@@ -129,5 +128,5 @@ struct cigar_op
     }
 };
 
-typedef nvbio::vector<target_system_tag, cigar_op> D_VectorCigarOp;
-typedef nvbio::vector<host_tag, cigar_op> H_VectorCigarOp;
+typedef D_Vector<cigar_op> D_VectorCigarOp;
+typedef H_Vector<cigar_op> H_VectorCigarOp;

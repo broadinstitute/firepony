@@ -2,12 +2,16 @@ nvbio_module(bqsr)
 
 addsources(
 bqsr.cu
-bam_loader.cpp
+bqsr_types.h
+bqsr_context.h
+bam_loader.cu
 bam_loader.h
 reference.cu
 reference.h
 util.cu
 util.h
+variants.cu
+variants.h
 )
 
 cuda_add_executable(bqsr ${bqsr_srcs})

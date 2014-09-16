@@ -39,7 +39,7 @@ reference_genome_device::~reference_genome_device()
     }
 }
 
-void reference_genome_device::load(io::FMIndexData *h_fmi, const nvbio::vector<host_tag, uint64>& ref_sequence_offsets)
+void reference_genome_device::load(io::FMIndexData *h_fmi, const H_VectorU32& ref_sequence_offsets)
 {
     d_fmi = new io::FMIndexDataDevice(*h_fmi, io::FMIndexData::GENOME);
     this->ref_sequence_offsets = ref_sequence_offsets;
@@ -98,8 +98,8 @@ void reference_genome::generate_reference_sequence_map(void)
         char *name = &h_fmi->m_bnt_data.names[ann->name_offset];
         uint32 h = bqsr_string_hash(name);
 
-        assert(ref_sequence_id_map.find(h) == ref_sequence_id_map.end()
-                || !"duplicate reference sequence name!");
+        NVBIO_CUDA_ASSERT(ref_sequence_id_map.find(h) == ref_sequence_id_map.end() ||
+                          !"duplicate reference sequence name!");
 
         ref_sequence_id_map[h] = ref_seq_id;
         ref_sequence_offsets[ref_seq_id] = ann->offset;
@@ -107,4 +107,3 @@ void reference_genome::generate_reference_sequence_map(void)
         ref_seq_id++;
     }
 }
-

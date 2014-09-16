@@ -19,6 +19,7 @@
 #pragma once
 
 #include <nvbio/basic/types.h>
+#include <nvbio/basic/vector.h>
 
 using namespace nvbio;
 

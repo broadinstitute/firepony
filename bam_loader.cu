@@ -196,33 +196,7 @@ bool BAMfile::init(void)
 
 bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, const uint32 batch_size)
 {
-    batch->align_headers.clear();
-    batch->index.clear();
-    batch->crq_index.clear();
-    batch->aux_data.clear();
-    batch->names.clear();
-    batch->cigars.clear();
-    batch->reads.clear();
-    batch->qualities.clear();
-
-    // read groups are special: they're initialized to zero
-    batch->read_groups.assign(batch_size, 0);
-
-    if (batch->align_headers.size() < batch_size)
-    {
-        if (!skip_headers)
-        {
-            batch->align_headers.reserve(batch_size);
-            batch->index.reserve(batch_size);
-            batch->aux_data.reserve(batch_size * 1024);
-            batch->names.reserve(batch_size * 512);
-        }
-
-        batch->crq_index.reserve(batch_size);
-        batch->cigars.reserve(batch_size * 32);
-        batch->reads.reserve(batch_size * 350);
-        batch->qualities.reserve(batch_size * 350);
-    }
+    batch->reset(batch_size, skip_headers);
 
     // temp vector for translating CIGARs
     nvbio::vector<host_tag, uint32> cigar_temp(64);
@@ -284,6 +258,10 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
         // push the CRQ index
         BAM_CRQ_index crq_index(batch->cigars.size(), align.num_cigar_ops(), batch->reads.size(), align.l_seq, batch->qualities.size());
         batch->crq_index.push_back(crq_index);
+
+        // push the alignment position
+        batch->alignment_positions.push_back(align.pos);
+        batch->alignment_sequence_IDs.push_back(align.refID);
 
         // figure out the CIGAR length and make sure we can store it
         const uint32 cigar_len = (align.flag_nc & 0xffff);
@@ -372,18 +350,18 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
 
             case 'H':
                 // no clue what to do here
-                assert(!"someone please help me!!");
+                NVBIO_CUDA_ASSERT(!"someone please help me!!");
                 exit(1);
                 break;
 
             case 'B':
                 // implement later...
-                assert(!"byte array not implemented");
+                NVBIO_CUDA_ASSERT(!"byte array not implemented");
                 exit(1);
                 break;
 
             default:
-                assert(!"invalid tag type");
+                NVBIO_CUDA_ASSERT(!"invalid tag type");
                 exit(1);
                 break;
             }

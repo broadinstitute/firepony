@@ -24,6 +24,17 @@
 
 using namespace nvbio;
 
+// help the eclipse error parser deal with CUDA keywords
+#ifdef __CDT_PARSER__
+#define __global__
+#define __device__
+#define __shared__
+#define __host__
+#define __constant__
+#define __const__
+#define __restrict__
+#endif
+
 //#define RUN_ON_CPU
 
 #ifdef RUN_ON_CPU

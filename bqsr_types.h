@@ -44,6 +44,16 @@ typedef nvbio::PackedVector<device_tag, 4> D_VectorDNA16;
 typedef H_VectorDNA16::stream_type H_StreamDNA16;
 typedef D_VectorDNA16::stream_type D_StreamDNA16;
 
+typedef nvbio::PackedVector<host_tag, 1> H_PackedVector_1b;
+typedef nvbio::PackedVector<device_tag, 1> D_PackedVector_1b;
+
+typedef nvbio::PackedVector<host_tag, 2> H_PackedVector_2b;
+typedef nvbio::PackedVector<device_tag, 2> D_PackedVector_2b;
+
+// this is evil: endianess between reference data and sequence data doesn't seem to match...
+typedef nvbio::PackedVector<host_tag, 2, true>::stream_type H_PackedReference;
+typedef nvbio::PackedVector<device_tag, 2, true>::stream_type D_PackedReference;
+
 typedef nvbio::vector<device_tag, uint2> D_VectorU32_2;
 typedef nvbio::vector<host_tag, uint2> H_VectorU32_2;
 typedef nvbio::vector<device_tag, ushort2> D_VectorU16_2;

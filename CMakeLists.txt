@@ -1,12 +1,14 @@
 nvbio_module(bqsr)
 
 addsources(
-bqsr.cu
-bqsr_types.h
-bqsr_context.h
-bqsr_context.cu
 bam_loader.cu
 bam_loader.h
+bqsr.cu
+bqsr_context.h
+bqsr_context.cu
+bqsr_types.h
+cigar.h
+cigar.cu
 filters.h
 filters.cu
 reference.cu

@@ -130,6 +130,7 @@ void build_read_offset_list(bqsr_context *context,
 
 // functor used to compute the alignment window list
 // for each read, compute the end of the alignment window in the reference and the sequence
+// xxxnsubtil: this is very similar to cigar_coordinates_expand, should merge
 struct compute_alignment_window : public bqsr_lambda
 {
     compute_alignment_window(bqsr_context::view ctx,

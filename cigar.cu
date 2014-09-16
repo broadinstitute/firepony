@@ -36,7 +36,7 @@ struct cigar_op_len : public thrust::unary_function<const cigar_op&, uint32>
     }
 };
 
-// expand cigar ops
+// expand cigar ops into temp storage
 struct cigar_op_expand : public bqsr_lambda
 {
     cigar_op_expand(bqsr_context::view ctx,
@@ -49,6 +49,8 @@ struct cigar_op_expand : public bqsr_lambda
         const cigar_op& op = batch.cigars[op_index];
         const uint32 out_base = ctx.cigar.cigar_offsets[op_index];
 
+        uint8 *out = &ctx.temp_storage[0] + out_base;
+
         for(uint32 i = 0; i < op.len; i++)
         {
             switch(op.op)
@@ -56,23 +58,44 @@ struct cigar_op_expand : public bqsr_lambda
             case cigar_op::OP_M:
             case cigar_op::OP_MATCH:
             case cigar_op::OP_X:
-                ctx.cigar.cigar_events[out_base + i] = cigar_event::M;
+                out[i] = cigar_event::M;
                 break;
 
             case cigar_op::OP_I:
             case cigar_op::OP_N:
-                ctx.cigar.cigar_events[out_base + i] = cigar_event::I;
+                out[i] = cigar_event::I;
                 break;
 
             case cigar_op::OP_D:
             case cigar_op::OP_H:
             case cigar_op::OP_P:
-                ctx.cigar.cigar_events[out_base + i] = cigar_event::D;
+                out[i] = cigar_event::D;
                 break;
 
             case cigar_op::OP_S:
-                ctx.cigar.cigar_events[out_base + i] = cigar_event::S;
+                out[i] = cigar_event::S;
+                break;
             }
+        }
+    }
+};
+
+// compact the cigar events from temporary storage into a 2-bit packed vector
+struct cigar_op_compact : public bqsr_lambda
+{
+    cigar_op_compact(bqsr_context::view ctx,
+                     const BAM_alignment_batch_device::const_view batch)
+        : bqsr_lambda(ctx, batch)
+    { }
+
+    NVBIO_HOST_DEVICE void operator() (const uint32 word_index)
+    {
+        D_PackedVector_2b::plain_view_type& events = ctx.cigar.cigar_events;
+        const uint8 *input = &ctx.temp_storage[word_index * D_PackedVector_2b::SYMBOLS_PER_WORD];
+
+        for(uint32 i = 0; i < D_PackedVector_2b::SYMBOLS_PER_WORD; i++)
+        {
+            events[word_index * D_PackedVector_2b::SYMBOLS_PER_WORD + i] = input[i];
         }
     }
 };
@@ -250,6 +273,84 @@ struct compute_is_snp : public bqsr_lambda_ref
     }
 };
 
+#ifdef CUDA_DEBUG
+// debug aid: sanity check that the expanded cigar events match what we expect
+struct sanity_check_cigar_events : public bqsr_lambda
+{
+    sanity_check_cigar_events(bqsr_context::view ctx,
+                              const BAM_alignment_batch_device::const_view batch)
+        : bqsr_lambda(ctx, batch)
+    { }
+
+    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    {
+        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const cigar_op *cigar = &batch.cigars[idx.cigar_start];
+
+        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
+        uint32 cigar_event_idx = 0;
+
+        for(uint32 c = 0; c < idx.cigar_len; c++)
+        {
+            for(uint32 i = 0; i < cigar[c].len; i++)
+            {
+                switch(cigar[c].op)
+                {
+                case cigar_op::OP_M:
+                case cigar_op::OP_MATCH:
+                case cigar_op::OP_X:
+                    if (ctx.cigar.cigar_events[cigar_start + cigar_event_idx] != cigar_event::M)
+                    {
+                        printf("*** failed sanity check: read %u cigar op %u %u event offset %u: expected M, got %c\n",
+                                read_index, c, i, cigar_start + cigar_event_idx, cigar_event::ascii(ctx.cigar.cigar_events[cigar_start + cigar_event_idx]));
+                        return;
+                    }
+
+                    cigar_event_idx++;
+                    break;
+
+                case cigar_op::OP_N: // xxxnsubtil: N is really not supported and shouldn't be here
+                case cigar_op::OP_I:
+                    if (ctx.cigar.cigar_events[cigar_start + cigar_event_idx] != cigar_event::I)
+                    {
+                        printf("*** failed sanity check: read %u cigar op %u %u event offset %u: expected I, got %c\n",
+                                read_index, c, i, cigar_start + cigar_event_idx, cigar_event::ascii(ctx.cigar.cigar_events[cigar_start + cigar_event_idx]));
+                        return;
+                    }
+
+                    cigar_event_idx++;
+                    break;
+
+                case cigar_op::OP_D:
+                case cigar_op::OP_H:
+                case cigar_op::OP_P: // xxxnsubtil: not sure how to handle P
+                    if (ctx.cigar.cigar_events[cigar_start + cigar_event_idx] != cigar_event::D)
+                    {
+                        printf("*** failed sanity check: read %u cigar op %u %u event offset %u: expected D, got %c\n",
+                                read_index, c, i, cigar_start + cigar_event_idx, cigar_event::ascii(ctx.cigar.cigar_events[cigar_start + cigar_event_idx]));
+                        return;
+                    }
+
+                    cigar_event_idx++;
+                    break;
+
+                case cigar_op::OP_S:
+                    if (ctx.cigar.cigar_events[cigar_start + cigar_event_idx] != cigar_event::S)
+                    {
+                        printf("*** failed sanity check: read %u cigar op %u %u event offset %u: expected S, got %c\n",
+                                read_index, c, i, cigar_start + cigar_event_idx, cigar_event::ascii(ctx.cigar.cigar_events[cigar_start + cigar_event_idx]));
+                        return;
+                    }
+
+                    cigar_event_idx++;
+                    break;
+                }
+            }
+        }
+    }
+};
+#endif
+
 void expand_cigars(bqsr_context *context, const reference_genome& reference, const BAM_alignment_batch_device& batch)
 {
     cigar_context& ctx = context->cigar;
@@ -272,7 +373,10 @@ void expand_cigars(bqsr_context *context, const reference_genome& reference, con
     uint32 expanded_cigar_len = ctx.cigar_offsets[batch.cigars.size()];
 
     // make sure we have enough room for the expanded cigars
+    // note: temporary storage must be padded to a multiple of the word size, since we'll pack whole words at a time
+    context->temp_storage.resize(util::divide_ri(expanded_cigar_len, D_PackedVector_2b::SYMBOLS_PER_WORD) * D_PackedVector_2b::SYMBOLS_PER_WORD);
     ctx.cigar_events.resize(expanded_cigar_len);
+
     ctx.cigar_event_reference_coordinates.resize(expanded_cigar_len);
     ctx.cigar_event_read_coordinates.resize(expanded_cigar_len);
 
@@ -285,10 +389,22 @@ void expand_cigars(bqsr_context *context, const reference_genome& reference, con
     // is_snp requires zero initialization
     thrust::fill(ctx.is_snp.m_storage.begin(), ctx.is_snp.m_storage.end(), 0);
 
-    // expand the cigar ops first (xxxnsubtil: same as above, active read list is ignored)
+    // expand the cigar ops into temp storage (xxxnsubtil: same as above, active read list is ignored)
     thrust::for_each(thrust::make_counting_iterator(0),
                      thrust::make_counting_iterator(0) + batch.cigars.size(),
                      cigar_op_expand(*context, batch));
+
+    // pack the cigar into a 2-bit vector
+    // the index here is a 32-bit word index to be filled by each thread
+    thrust::for_each(thrust::make_counting_iterator(0),
+                     thrust::make_counting_iterator(0) + util::divide_ri(expanded_cigar_len, ctx.cigar_events.SYMBOLS_PER_WORD),
+                     cigar_op_compact(*context, batch));
+
+#ifdef CUDA_DEBUG
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     sanity_check_cigar_events(*context, batch));
+#endif
 
     // now expand the coordinates per read
     // this avoids having to deal with boundary condtions within reads

@@ -18,7 +18,10 @@
 
 #include <nvbio/basic/types.h>
 #include <nvbio/basic/vector.h>
-#include <nvbio/io/fmi.h>
+#include <nvbio/io/sequence/sequence.h>
+#include <nvbio/io/sequence/sequence_access.h>
+#include <nvbio/io/sequence/sequence_mmap.h>
+#include <nvbio/strings/alphabet.h>
 
 #include "util.h"
 #include "reference.h"
@@ -26,83 +29,74 @@
 using namespace nvbio;
 
 reference_genome_device::reference_genome_device()
-    : d_fmi(NULL)
+    : d_ref(NULL)
 {
 }
 
 reference_genome_device::~reference_genome_device()
 {
-    if (d_fmi)
+    if (d_ref)
     {
-        delete d_fmi;
-        d_fmi = NULL;
+        delete d_ref;
+        d_ref = NULL;
     }
 }
 
-void reference_genome_device::load(io::FMIndexData *h_fmi, const H_VectorU32& ref_sequence_offsets)
+void reference_genome_device::load(io::SequenceData *h_ref, const H_VectorU32& ref_sequence_offsets)
 {
-    d_fmi = new io::FMIndexDataDevice(*h_fmi, io::FMIndexData::GENOME);
+    d_ref = new io::SequenceDataDevice(*h_ref);
     this->ref_sequence_offsets = ref_sequence_offsets;
 }
 
 reference_genome::reference_genome()
-    : h_fmi(NULL)
+    : h_ref(NULL)
 {
 }
 
 reference_genome::~reference_genome()
 {
-    if (h_fmi)
+    if (h_ref)
     {
-        delete h_fmi;
-        h_fmi = NULL;
+        delete h_ref;
+        h_ref = NULL;
     }
 }
 
 bool reference_genome::load(const char *name)
 {
-    io::FMIndexDataMMAP *mmap = new io::FMIndexDataMMAP();
-    if (mmap->load(name))
-    {
-        h_fmi = mmap;
-        generate_reference_sequence_map();
-        return true;
-    }
+    h_ref = io::map_sequence_file(name);
+    if (h_ref == NULL)
+        h_ref = io::load_sequence_file(DNA, name);
 
-    delete mmap;
+    if (!h_ref)
+        return false;
 
-    io::FMIndexDataRAM *file = new io::FMIndexDataRAM();
-    if (file->load(name, io::FMIndexData::GENOME))
-    {
-        h_fmi = file;
-        generate_reference_sequence_map();
-        return true;
-    }
+    generate_reference_sequence_map();
 
-    return false;
+    return true;
 }
 
 void reference_genome::download(void)
 {
-    device.load(h_fmi, ref_sequence_offsets);
+    device.load(h_ref, ref_sequence_offsets);
 }
 
 void reference_genome::generate_reference_sequence_map(void)
 {
-    ref_sequence_offsets.resize(h_fmi->m_bnt_info.n_seqs);
+    io::SequenceDataView view = plain_view(*h_ref);
+    ref_sequence_offsets.resize(view.m_n_seqs);
 
     uint32 ref_seq_id = 0;
-    for(unsigned int i = 0; i < h_fmi->m_bnt_info.n_seqs; i++)
+    for(unsigned int i = 0; i < view.m_n_seqs; i++)
     {
-        io::BNTAnn *ann = &h_fmi->m_bnt_data.anns[i];
-        char *name = &h_fmi->m_bnt_data.names[ann->name_offset];
+        char *name = &view.m_name_stream[view.m_name_index[i]];
         uint32 h = bqsr_string_hash(name);
 
         NVBIO_CUDA_ASSERT(ref_sequence_id_map.find(h) == ref_sequence_id_map.end() ||
                           !"duplicate reference sequence name!");
 
         ref_sequence_id_map[h] = ref_seq_id;
-        ref_sequence_offsets[ref_seq_id] = ann->offset;
+        ref_sequence_offsets[ref_seq_id] = view.m_sequence_index[i];
 
         ref_seq_id++;
     }

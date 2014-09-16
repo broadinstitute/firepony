@@ -19,9 +19,9 @@
 #include <nvbio/basic/types.h>
 #include <nvbio/basic/vector.h>
 #include <nvbio/basic/dna.h>
-#include <nvbio/io/reads/reads.h>
+#include <nvbio/io/sequence/sequence.h>
 #include <nvbio/io/vcf.h>
-#include <nvbio/io/fmi.h>
+#include <nvbio/io/sequence/sequence_pac.h>
 
 #include <map>
 

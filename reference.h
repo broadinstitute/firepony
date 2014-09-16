@@ -20,9 +20,8 @@
 
 #include <nvbio/basic/types.h>
 #include <nvbio/basic/vector.h>
-#include <nvbio/io/reads/reads.h>
+#include <nvbio/io/sequence/sequence.h>
 #include <nvbio/io/vcf.h>
-#include <nvbio/io/fmi.h>
 
 #include <map>
 
@@ -33,25 +32,25 @@ using namespace nvbio;
 
 struct reference_genome_device
 {
-    io::FMIndexDataDevice *d_fmi;
+    io::SequenceDataDevice *d_ref;
     D_VectorU32 ref_sequence_offsets;
 
     reference_genome_device();
     ~reference_genome_device();
 
-    void load(io::FMIndexData *h_fmi, const H_VectorU32& ref_sequence_offsets);
+    void load(io::SequenceData *h_ref, const H_VectorU32& ref_sequence_offsets);
     void transform_alignment_start_positions(BAM_alignment_batch_device *batch);
 
     struct const_view
     {
-        const nvbio::io::FMIndexData::stream_type genome_stream;
+        const nvbio::io::SequenceDataDevice::const_plain_view_type genome_stream;
         const D_VectorU32::const_plain_view_type ref_sequence_offsets;
     };
 
     operator const_view() const
     {
         const_view v = {
-                nvbio::io::FMIndexData::stream_type(d_fmi->genome_stream()),
+                plain_view(*d_ref),
                 plain_view(ref_sequence_offsets)
         };
 
@@ -61,7 +60,7 @@ struct reference_genome_device
 
 struct reference_genome
 {
-    io::FMIndexData *h_fmi;
+    io::SequenceData *h_ref;
     // maps ref sequence name hash to ref sequence ID
     std::map<uint32, uint32> ref_sequence_id_map;
     // maps ref sequence ID to ref sequence offset

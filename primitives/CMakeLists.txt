@@ -1,9 +1,0 @@
-addsources(
-algorithms.h
-cuda.h
-util.h
-packed_stream_packer.h
-packed_stream.h
-packed_vector.h
-vector.h
-)

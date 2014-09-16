@@ -1,40 +1,43 @@
-nvbio_module(bqsr)
+project(bqsr)
+cmake_minimum_required(VERSION 2.8)
 
-addsources(
-alignment_data.h
-baq.cu
-baq.h
-bqsr.cu
-bqsr_context.h
-bqsr_context.cu
-bqsr_types.h
-cigar.h
-cigar.cu
-covariates.h
-covariates_bit_packing.h
-covariates_table.h
-covariates_table.cu
-covariates.cu
-filters.h
-filters.cu
-gamgee_loader.cu
-gamgee_loader.h
-sequence_data.h
-util.cu
-util.h
-variants.cu
-variants.h
+include(ExternalProject)
 
-from_nvbio/alphabet_inl.h
-from_nvbio/alphabet.h
-from_nvbio/dna.h
-from_nvbio/vcf.cu
-from_nvbio/vcf.h
-)
+# default to debug builds
+if (NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "Release")
+endif()
 
-nvbio_add_module_directory(primitives)
+# grab gcc flags
+include("gcc.cmake")
 
-cuda_add_executable(bqsr ${bqsr_srcs})
-target_link_libraries(bqsr nvbio zlibstatic crcstatic ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
-add_dependencies(bqsr gamgee zlib_bqsr)
+# locate required packages
+# CUDA 7.0 is required to build
+find_package(CUDA 7.0 REQUIRED)
+# enable C++11 support
+set(CUDA_NVCC_FLAGS "-std=c++11")
+# build for Kepler
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} ${CUDA_NVCC_DEBUG_FLAGS} --gpu-architecture=sm_35 -use_fast_math)
 
+find_package(OpenMP)
+if (OPENMP_FOUND)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
+
+# set cuda debug flags
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
+    set(CUDA_NVCC_DEBUG_FLAGS "-g -lineinfo -G")
+else()
+    set(CUDA_NVCC_DEBUG_FLAGS "-lineinfo")
+endif()
+
+include_directories(${CMAKE_SOURCE_DIR})
+
+# build dependencies
+include("contrib/boost.cmake")
+include("contrib/htslib.cmake")
+include("contrib/gamgee.cmake")
+include("contrib/zlib.cmake")
+
+add_subdirectory(bqsr)

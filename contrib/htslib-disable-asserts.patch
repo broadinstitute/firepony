@@ -1,0 +1,14 @@
+diff --git a/Makefile b/Makefile
+index 1087528..557ba7e 100644
+--- a/Makefile
++++ b/Makefile
+@@ -11,7 +11,7 @@ RANLIB = ranlib
+ # TODO: edit cram code to remove need for -DSAMTOOLS
+ CPPFLAGS = -I. -DSAMTOOLS=1
+ # TODO: probably update cram code to make it compile cleanly with -Wc++-compat
+-CFLAGS   = -g -Wall -O2
++CFLAGS   = -g -Wall -O2 -DNDEBUG
+ EXTRA_CFLAGS_PIC = -fpic
+ LDFLAGS  =
+ LDLIBS   =
+

@@ -204,6 +204,9 @@ struct compute_vcf_ranges : public bqsr_lambda
             // emit an empty VCF range
             vcf_range = make_uint2(uint32(-1), uint32(-1));
         } else {
+            if (vcf_end >= ctx.db.genome_positions + ctx.db.genome_positions.size())
+                vcf_end--;
+
             vcf_range = make_uint2(vcf_start - ctx.db.genome_positions.begin(),
                                    vcf_end - ctx.db.genome_positions.begin());
         }

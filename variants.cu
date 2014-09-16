@@ -66,14 +66,7 @@ struct compute_read_offset_list : public bqsr_lambda
         const BAM_CRQ_index& idx = batch.crq_index[read_index];
 
         const BAM_cigar_op *cigar = &batch.cigars[idx.cigar_start];
-        uint16 *offset_list = &ctx.snp_filter.read_offset_list[idx.read_start];
-
-        if (batch.alignment_positions[read_index] == uint32(-1))
-        {
-            // read is not aligned, mark all offsets as -1
-            memset(offset_list, -1, sizeof(uint16) * idx.read_len);
-            return;
-        }
+        uint16 *offset_list = &ctx.read_offset_list[idx.read_start];
 
         // create a list of offsets from the base alignment position for each BP in the read
         uint16 offset = 0;
@@ -89,7 +82,6 @@ struct compute_read_offset_list : public bqsr_lambda
                     *offset_list = offset;
                     offset_list++;
                     offset++;
-
                 }
 
                 break;
@@ -127,12 +119,9 @@ struct compute_read_offset_list : public bqsr_lambda
 void build_read_offset_list(bqsr_context *context,
                             const BAM_alignment_batch_device& batch)
 {
-    snp_filter_context& ctx = context->snp_filter;
-
-    ctx.read_offset_list.resize(batch.reads.size());
-    thrust::fill(ctx.read_offset_list.begin(), ctx.read_offset_list.end(), uint16(-1));
-    thrust::for_each(context->read_order.begin(),
-                     context->read_order.end(),
+    context->read_offset_list.resize(batch.reads.size());
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
                      compute_read_offset_list(*context, batch));
 }
 
@@ -148,7 +137,7 @@ struct compute_alignment_window : public bqsr_lambda
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const BAM_CRQ_index& idx = batch.crq_index[read_index];
-        const uint16 *offset_list = &ctx.snp_filter.read_offset_list[idx.read_start];
+        const uint16 *offset_list = &ctx.read_offset_list[idx.read_start];
         uint2& output = ctx.alignment_windows[read_index];
 
         // scan the offset list looking for the largest offset
@@ -174,11 +163,11 @@ struct compute_alignment_window : public bqsr_lambda
 // for each read, compute the end of the alignment window in the reference
 void build_alignment_windows(bqsr_context *ctx, const BAM_alignment_batch_device& batch)
 {
-    ctx->alignment_windows.resize(batch.reads.size());
-    thrust::for_each(ctx->read_order.begin(),
-                     ctx->read_order.end(),
     // set up the alignment window buffer
     ctx->alignment_windows.resize(batch.crq_index.size());
+    // compute alignment windows
+    thrust::for_each(ctx->active_read_list.begin(),
+                     ctx->active_read_list.end(),
                      compute_alignment_window(*ctx, batch));
 }
 
@@ -270,14 +259,14 @@ public:
     {
         const BAM_CRQ_index& idx = batch.crq_index[read_index];
         const uint2& alignment_window = ctx.alignment_windows[read_index];
-        const uint16 *offset_list = &ctx.snp_filter.read_offset_list[read_index];
+        const uint16 *offset_list = &ctx.read_offset_list[0];
 
         uint2 vcf_db_range = ctx.snp_filter.active_vcf_ranges[read_index];
         uint2 vcf_range = make_uint2(ctx.db.genome_positions[vcf_db_range.x],
                                       ctx.db.genome_positions[vcf_db_range.y]);
 
         // traverse the list of reads together with the VCF list; when we find a match, stop
-        for(uint32 bp = 0; bp < idx.read_len; bp++)
+        for(uint32 bp = idx.read_start; bp < idx.read_start + idx.read_len; bp++)
         {
             if (offset_list[bp] == uint16(-1))
             {
@@ -326,7 +315,7 @@ public:
                     const uint32 end = start + vcf_match_len; // this is guaranteed to not be larger than the read len
 
                     for(uint32 dead_bp = start; dead_bp < end; dead_bp++)
-                        ctx.snp_filter.active_location_list[dead_bp] = 0;
+                        ctx.active_location_list[dead_bp] = 0;
 
                     // move the BP counter forward
                     bp += end - start;
@@ -356,30 +345,22 @@ void filter_snps(bqsr_context *context,
     snp_filter_context& snp = context->snp_filter;
 
     // compute the VCF ranges for each read
-    thrust::for_each(context->read_order.begin(),
-                     context->read_order.end(),
     snp.active_vcf_ranges.resize(batch.crq_index.size());
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
                      compute_vcf_ranges(*context, batch));
 
     // build a list of reads with active VCF ranges
-    snp.active_read_ids.resize(context->read_order.size());
-    snp.active_read_ids_temp = context->read_order;
+    snp.active_read_ids.resize(context->active_read_list.size());
+    context->temp_u32 = context->active_read_list;
 
     uint32 num_active;
-    num_active = nvbio::cuda::copy_if(snp.active_read_ids_temp.size(),
-                                      snp.active_read_ids_temp.begin(),
+    num_active = nvbio::cuda::copy_if(context->temp_u32.size(),
+                                      context->temp_u32.begin(),
                                       snp.active_read_ids.begin(),
                                       vcf_active_predicate(plain_view(snp.active_vcf_ranges)),
                                       context->temp_storage);
-
     snp.active_read_ids.resize(num_active);
-
-    // resize the active location list to cover all of the current batch
-    context->snp_filter.active_location_list.resize(batch.reads.size());
-    // mark all BPs as active
-    thrust::fill(context->snp_filter.active_location_list.m_storage.begin(),
-                 context->snp_filter.active_location_list.m_storage.end(),
-                 0xffffffff);
 
     // finally apply the VCF filter
     // this will create zeros in the active location list for each BP that matches a known variant

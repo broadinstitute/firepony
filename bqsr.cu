@@ -22,6 +22,7 @@
 #include <nvbio/io/sequence/sequence.h>
 #include <nvbio/io/vcf.h>
 #include <nvbio/io/sequence/sequence_pac.h>
+#include <nvbio/io/sequence/sequence_sam.h>
 
 #include <map>
 
@@ -30,6 +31,8 @@
 #include "util.h"
 #include "variants.h"
 #include "bqsr_context.h"
+
+using namespace nvbio;
 
 /*
 // sort batch by increasing alignment position
@@ -42,6 +45,25 @@ void device_sort_batch(BAM_alignment_batch_device *batch)
                         batch->read_order.begin());
 }
 */
+
+struct remove_unaligned_reads_functor : public bqsr_lambda
+{
+    remove_unaligned_reads_functor(bqsr_context::view ctx,
+                                   const BAM_alignment_batch_device::const_view batch)
+        : bqsr_lambda(ctx, batch)
+    { }
+
+    NVBIO_HOST_DEVICE void operator() (const uint32 read_id)
+    {
+        uint32& read_index = ctx.active_read_list[read_id];
+
+        if (batch.flags[read_index] & nvbio::io::SAMFlag_SegmentUnmapped ||
+            batch.alignment_positions[read_index] == uint32(-1))
+        {
+            read_index = uint32(-1);
+        }
+    }
+};
 
 int main(int argc, char **argv)
 {
@@ -88,19 +110,13 @@ int main(int argc, char **argv)
     {
         // load the next batch on the device
         batch.load(h_batch);
+        ctx.start_batch(batch);
 
-        // initialize the read order with 0..N
-        ctx.read_order.resize(batch.crq_index.size());
-        thrust::copy(thrust::make_counting_iterator(0),
-                     thrust::make_counting_iterator(0) + batch.crq_index.size(),
-                     ctx.read_order.begin());
-
-        // sort read_order by decreasing len
-        //device_sort_batch(&batch);
-
-        // transform the alignment coordinates to genome coordinates
-        //genome.device.transform_alignment_start_positions(&batch);
-
+        // mark and remove unmapped reads
+        thrust::for_each(thrust::make_counting_iterator(0),
+                         thrust::make_counting_iterator(0) + ctx.active_read_list.size(),
+                         remove_unaligned_reads_functor(ctx, batch));
+        ctx.compact_active_read_list();
 
         // build read offset list
         build_read_offset_list(&ctx, batch);
@@ -115,7 +131,7 @@ int main(int argc, char **argv)
         H_VectorU2 h_alignment_windows = ctx.alignment_windows;
         H_VectorU2 h_vcf_ranges = ctx.snp_filter.active_vcf_ranges;
 
-        H_VectorU32 h_read_order = ctx.read_order;
+        H_VectorU32 h_read_order = ctx.active_read_list;
         for(uint32 read_id = 0; read_id < 50 && read_id < h_read_order.size(); read_id++)
         {
             io::SequenceDataView view = plain_view(*genome.h_ref);
@@ -147,8 +163,8 @@ int main(int argc, char **argv)
 #if 0
         printf("active VCF ranges: %lu out of %lu reads (%f %%)\n",
                 ctx.snp_filter.active_read_ids.size(),
-                ctx.read_order.size(),
-                100.0 * float(ctx.snp_filter.active_read_ids.size()) / ctx.read_order.size());
+                ctx.active_read_list.size(),
+                100.0 * float(ctx.snp_filter.active_read_ids.size()) / ctx.active_read_list.size());
 
         H_ActiveLocationList h_bplist = ctx.snp_filter.active_location_list;
         uint32 zeros = 0;

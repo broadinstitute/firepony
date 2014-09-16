@@ -19,6 +19,7 @@
 #include <nvbio/basic/types.h>
 #include <nvbio/basic/primitives.h>
 #include <nvbio/io/sequence/sequence_sam.h> // for read flags
+#include <nvbio/strings/alphabet.h>
 
 #include "bqsr_types.h"
 #include "bqsr_context.h"
@@ -311,4 +312,72 @@ void filter_reads(bqsr_context *context, const BAM_alignment_batch& batch)
     active_read_list.resize(num_active);
 
     context->stats.filtered_reads += start_count - num_active;
+}
+
+// filter non-regular bases (anything other than A, C, G, T)
+struct filter_non_regular_bases : public bqsr_lambda
+{
+    filter_non_regular_bases(bqsr_context::view ctx,
+                             const BAM_alignment_batch_device::const_view batch)
+        : bqsr_lambda(ctx, batch)
+    { }
+
+    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    {
+        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+
+        for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
+        {
+            uint8 bp = batch.reads[i];
+            if (bp != AlphabetTraits<DNA_IUPAC>::A &&
+                bp != AlphabetTraits<DNA_IUPAC>::C &&
+                bp != AlphabetTraits<DNA_IUPAC>::G &&
+                bp != AlphabetTraits<DNA_IUPAC>::T)
+            {
+                ctx.active_location_list[i] = 0;
+            }
+        }
+    }
+};
+
+/**
+ * The lowest quality score for a base that is considered reasonable for statistical analysis.  This is
+ * because Q 6 => you stand a 25% of being right, which means all bases are equally likely
+ */
+#define MIN_USABLE_Q_SCORE 6
+
+// filter bases with quality < MIN_USABLE_Q_SCORE
+struct filter_low_quality_bases : public bqsr_lambda
+{
+    filter_low_quality_bases(bqsr_context::view ctx,
+                             const BAM_alignment_batch_device::const_view batch)
+        : bqsr_lambda(ctx, batch)
+    { }
+
+    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    {
+        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+
+        for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
+        {
+            uint8 qual = batch.qualities[i];
+            if (qual < MIN_USABLE_Q_SCORE)
+            {
+                ctx.active_location_list[i] = 0;
+            }
+        }
+    }
+};
+
+// apply per-BP filters to the batch
+// (known SNPs are filtered elsewhere)
+void filter_bases(bqsr_context *context, const BAM_alignment_batch& batch)
+{
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     filter_non_regular_bases(*context, batch.device));
+
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     filter_low_quality_bases(*context, batch.device));
 }

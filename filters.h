@@ -22,3 +22,4 @@
 #include "bqsr_context.h"
 
 void filter_reads(bqsr_context *context, const BAM_alignment_batch& batch);
+void filter_bases(bqsr_context *context, const BAM_alignment_batch& batch);

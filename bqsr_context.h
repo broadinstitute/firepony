@@ -55,6 +55,7 @@ struct covariate_context
 
 struct bqsr_context
 {
+    BAM_header& bam_header;
     const DeviceSNPDatabase& db;
     const reference_genome_device& reference;
 
@@ -78,14 +79,17 @@ struct bqsr_context
     snp_filter_context snp_filter;
 
 
-    bqsr_context(const DeviceSNPDatabase& db,
+    bqsr_context(BAM_header& bam_header,
+                 const DeviceSNPDatabase& db,
                  const reference_genome_device& reference)
-        : db(db),
+        : bam_header(bam_header),
+          db(db),
           reference(reference)
     { }
 
     struct view
     {
+        BAM_header::view                        bam_header;
         DeviceSNPDatabase::const_view           db;
         reference_genome_device::const_view     reference;
         D_VectorU32::plain_view_type            active_read_list;
@@ -100,6 +104,7 @@ struct bqsr_context
     operator view()
     {
         view v = {
+            bam_header,
             db,
             reference,
             plain_view(active_read_list),

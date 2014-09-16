@@ -43,12 +43,35 @@ struct BAM_header
 
     // reference sequence names and lengths
     std::vector<std::string> sq_names;
-    std::vector<int32> sq_lengths;
+    H_VectorI32 sq_lengths;
+    // xxxnsubtil: ugly hack, fix!
+    D_VectorI32 d_sq_lengths;
 
     // key is a hash of the read group name, value is a sequential ID for the read group
     std::map<uint32, uint32> rg_name_to_id;
     // number of read groups in the map
     uint32 n_read_groups;
+
+    struct view
+    {
+        int32 n_ref;
+        D_VectorI32::plain_view_type sq_lengths;
+        uint32 n_read_groups;
+    };
+
+    operator view()
+    {
+        // xxxnsubtil: ugly hack, fix and revert to const_view!
+        d_sq_lengths = sq_lengths;
+
+        view v = {
+                n_ref,
+                plain_view(d_sq_lengths),
+                n_read_groups,
+        };
+
+        return v;
+    }
 };
 
 // BAM alignment section

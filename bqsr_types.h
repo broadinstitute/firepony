@@ -35,6 +35,9 @@ typedef nvbio::vector<host_tag, uint32> H_VectorU32;
 typedef nvbio::vector<device_tag, uint64> D_VectorU64;
 typedef nvbio::vector<host_tag, uint64> H_VectorU64;
 
+typedef nvbio::vector<device_tag, int32> D_VectorI32;
+typedef nvbio::vector<host_tag, int32> H_VectorI32;
+
 //template <typename system_tag> using Vector_DNA16 = nvbio::PackedVector<system_tag, 4>;
 typedef nvbio::PackedVector<host_tag, 4> H_VectorDNA16;
 typedef nvbio::PackedVector<device_tag, 4> D_VectorDNA16;

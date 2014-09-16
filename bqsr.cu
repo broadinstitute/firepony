@@ -94,7 +94,6 @@ int main(int argc, char **argv)
     DeviceSNPDatabase dev_db;
     dev_db.load(db);
 
-    bqsr_context ctx(dev_db, genome.device);
 
     printf("%lu variants\n", db.genome_positions.size());
     printf("reading BAM %s...\n", bam_name);
@@ -105,6 +104,7 @@ int main(int argc, char **argv)
     BAM_alignment_batch_device batch;
 
     uint64 alignments = 0;
+    bqsr_context ctx(bam.header, dev_db, genome.device);
 
     while(bam.next_batch(&h_batch, true, 2000000))
     {

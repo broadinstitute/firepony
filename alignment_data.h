@@ -82,23 +82,26 @@ enum AlignmentFlags
     SUPPLEMENTARY = 2048,
 };
 
-enum BatchDataMask
+namespace AlignmentDataMask
 {
-    NAME                 = 0x001,
-    CHROMOSOME           = 0x002,
-    ALIGNMENT_START      = 0x004,
-    ALIGNMENT_STOP       = 0x008,
-    MATE_CHROMOSOME      = 0x010,
-    MATE_ALIGNMENT_START = 0x020,
-    CIGAR                = 0x040,
-    READS                = 0x080,
-    QUALITIES            = 0x100,
-    FLAGS                = 0x200,
-    MAPQ                 = 0x400,
+    enum
+    {
+        NAME                 = 0x001,
+        CHROMOSOME           = 0x002,
+        ALIGNMENT_START      = 0x004,
+        ALIGNMENT_STOP       = 0x008,
+        MATE_CHROMOSOME      = 0x010,
+        MATE_ALIGNMENT_START = 0x020,
+        CIGAR                = 0x040,
+        READS                = 0x080,
+        QUALITIES            = 0x100,
+        FLAGS                = 0x200,
+        MAPQ                 = 0x400,
 
-    // list of tags that we require
-    READ_GROUP           = 0x800,
-};
+        // list of tags that we require
+        READ_GROUP           = 0x800,
+    };
+}
 
 // CRQ: cigars, reads, qualities
 struct CRQ_index
@@ -274,68 +277,68 @@ struct alignment_batch_host : public alignment_batch_storage<host_tag>
 
         read_group.clear();
 
-        if (data_mask & NAME)
+        if (data_mask & AlignmentDataMask::NAME)
         {
             name.reserve(batch_size);
         }
 
-        if (data_mask & CHROMOSOME)
+        if (data_mask & AlignmentDataMask::CHROMOSOME)
         {
             chromosome.reserve(batch_size);
         }
 
-        if (data_mask & ALIGNMENT_START)
+        if (data_mask & AlignmentDataMask::ALIGNMENT_START)
         {
             alignment_start.reserve(batch_size);
         }
 
-        if (data_mask & ALIGNMENT_STOP)
+        if (data_mask & AlignmentDataMask::ALIGNMENT_STOP)
         {
             alignment_stop.reserve(batch_size);
         }
 
-        if (data_mask & MATE_CHROMOSOME)
+        if (data_mask & AlignmentDataMask::MATE_CHROMOSOME)
         {
             mate_chromosome.reserve(batch_size);
         }
 
-        if (data_mask & MATE_ALIGNMENT_START)
+        if (data_mask & AlignmentDataMask::MATE_ALIGNMENT_START)
         {
             mate_alignment_start.reserve(batch_size);
         }
 
-        if (data_mask & CIGAR)
+        if (data_mask & AlignmentDataMask::CIGAR)
         {
             cigars.reserve(batch_size * 32);
             cigar_start.reserve(batch_size);
             cigar_len.reserve(batch_size);
         }
 
-        if (data_mask & READS)
+        if (data_mask & AlignmentDataMask::READS)
         {
             reads.reserve(batch_size * 100);
             read_start.reserve(batch_size);
             read_len.reserve(batch_size);
         }
 
-        if (data_mask & QUALITIES)
+        if (data_mask & AlignmentDataMask::QUALITIES)
         {
             qualities.reserve(batch_size * 100);
             qual_start.reserve(batch_size);
             qual_len.reserve(batch_size);
         }
 
-        if (data_mask & FLAGS)
+        if (data_mask & AlignmentDataMask::FLAGS)
         {
             flags.reserve(batch_size);
         }
 
-        if (data_mask & MAPQ)
+        if (data_mask & AlignmentDataMask::MAPQ)
         {
             mapq.reserve(batch_size);
         }
 
-        if (data_mask & READ_GROUP)
+        if (data_mask & AlignmentDataMask::READ_GROUP)
         {
             read_group.reserve(batch_size);
         }
@@ -359,42 +362,42 @@ struct alignment_batch
     {
         device.num_reads = host.num_reads;
 
-        if (data_mask & CHROMOSOME)
+        if (data_mask & AlignmentDataMask::CHROMOSOME)
         {
             device.chromosome = host.chromosome;
         } else {
             device.chromosome.clear();
         }
 
-        if (data_mask & ALIGNMENT_START)
+        if (data_mask & AlignmentDataMask::ALIGNMENT_START)
         {
             device.alignment_start = host.alignment_start;
         } else {
             device.alignment_start.clear();
         }
 
-        if (data_mask & ALIGNMENT_STOP)
+        if (data_mask & AlignmentDataMask::ALIGNMENT_STOP)
         {
             device.alignment_stop = host.alignment_stop;
         } else {
             device.alignment_stop.clear();
         }
 
-        if (data_mask & MATE_CHROMOSOME)
+        if (data_mask & AlignmentDataMask::MATE_CHROMOSOME)
         {
             device.mate_chromosome = host.mate_chromosome;
         } else {
             device.mate_chromosome.clear();
         }
 
-        if (data_mask & MATE_ALIGNMENT_START)
+        if (data_mask & AlignmentDataMask::MATE_ALIGNMENT_START)
         {
             device.mate_alignment_start = host.mate_alignment_start;
         } else {
             device.mate_alignment_start.clear();
         }
 
-        if (data_mask & CIGAR)
+        if (data_mask & AlignmentDataMask::CIGAR)
         {
             device.cigars = host.cigars;
             device.cigar_start = host.cigar_start;
@@ -405,7 +408,7 @@ struct alignment_batch
             device.cigar_len.clear();
         }
 
-        if (data_mask & READS)
+        if (data_mask & AlignmentDataMask::READS)
         {
             device.reads = host.reads;
             device.read_start = host.read_start;
@@ -416,7 +419,7 @@ struct alignment_batch
             device.read_len.clear();
         }
 
-        if (data_mask & QUALITIES)
+        if (data_mask & AlignmentDataMask::QUALITIES)
         {
             device.qualities = host.qualities;
             device.qual_start = host.qual_start;
@@ -427,21 +430,21 @@ struct alignment_batch
             device.qual_len.clear();
         }
 
-        if (data_mask & FLAGS)
+        if (data_mask & AlignmentDataMask::FLAGS)
         {
             device.flags = host.flags;
         } else {
             device.flags.clear();
         }
 
-        if (data_mask & MAPQ)
+        if (data_mask & AlignmentDataMask::MAPQ)
         {
             device.mapq = host.mapq;
         } else {
             device.mapq.clear();
         }
 
-        if (data_mask & READ_GROUP)
+        if (data_mask & AlignmentDataMask::READ_GROUP)
         {
             device.read_group = host.read_group;
         } else {

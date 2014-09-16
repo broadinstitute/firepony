@@ -114,32 +114,32 @@ bool gamgee_file::next_batch(alignment_batch *batch, uint32 data_mask, const uin
         h_batch->num_reads++;
         h_batch->name.push_back(record.name());
 
-        if (data_mask & CHROMOSOME)
+        if (data_mask & AlignmentDataMask::CHROMOSOME)
         {
             h_batch->chromosome.push_back(record.chromosome());
         }
 
-        if (data_mask & ALIGNMENT_START)
+        if (data_mask & AlignmentDataMask::ALIGNMENT_START)
         {
             h_batch->alignment_start.push_back(record.alignment_start() - 1);
         }
 
-        if (data_mask & ALIGNMENT_STOP)
+        if (data_mask & AlignmentDataMask::ALIGNMENT_STOP)
         {
             h_batch->alignment_stop.push_back(record.alignment_stop() - 1);
         }
 
-        if (data_mask & MATE_CHROMOSOME)
+        if (data_mask & AlignmentDataMask::MATE_CHROMOSOME)
         {
             h_batch->mate_chromosome.push_back(record.mate_chromosome());
         }
 
-        if (data_mask & MATE_ALIGNMENT_START)
+        if (data_mask & AlignmentDataMask::MATE_ALIGNMENT_START)
         {
             h_batch->mate_alignment_start.push_back(record.mate_alignment_start() - 1);
         }
 
-        if (data_mask & CIGAR)
+        if (data_mask & AlignmentDataMask::CIGAR)
         {
             gamgee::Cigar cigar = record.cigar();
 
@@ -157,7 +157,7 @@ bool gamgee_file::next_batch(alignment_batch *batch, uint32 data_mask, const uin
             }
         }
 
-        if (data_mask & READS)
+        if (data_mask & AlignmentDataMask::READS)
         {
             gamgee::ReadBases read = record.bases();
 
@@ -178,7 +178,7 @@ bool gamgee_file::next_batch(alignment_batch *batch, uint32 data_mask, const uin
             }
         }
 
-        if (data_mask & QUALITIES)
+        if (data_mask & AlignmentDataMask::QUALITIES)
         {
             gamgee::BaseQuals quals = record.base_quals();
 
@@ -189,17 +189,17 @@ bool gamgee_file::next_batch(alignment_batch *batch, uint32 data_mask, const uin
             memcpy(&h_batch->qualities[h_batch->qual_start[read_id]], &quals[0], quals.size());
         }
 
-        if (data_mask & FLAGS)
+        if (data_mask & AlignmentDataMask::FLAGS)
         {
             h_batch->flags.push_back(extract_gamgee_flags(record));
         }
 
-        if (data_mask & MAPQ)
+        if (data_mask & AlignmentDataMask::MAPQ)
         {
             h_batch->mapq.push_back(record.mapping_qual());
         }
 
-        if (data_mask & READ_GROUP)
+        if (data_mask & AlignmentDataMask::READ_GROUP)
         {
             // locate the RG tag
             gamgee::SamTag<std::string> tag = record.string_tag("RG");

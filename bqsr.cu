@@ -111,15 +111,15 @@ int main(int argc, char **argv)
 
     bqsr_context context(bam.header, dev_db, reference);
 
-    uint32 data_mask = BatchDataMask::NAME |
-                        BatchDataMask::CHROMOSOME |
-                        BatchDataMask::ALIGNMENT_START |
-                        BatchDataMask::CIGAR |
-                        BatchDataMask::READS |
-                        BatchDataMask::QUALITIES |
-                        BatchDataMask::FLAGS |
-                        BatchDataMask::MAPQ |
-                        BatchDataMask::READ_GROUP;
+    uint32 data_mask = AlignmentDataMask::NAME |
+                        AlignmentDataMask::CHROMOSOME |
+                        AlignmentDataMask::ALIGNMENT_START |
+                        AlignmentDataMask::CIGAR |
+                        AlignmentDataMask::READS |
+                        AlignmentDataMask::QUALITIES |
+                        AlignmentDataMask::FLAGS |
+                        AlignmentDataMask::MAPQ |
+                        AlignmentDataMask::READ_GROUP;
 
     while(bam.next_batch(&batch, data_mask, 100000))
 //    while(bam.next_batch(&batch, 500))

@@ -68,7 +68,7 @@ struct compute_read_offset_list : public bqsr_lambda
     {
         const BAM_CRQ_index& idx = batch.crq_index[read_index];
 
-        const BAM_cigar_op *cigar = &batch.cigars[idx.cigar_start];
+        const cigar_op *cigar = &batch.cigars[idx.cigar_start];
         uint16 *offset_list = &ctx.read_offset_list[idx.read_start];
 
         // create a list of offsets from the base alignment position for each BP in the read
@@ -77,9 +77,9 @@ struct compute_read_offset_list : public bqsr_lambda
         {
             switch(cigar[c].op)
             {
-            case BAM_cigar_op::OP_M:
-            case BAM_cigar_op::OP_MATCH:
-            case BAM_cigar_op::OP_X:
+            case cigar_op::OP_M:
+            case cigar_op::OP_MATCH:
+            case cigar_op::OP_X:
                 for(uint32 i = 0; i < cigar[c].len; i++)
                 {
                     *offset_list = offset;
@@ -89,8 +89,8 @@ struct compute_read_offset_list : public bqsr_lambda
 
                 break;
 
-            case BAM_cigar_op::OP_I:
-            case BAM_cigar_op::OP_N:
+            case cigar_op::OP_I:
+            case cigar_op::OP_N:
                 for(uint32 i = 0; i < cigar[c].len; i++)
                 {
                     *offset_list = offset;
@@ -99,13 +99,13 @@ struct compute_read_offset_list : public bqsr_lambda
 
                 break;
 
-            case BAM_cigar_op::OP_D:
-            case BAM_cigar_op::OP_H:
-            case BAM_cigar_op::OP_P:
+            case cigar_op::OP_D:
+            case cigar_op::OP_H:
+            case cigar_op::OP_P:
                 offset += cigar[c].len;
                 break;
 
-            case BAM_cigar_op::OP_S:
+            case cigar_op::OP_S:
                 for(uint32 i = 0; i < cigar[c].len; i++)
                 {
                     *offset_list = uint16(-1);

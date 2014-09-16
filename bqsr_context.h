@@ -76,7 +76,7 @@ struct bqsr_context
     // list of active BP locations
     D_ActiveLocationList active_location_list;
     // list of read offsets in the reference for each BP (relative to the alignment start position)
-    D_ReadOffsetList read_offset_list;
+    D_VectorU16 read_offset_list;
 
     // temporary storage for CUB calls
     D_VectorU8 temp_storage;
@@ -107,7 +107,7 @@ struct bqsr_context
         D_VectorU32_2::plain_view_type          alignment_windows;
         D_VectorU16_2::plain_view_type          sequence_alignment_windows;
         D_ActiveLocationList::plain_view_type   active_location_list;
-        D_ReadOffsetList::plain_view_type       read_offset_list;
+        D_VectorU16::plain_view_type            read_offset_list;
         D_VectorU8::plain_view_type             temp_storage;
         D_VectorU32::plain_view_type            temp_u32;
         snp_filter_context::view                snp_filter;

@@ -307,7 +307,7 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
             readData(&cigar_temp[0], sizeof(uint32) * cigar_len, __LINE__);
             for(uint32 c = 0; c < cigar_len; c++)
             {
-                BAM_cigar_op op;
+                cigar_op op;
                 op.op = cigar_temp[c] & 0xf;
                 op.len = cigar_temp[c] >> 4;
 

@@ -27,9 +27,9 @@
 #include "bam_loader.h"
 
 // compute the length of a given cigar operator
-struct cigar_op_len : public thrust::unary_function<const BAM_cigar_op&, uint32>
+struct cigar_op_len : public thrust::unary_function<const cigar_op&, uint32>
 {
-    NVBIO_HOST_DEVICE uint32 operator() (const BAM_cigar_op& op) const
+    NVBIO_HOST_DEVICE uint32 operator() (const cigar_op& op) const
     {
         return op.len;
     }
@@ -45,29 +45,28 @@ struct cigar_op_expand : public bqsr_lambda
 
     NVBIO_HOST_DEVICE void operator() (const uint32 op_index)
     {
-        const BAM_cigar_op& op = batch.cigars[op_index];
+        const cigar_op& op = batch.cigars[op_index];
         const uint32 out_base = ctx.cigar.cigar_offsets[op_index];
 
         for(uint32 i = 0; i < op.len; i++)
         {
             switch(op.op)
             {
-            case BAM_cigar_op::OP_M:
-            case BAM_cigar_op::OP_MATCH:
-            case BAM_cigar_op::OP_X:
-                ctx.cigar.cigar_ops[out_base + i] = cigar_event::M;
+            case cigar_op::OP_M:
+            case cigar_op::OP_MATCH:
+            case cigar_op::OP_X:
+                ctx.cigar.cigar_events[out_base + i] = cigar_event::M;
                 break;
 
-            case BAM_cigar_op::OP_I:
-            case BAM_cigar_op::OP_N:
-            case BAM_cigar_op::OP_S:
-                ctx.cigar.cigar_ops[out_base + i] = cigar_event::I;
+            case cigar_op::OP_I:
+            case cigar_op::OP_N:
+                ctx.cigar.cigar_events[out_base + i] = cigar_event::I;
                 break;
 
-            case BAM_cigar_op::OP_D:
-            case BAM_cigar_op::OP_H:
-            case BAM_cigar_op::OP_P:
-                ctx.cigar.cigar_ops[out_base + i] = cigar_event::D;
+            case cigar_op::OP_D:
+            case cigar_op::OP_H:
+            case cigar_op::OP_P:
+                ctx.cigar.cigar_events[out_base + i] = cigar_event::D;
                 break;
             }
         }
@@ -86,7 +85,7 @@ struct cigar_coordinates_expand : public bqsr_lambda
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const BAM_CRQ_index& idx = batch.crq_index[read_index];
-        const BAM_cigar_op *cigar = &batch.cigars[idx.cigar_start];
+        const cigar_op *cigar = &batch.cigars[idx.cigar_start];
 
         uint32 base = ctx.cigar.cigar_offsets[idx.cigar_start];
         uint16 *output_read_coordinates = &ctx.cigar.cigar_op_read_coordinates[base];
@@ -99,9 +98,9 @@ struct cigar_coordinates_expand : public bqsr_lambda
         {
             switch(cigar[c].op)
             {
-            case BAM_cigar_op::OP_M:
-            case BAM_cigar_op::OP_MATCH:
-            case BAM_cigar_op::OP_X:
+            case cigar_op::OP_M:
+            case cigar_op::OP_MATCH:
+            case cigar_op::OP_X:
                 for(uint32 i = 0; i < cigar[c].len; i++)
                 {
                     *output_read_coordinates++ = read_offset;
@@ -113,7 +112,7 @@ struct cigar_coordinates_expand : public bqsr_lambda
 
                 break;
 
-            case BAM_cigar_op::OP_S:
+            case cigar_op::OP_S:
                 for(uint32 i = 0; i < cigar[c].len; i++)
                 {
                     *output_read_coordinates++ = uint16(-1);
@@ -124,8 +123,8 @@ struct cigar_coordinates_expand : public bqsr_lambda
 
                 break;
 
-            case BAM_cigar_op::OP_I:
-            case BAM_cigar_op::OP_N:
+            case cigar_op::OP_N: // xxxnsubtil: N is really not supported and shouldn't be here
+            case cigar_op::OP_I:
                 for(uint32 i = 0; i < cigar[c].len; i++)
                 {
                     *output_read_coordinates++ = read_offset;
@@ -136,9 +135,9 @@ struct cigar_coordinates_expand : public bqsr_lambda
 
                 break;
 
-            case BAM_cigar_op::OP_D:
-            case BAM_cigar_op::OP_H:
-            case BAM_cigar_op::OP_P:
+            case cigar_op::OP_D:
+            case cigar_op::OP_H:
+            case cigar_op::OP_P: // xxxnsubtil: not sure how to handle P
                 for(uint32 i = 0; i < cigar[c].len; i++)
                 {
                     *output_read_coordinates++ = uint16(-1);

@@ -25,11 +25,30 @@ using namespace nvbio;
 
 struct cigar_event
 {
-    enum {
-        M = 0,
-        I = 1,
-        D = 2,
-    };
+    // note that this is stored in a packed 2-bit vector
+    typedef enum {
+        M = 0,  // match or mismatch
+        I = 1,  // insertion to the reference
+        D = 2,  // deletion from the reference
+        S = 3,  // soft clipping (bases exist in read but not in reference)
+    } Event;
+
+    static char ascii(Event e)
+    {
+        return e == M ? 'M' :
+               e == I ? 'I' :
+               e == D ? 'D' :
+                        'S';
+    }
+
+    static char ascii(uint32 e)
+    {
+        return e == M ? 'M' :
+               e == I ? 'I' :
+               e == D ? 'D' :
+               e == S ? 'S' :
+                        '?';
+    }
 };
 
 struct cigar_context

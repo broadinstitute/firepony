@@ -143,40 +143,6 @@ struct BAM_alignment_data
 };
 */
 
-struct BAM_cigar_op
-{
-    uint32 len:24, op:4;
-
-    enum
-    {
-        OP_M     = 0,
-        OP_I     = 1,
-        OP_D     = 2,
-        OP_N     = 3,
-        OP_S     = 4,
-        OP_H     = 5,
-        OP_P     = 6,
-        OP_MATCH = 7,
-        OP_X     = 8,
-    };
-
-    NVBIO_HOST_DEVICE char ascii_op(void) const
-    {
-        return op == 0 ? 'M' :
-               op == 1 ? 'I' :
-               op == 2 ? 'D' :
-               op == 3 ? 'N' :
-               op == 4 ? 'S' :
-               op == 5 ? 'H' :
-               op == 6 ? 'P' :
-               op == 7 ? '=' :
-                         'X';
-    }
-};
-
-typedef nvbio::vector<device_tag, BAM_cigar_op> D_VectorCigarOp;
-typedef nvbio::vector<host_tag, BAM_cigar_op> H_VectorCigarOp;
-
 // CRQ: cigars, reads, qualities
 struct BAM_CRQ_index
 {
@@ -207,7 +173,7 @@ struct BAM_alignment_batch_storage
 {
     uint32 num_reads;
 
-    nvbio::vector<system_tag, BAM_cigar_op> cigars;
+    nvbio::vector<system_tag, cigar_op> cigars;
     nvbio::PackedVector<system_tag, 4> reads; //VectorDNA16<system_tag> reads;
     nvbio::vector<system_tag, uint8> qualities;
     nvbio::vector<system_tag, uint16> flags;
@@ -341,7 +307,7 @@ struct BAM_alignment_batch_device_view
     uint32 num_reads;
 
     uint32 *read_order;
-    BAM_cigar_op *cigars;
+    cigar_op *cigars;
     uint32 *reads;
     uint8 *qualities;
     uint32 *read_groups;

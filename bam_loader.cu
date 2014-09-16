@@ -284,7 +284,15 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
 
         // push the alignment position
         batch->alignment_positions.push_back(align.pos); // BAM pos is 0-based
-        batch->alignment_sequence_IDs.push_back(align.refID);
+
+        // make sure the refID is valid and push it
+        if (align.refID < 0 || uint32(align.refID) >= header.n_ref)
+        {
+            // push an invalid refID
+            batch->alignment_sequence_IDs.push_back(uint32(-1));
+        } else {
+            batch->alignment_sequence_IDs.push_back(align.refID);
+        }
 
         // figure out the CIGAR length and make sure we can store it
         const uint32 cigar_len = (align.flag_nc & 0xffff);

@@ -24,6 +24,12 @@ util.cu
 util.h
 variants.cu
 variants.h
+
+from_nvbio/alphabet_inl.h
+from_nvbio/alphabet.h
+from_nvbio/dna.h
+from_nvbio/vcf.cu
+from_nvbio/vcf.h
 )
 
 nvbio_add_module_directory(primitives)

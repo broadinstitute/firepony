@@ -16,10 +16,11 @@
  *
  */
 
-#include <nvbio/basic/dna.h>
+#include "from_nvbio/dna.h"
+#include "from_nvbio/vcf.h"
+
 #include <nvbio/io/sequence/sequence.h>
 #include <nvbio/io/sequence/sequence_access.h>
-#include <nvbio/io/vcf.h>
 #include <nvbio/io/sequence/sequence_pac.h>
 
 #include <map>
@@ -95,7 +96,7 @@ int main(int argc, char **argv)
 
     SNPDatabase_refIDs db;
     printf("loading variant database %s...\n", vcf_name);
-    nvbio::io::loadVCF(db, vcf_name);
+    loadVCF(db, vcf_name);
     db.compute_sequence_offsets(reference);
 
     DeviceSNPDatabase dev_db;

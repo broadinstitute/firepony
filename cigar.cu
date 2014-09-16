@@ -16,7 +16,7 @@
  *
  */
 
-#include <nvbio/basic/dna.h>
+#include "from_nvbio/dna.h"
 
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/functional.h>

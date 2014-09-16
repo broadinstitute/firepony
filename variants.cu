@@ -32,15 +32,15 @@ void SNPDatabase_refIDs::compute_sequence_offsets(const reference_genome& genome
     {
         uint32 h = bqsr_string_hash(reference_sequence_names[c].c_str());
 
-        assert(genome.ref_sequence_id_map.find(h) != genome.ref_sequence_id_map.end());
+        assert(genome.sequence_id_map.find(h) != genome.sequence_id_map.end());
 
         // use find() to avoid touching the map --- operator[] can insert, which is invalid on a const object
-        uint32 id = (*genome.ref_sequence_id_map.find(h)).second;
+        uint32 id = (*genome.sequence_id_map.find(h)).second;
         variant_sequence_ref_ids[c] = id;
 
         // store the genome offset for this VCF entry
-        genome_start_positions[c] = genome.ref_sequence_offsets[id] + sequence_positions[c].x - 1; // sequence positions are 1-based, genome positions are 0-based
-        genome_stop_positions[c] = genome.ref_sequence_offsets[id] + sequence_positions[c].y - 1;
+        genome_start_positions[c] = genome.sequence_offsets[id] + sequence_positions[c].x - 1; // sequence positions are 1-based, genome positions are 0-based
+        genome_stop_positions[c] = genome.sequence_offsets[id] + sequence_positions[c].y - 1;
     }
 }
 
@@ -159,7 +159,7 @@ struct compute_alignment_window : public bqsr_lambda
             output = make_uint2(uint32(-1), uint32(-1));
         } else {
             // transform the start position
-            output.x = ctx.reference.ref_sequence_offsets[batch.alignment_sequence_IDs[read_index]] + batch.alignment_positions[read_index];
+            output.x = ctx.reference.sequence_offsets[batch.alignment_sequence_IDs[read_index]] + batch.alignment_positions[read_index];
             output.y = output.x + offset_list[c];
 
             output_sequence.x = batch.alignment_positions[read_index];

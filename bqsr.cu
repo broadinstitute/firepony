@@ -188,7 +188,7 @@ void debug_read(bqsr_context *context, const reference_genome& genome, const BAM
     const uint2 alignment_window = context->alignment_windows[read_index];
     printf("  sequence name [%s]\n  sequence base [%u]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
             &view.m_name_stream[view.m_name_index[batch.alignment_sequence_IDs[read_index]]],
-            genome.ref_sequence_offsets[batch.alignment_sequence_IDs[read_index]],
+            genome.sequence_offsets[batch.alignment_sequence_IDs[read_index]],
             batch.alignment_positions[read_index],
             alignment_window.x,
             alignment_window.y);

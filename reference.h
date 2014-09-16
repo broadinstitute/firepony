@@ -33,7 +33,7 @@ using namespace nvbio;
 struct reference_genome_device
 {
     io::SequenceDataDevice *d_ref;
-    D_VectorU32 ref_sequence_offsets;
+    D_VectorU32 sequence_offsets;
 
     reference_genome_device();
     ~reference_genome_device();
@@ -44,14 +44,14 @@ struct reference_genome_device
     struct const_view
     {
         const nvbio::io::SequenceDataDevice::const_plain_view_type genome_stream;
-        const D_VectorU32::const_plain_view_type ref_sequence_offsets;
+        const D_VectorU32::const_plain_view_type sequence_offsets;
     };
 
     operator const_view() const
     {
         const_view v = {
                 plain_view(*d_ref),
-                plain_view(ref_sequence_offsets)
+                plain_view(sequence_offsets)
         };
 
         return v;
@@ -62,9 +62,9 @@ struct reference_genome
 {
     io::SequenceData *h_ref;
     // maps ref sequence name hash to ref sequence ID
-    std::map<uint32, uint32> ref_sequence_id_map;
+    std::map<uint32, uint32> sequence_id_map;
     // maps ref sequence ID to ref sequence offset
-    H_VectorU32 ref_sequence_offsets;
+    H_VectorU32 sequence_offsets;
 
     struct reference_genome_device device;
 

@@ -45,7 +45,7 @@ reference_genome_device::~reference_genome_device()
 void reference_genome_device::load(io::SequenceData *h_ref, const H_VectorU32& ref_sequence_offsets)
 {
     d_ref = new io::SequenceDataDevice(*h_ref);
-    this->ref_sequence_offsets = ref_sequence_offsets;
+    this->sequence_offsets = ref_sequence_offsets;
 }
 
 reference_genome::reference_genome()
@@ -78,13 +78,13 @@ bool reference_genome::load(const char *name)
 
 void reference_genome::download(void)
 {
-    device.load(h_ref, ref_sequence_offsets);
+    device.load(h_ref, sequence_offsets);
 }
 
 void reference_genome::generate_reference_sequence_map(void)
 {
     io::SequenceDataView view = plain_view(*h_ref);
-    ref_sequence_offsets.resize(view.m_n_seqs);
+    sequence_offsets.resize(view.m_n_seqs + 1);
 
     uint32 ref_seq_id = 0;
     for(unsigned int i = 0; i < view.m_n_seqs; i++)
@@ -92,12 +92,14 @@ void reference_genome::generate_reference_sequence_map(void)
         char *name = &view.m_name_stream[view.m_name_index[i]];
         uint32 h = bqsr_string_hash(name);
 
-        NVBIO_CUDA_ASSERT(ref_sequence_id_map.find(h) == ref_sequence_id_map.end() ||
+        NVBIO_CUDA_ASSERT(sequence_id_map.find(h) == sequence_id_map.end() ||
                           !"duplicate reference sequence name!");
 
-        ref_sequence_id_map[h] = ref_seq_id;
-        ref_sequence_offsets[ref_seq_id] = view.m_sequence_index[i];
+        sequence_id_map[h] = ref_seq_id;
+        sequence_offsets[ref_seq_id] = view.m_sequence_index[i];
 
         ref_seq_id++;
     }
+
+    sequence_offsets[view.m_n_seqs] = h_ref->m_sequence_stream_len;
 }

@@ -21,6 +21,7 @@
 #include "bqsr_types.h"
 #include "alignment_data.h"
 #include "sequence_data.h"
+#include "variant_data.h"
 #include "variants.h"
 #include "covariates.h"
 #include "cigar.h"
@@ -43,7 +44,7 @@ struct bqsr_statistics // host-only
 struct bqsr_context
 {
     alignment_header& bam_header;
-    const DeviceSNPDatabase& db;
+    const variant_database& variant_db;
     const sequence_data& reference;
 
     // sorted list of active reads
@@ -77,17 +78,17 @@ struct bqsr_context
     bqsr_statistics stats;
 
     bqsr_context(alignment_header& bam_header,
-                 const DeviceSNPDatabase& db,
+                 const variant_database& variant_db,
                  const sequence_data& reference)
         : bam_header(bam_header),
-          db(db),
+          variant_db(variant_db),
           reference(reference)
     { }
 
     struct view
     {
         alignment_header::const_view            bam_header;
-        DeviceSNPDatabase::const_view           db;
+        variant_database_device::const_view     variant_db;
         sequence_data_device::const_view        reference;
         D_VectorU32::view                       active_read_list;
         D_VectorU32_2::view                     alignment_windows;
@@ -109,7 +110,7 @@ struct bqsr_context
     {
         view v = {
             bam_header,
-            db,
+            variant_db.device,
             reference.device,
             active_read_list,
             alignment_windows,

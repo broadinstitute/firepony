@@ -41,4 +41,4 @@ public:
 };
 
 bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 data_mask, bool try_mmap = true);
-bool gamgee_load_vcf(variant_db& output, const char *fname, uint32 data_mask);
+bool gamgee_load_vcf(variant_database *output, const sequence_data& reference, const char *filename, uint32 data_mask, bool try_mmap = true);

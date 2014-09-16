@@ -96,9 +96,11 @@ void sequence_data::unserialize(shared_memory_file& shm)
     host_mmap_container = shm;
 }
 
-void sequence_data::download(void)
+size_t sequence_data::download(void)
 {
-    uint64 num_bytes = 0;
+    size_t num_bytes = 0;
+#define TRACK_VECTOR_SIZE(f) num_bytes += sizeof(host.f[0]) * device.f.size();
+#define TRACK_PACKED_VECTOR_SIZE(f) num_bytes += sizeof(uint32) * device.f.m_storage.size();
 
     device.num_sequences = host.num_sequences;
 
@@ -107,7 +109,10 @@ void sequence_data::download(void)
         device.bases.copy_from_view(host.bases);
         device.sequence_bp_start.copy_from_view(host.sequence_bp_start);
         device.sequence_bp_len.copy_from_view(host.sequence_bp_len);
-        num_bytes += host.bases.size() / 2 + host.sequence_bp_start.size() * 8 + host.sequence_bp_len.size() * 8;
+
+        TRACK_PACKED_VECTOR_SIZE(bases);
+        TRACK_VECTOR_SIZE(sequence_bp_start);
+        TRACK_VECTOR_SIZE(sequence_bp_len);
     }
 
     if (data_mask & SequenceDataMask::QUALITIES)
@@ -116,15 +121,18 @@ void sequence_data::download(void)
         device.sequence_qual_start.copy_from_view(host.sequence_qual_start);
         device.sequence_qual_len.copy_from_view(host.sequence_qual_len);
 
-        num_bytes += host.qualities.size() + host.sequence_qual_start.size() * 8 + host.sequence_qual_len.size() * 8;
+        TRACK_VECTOR_SIZE(qualities);
+        TRACK_VECTOR_SIZE(sequence_qual_start);
+        TRACK_VECTOR_SIZE(sequence_qual_len);
     }
 
     if (data_mask & SequenceDataMask::NAMES)
     {
         device.sequence_id.copy_from_view(host.sequence_id);
-
-        num_bytes += host.sequence_id.size() * 4;
+        TRACK_VECTOR_SIZE(sequence_id);
     }
 
-    printf("downloaded %lu MB of sequence data\n", num_bytes / (1024 * 1024));
+    return num_bytes;
+#undef TRACK_VECTOR_SIZE
+#undef TRACK_PACKED_VECTOR_SIZE
 }

@@ -311,19 +311,23 @@ bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 d
     return true;
 }
 
-bool gamgee_load_vcf(variant_db& output, const char *fname, uint32 data_mask)
+bool gamgee_load_vcf(variant_database *output, const sequence_data& reference, const char *filename, uint32 data_mask, bool try_mmap)
 {
-    auto& batch = output.host;
-    auto& header = output.header;
 
-    for(auto& record : gamgee::VariantReader<gamgee::VariantIterator>{std::string(fname)})
+    auto& batch = output->host_malloc_container;
+    output->data_mask = data_mask;
+
+    for(auto& record : gamgee::VariantReader<gamgee::VariantIterator>{std::string(filename)})
     {
         // collect all the common variant data
         struct
         {
             uint32 chromosome;
-            uint32 alignment_start;
-            uint32 alignment_stop;
+            uint32 chromosome_window_start;
+            uint32 reference_window_start;
+            uint32 alignment_window_len;
+            uint32 reference_sequence_start;
+            uint32 reference_sequence_len;
             uint32 id;
             float qual;
             uint32 n_samples;
@@ -335,15 +339,24 @@ bool gamgee_load_vcf(variant_db& output, const char *fname, uint32 data_mask)
             uint32 gamgee_chromosome_id = record.chromosome();
             std::string chromosome_name = record.header().chromosomes()[gamgee_chromosome_id];
 
-            variant_data.chromosome = header.chromosome_db.insert(chromosome_name);
+            uint32 id = reference.sequence_names.lookup(chromosome_name);
+            if (id == uint32(-1))
+            {
+                printf("WARNING: chromosome %s not found in reference data, skipping\n", chromosome_name.c_str());
+                continue;
+            }
+
+            variant_data.chromosome = id;
         }
 
-        variant_data.alignment_start = record.alignment_start();
-        variant_data.alignment_stop = record.alignment_stop();
+        variant_data.chromosome_window_start = record.alignment_start();
+        // note: VCF positions are 1-based, but we convert to 0-based in the reference window
+        variant_data.reference_window_start = record.alignment_start() + reference.host.sequence_bp_start[variant_data.chromosome] - 1;
+        variant_data.alignment_window_len = record.alignment_stop() - record.alignment_start();
 
         if (data_mask & VariantDataMask::ID)
         {
-            variant_data.id = header.id_db.insert(record.id());
+            variant_data.id = output->id_db.insert(record.id());
         }
 
         variant_data.qual = record.qual();
@@ -361,14 +374,11 @@ bool gamgee_load_vcf(variant_db& output, const char *fname, uint32 data_mask)
                 batch.chromosome.push_back(variant_data.chromosome);
             }
 
-            if (data_mask & VariantDataMask::ALIGNMENT_START)
+            if (data_mask & VariantDataMask::ALIGNMENT)
             {
-                batch.alignment_start.push_back(variant_data.alignment_start);
-            }
-
-            if (data_mask & VariantDataMask::ALIGNMENT_STOP)
-            {
-                batch.alignment_stop.push_back(variant_data.alignment_stop);
+                batch.chromosome_window_start.push_back(variant_data.chromosome_window_start);
+                batch.reference_window_start.push_back(variant_data.reference_window_start);
+                batch.alignment_window_len.push_back(variant_data.alignment_window_len);
             }
 
             if (data_mask & VariantDataMask::ID)
@@ -379,35 +389,35 @@ bool gamgee_load_vcf(variant_db& output, const char *fname, uint32 data_mask)
             if (data_mask & VariantDataMask::REFERENCE)
             {
                 const std::string& ref = record.ref();
-                uint32 ref_start = batch.reference.size();
-                uint32 ref_len = ref.size();
+                const uint32 ref_start = batch.reference_sequence.size();
+                const uint32 ref_len = ref.size();
 
-                batch.reference_start.push_back(ref_start);
-                batch.reference_len.push_back(ref_len);
+                batch.reference_sequence_start.push_back(ref_start);
+                batch.reference_sequence_len.push_back(ref_len);
 
                 // make sure we have enough memory, then read in the sequence
                 // xxxnsubtil: we don't pad reference data to a dword multiple since variants are
                 // meant to be read-only, so RMW hazards should never happen
-                batch.reference.resize(ref_start + ref_len);
+                batch.reference_sequence.resize(ref_start + ref_len);
                 for(uint32 i = 0; i < ref_len; i++)
                 {
-                    batch.reference[ref_start + i] = from_nvbio::char_to_iupac16(ref[i]);
+                    batch.reference_sequence[ref_start + i] = from_nvbio::char_to_iupac16(ref[i]);
                 }
             }
 
             if (data_mask & VariantDataMask::ALTERNATE)
             {
-                uint32 alt_start = batch.alternate.size();
-                uint32 alt_len = alt.size();
+                const uint32 alt_start = batch.alternate_sequence.size();
+                const uint32 alt_len = alt.size();
 
-                batch.alternate_start.push_back(alt_start);
-                batch.alternate_len.push_back(alt_len);
+                batch.alternate_sequence_start.push_back(alt_start);
+                batch.alternate_sequence_len.push_back(alt_len);
 
                 // xxxnsubtil: same as above, this is not padded to dword size
-                batch.alternate.resize(alt_start + alt_len);
+                batch.alternate_sequence.resize(alt_start + alt_len);
                 for(uint32 i = 0; i < alt_len; i++)
                 {
-                    batch.alternate[alt_start + i] = from_nvbio::char_to_iupac16(alt[i]);
+                    batch.alternate_sequence[alt_start + i] = from_nvbio::char_to_iupac16(alt[i]);
                 }
             }
 
@@ -428,5 +438,6 @@ bool gamgee_load_vcf(variant_db& output, const char *fname, uint32 data_mask)
         }
     }
 
+    output->host = output->host_malloc_container;
     return true;
 }

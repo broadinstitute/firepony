@@ -27,6 +27,7 @@ string_database.cu
 util.cu
 util.h
 variant_data.h
+variant_data.cu
 variants.cu
 variants.h
 
@@ -34,8 +35,6 @@ from_nvbio/alphabet_inl.h
 from_nvbio/alphabet.h
 from_nvbio/bufferedtextfile.h
 from_nvbio/dna.h
-from_nvbio/vcf.cu
-from_nvbio/vcf.h
 
 primitives/algorithms.h
 primitives/cuda.h

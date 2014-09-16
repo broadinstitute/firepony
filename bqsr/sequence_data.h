@@ -109,5 +109,6 @@ struct sequence_data
     size_t serialized_size(void);
     void *serialize(void *out);
     void unserialize(shared_memory_file& shm);
-    void download(void);
+
+    size_t download(void);
 };

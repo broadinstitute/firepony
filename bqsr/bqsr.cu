@@ -25,6 +25,7 @@
 #include "gamgee_loader.h"
 #include "alignment_data.h"
 #include "sequence_data.h"
+#include "variant_data.h"
 #include "util.h"
 #include "variants.h"
 #include "bqsr_context.h"
@@ -69,41 +70,50 @@ int main(int argc, char **argv)
 {
     // load the reference genome
     const char *ref_name = "/home/nsubtil/hg96/hs37d5.fa";
-    //const char *ref_name = "/home/nsubtil/hg96/test";
-    const char *vcf_name = "/home/nsubtil/hg96/ALL.chr20.integrated_phase1_v3.20101123.snps_indels_svs.genotypes-stripped.vcf";
-    //const char *vcf_name = "/home/nsubtil/hg96/ALL.chr20.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.vcf";
-    //const char *vcf_name = "/home/nsubtil/hg96/one-variant.vcf";
     const char *bam_name = "/home/nsubtil/hg96/HG00096.chrom20.ILLUMINA.bwa.GBR.low_coverage.20120522.bam";
 //    const char *bam_name = "/home/nsubtil/hg96/one-read.bam";
+    const char *vcf_name = "/home/nsubtil/hg96/ALL.chr20.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.vcf";
+
+    sequence_data reference;
+    variant_database vcf;
+    size_t num_bytes;
+    bool ret;
 
     init_cuda();
 
-    sequence_data reference;
-
-    if (gamgee_load_sequences(&reference, ref_name, SequenceDataMask::BASES | SequenceDataMask::NAMES) == false)
+    printf("loading reference from %s...\n", ref_name);
+    ret = gamgee_load_sequences(&reference, ref_name,
+                                SequenceDataMask::BASES |
+                                SequenceDataMask::NAMES);
+    if (ret == false)
     {
         printf("failed to load reference %s\n", ref_name);
         exit(1);
     }
 
-    reference.download();
+    num_bytes = reference.download();
+    printf("downloaded %lu MB of reference data\n", num_bytes / (1024 * 1024));
 
-    SNPDatabase_refIDs db;
     printf("loading variant database %s...\n", vcf_name);
-    loadVCF(db, vcf_name);
-    db.compute_sequence_offsets(reference);
+    ret = gamgee_load_vcf(&vcf, reference, vcf_name, VariantDataMask::CHROMOSOME |
+                                                     VariantDataMask::ALIGNMENT |
+                                                     VariantDataMask::REFERENCE);
+    if (ret == false)
+    {
+        printf("failed to load variant database %s\n", vcf_name);
+        exit(1);
+    }
 
-    DeviceSNPDatabase dev_db;
-    dev_db.load(db);
+    printf("%u variants\n", vcf.host.num_variants);
 
+    num_bytes = vcf.download();
+    printf("downloaded %lu MB of variant data\n", num_bytes / (1024 * 1024));
 
-    printf("%lu variants\n", db.genome_start_positions.size());
     printf("reading BAM %s...\n", bam_name);
-
     gamgee_alignment_file bam(bam_name);
     alignment_batch batch;
 
-    bqsr_context context(bam.header, dev_db, reference);
+    bqsr_context context(bam.header, vcf, reference);
 
     uint32 data_mask = AlignmentDataMask::NAME |
                         AlignmentDataMask::CHROMOSOME |

@@ -19,25 +19,19 @@
 #pragma once
 
 #include "bqsr_types.h"
-#include "util.h"
+#include "string_database.h"
+#include "mmap.h"
 
 #include <vector>
 
 #include <gamgee/variant.h>
-
-struct variant_db_header
-{
-       string_database id_db;
-       string_database chromosome_db;
-};
 
 namespace VariantDataMask
 {
     enum
     {
         CHROMOSOME          = 0x001,
-        ALIGNMENT_START     = 0x002,
-        ALIGNMENT_STOP      = 0x004,
+        ALIGNMENT           = 0x002,
         ID                  = 0x008,
         REFERENCE           = 0x010,
         ALTERNATE           = 0x020,
@@ -48,7 +42,7 @@ namespace VariantDataMask
 };
 
 template <typename system_tag>
-struct variant_db_storage
+struct variant_database_storage
 {
     template <typename T> using Vector = bqsr::vector<system_tag, T>;
     template <uint32 bits> using PackedVector = bqsr::packed_vector<system_tag, bits>;
@@ -56,132 +50,96 @@ struct variant_db_storage
     uint32 num_variants;
 
     Vector<uint32> chromosome;
-    Vector<uint32> alignment_start;
-    Vector<uint32> alignment_stop;
+    Vector<uint32> chromosome_window_start; // start position relative to the sequence
+    Vector<uint32> reference_window_start;  // global genome start position
+    Vector<uint32> alignment_window_len;    // length of the alignment window
+
     Vector<uint32> id;
     Vector<float> qual;
     Vector<uint32> n_samples;
     Vector<uint32> n_alleles;
 
-    // note: we assume that each DB entry will only have one alternate
+    // note: we assume that each DB entry will only have one alternate_sequence
     // for VCF entries with multiple alternates, we generate one DB entry
-    // for each alternate
+    // for each alternate_sequence
     // also note that we don't support alternate IDs here, only sequences
-    PackedVector<4> reference;
-    Vector<uint32> reference_start;
-    Vector<uint32> reference_len;
+    PackedVector<4> reference_sequence;
+    Vector<uint32> reference_sequence_start;
+    Vector<uint32> reference_sequence_len;
 
-    PackedVector<4> alternate;
-    Vector<uint32> alternate_start;
-    Vector<uint32> alternate_len;
+    PackedVector<4> alternate_sequence;
+    Vector<uint32> alternate_sequence_start;
+    Vector<uint32> alternate_sequence_len;
 
-    CUDA_HOST variant_db_storage()
+    CUDA_HOST variant_database_storage()
         : num_variants(0)
     { }
-};
 
-struct variant_db_device : public variant_db_storage<target_system_tag>
-{
     struct const_view
     {
         uint32 num_variants;
 
-        D_VectorU32::const_view chromosome;
-        D_VectorU32::const_view alignment_start;
-        D_VectorU32::const_view alignment_stop;
-        D_VectorF32::const_view qual;
-        D_VectorU32::const_view n_samples;
-        D_VectorU32::const_view n_alleles;
+        typename Vector<uint32>::const_view chromosome;
+        typename Vector<uint32>::const_view chromosome_window_start;
+        typename Vector<uint32>::const_view reference_window_start;
+        typename Vector<uint32>::const_view alignment_window_len;
 
-        D_PackedVector<4>::const_view reference;
-        D_VectorU32::const_view reference_start;
-        D_VectorU32::const_view reference_len;
+        typename Vector<uint32>::const_view id;
+        typename Vector<float>::const_view qual;
+        typename Vector<uint32>::const_view n_samples;
+        typename Vector<uint32>::const_view n_alleles;
 
-        D_PackedVector<4>::const_view alternate;
-        D_VectorU32::const_view alternate_start;
-        D_VectorU32::const_view alternate_len;
+        typename PackedVector<4>::const_view reference_sequence;
+        typename Vector<uint32>::const_view reference_sequence_start;
+        typename Vector<uint32>::const_view reference_sequence_len;
+
+        typename PackedVector<4>::const_view alternate_sequence;
+        typename Vector<uint32>::const_view alternate_sequence_start;
+        typename Vector<uint32>::const_view alternate_sequence_len;
+
+        typename Vector<uint2>::const_view chromosome_reference_window;
     };
 
-    operator const_view() const
+    CUDA_HOST operator const_view() const
     {
         struct const_view v = {
                 num_variants,
 
                 chromosome,
-                alignment_start,
-                alignment_stop,
+                chromosome_window_start,
+                reference_window_start,
+                alignment_window_len,
+
+                id,
                 qual,
                 n_samples,
                 n_alleles,
-                reference,
-                reference_start,
-                reference_len,
-                alternate,
-                alternate_start,
-                alternate_len,
+                reference_sequence,
+                reference_sequence_start,
+                reference_sequence_len,
+                alternate_sequence,
+                alternate_sequence_start,
+                alternate_sequence_len,
         };
 
         return v;
     }
 };
 
-struct variant_db_host : public variant_db_storage<host_tag>
-{
-};
+typedef variant_database_storage<target_system_tag> variant_database_device;
+typedef variant_database_storage<host_tag> variant_database_host;
 
-struct variant_db
+struct variant_database
 {
     uint32 data_mask;
 
-    variant_db_header header;
+    string_database id_db;
 
-    variant_db_host host;
-    variant_db_device device;
+    variant_database_host::const_view host;
+    variant_database_host host_malloc_container;
+    shared_memory_file host_mmap_container;
 
-    void download(void)
-    {
-        device.num_variants = host.num_variants;
+    variant_database_device device;
 
-        if (data_mask & VariantDataMask::CHROMOSOME)
-        {
-            device.chromosome = host.chromosome;
-        } else {
-            device.chromosome.clear();
-        }
-
-        if (data_mask & VariantDataMask::ALIGNMENT_START)
-        {
-            device.alignment_start = host.alignment_start;
-        } else {
-            device.alignment_start.clear();
-        }
-
-        if (data_mask & VariantDataMask::ALIGNMENT_STOP)
-        {
-            device.alignment_stop = host.alignment_stop;
-        } else {
-            device.alignment_stop.clear();
-        }
-
-        if (data_mask & VariantDataMask::QUAL)
-        {
-            device.qual = host.qual;
-        } else {
-            device.qual.clear();
-        }
-
-        if (data_mask & VariantDataMask::N_SAMPLES)
-        {
-            device.n_samples = host.n_samples;
-        } else {
-            device.n_samples.clear();
-        }
-
-        if (data_mask & VariantDataMask::N_ALLELES)
-        {
-            device.n_alleles = host.n_alleles;
-        } else {
-            device.n_alleles.clear();
-        }
-    };
+    size_t download(void);
 };

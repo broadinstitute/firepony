@@ -539,7 +539,7 @@ void debug_cigar(bqsr_context *context, const alignment_batch& batch, int read_i
         {
             printf("   - ");
         } else {
-            printf("% 3d ", (uint8) context->active_location_list[idx.read_start + bp_offset]);
+            printf("% 3d ", context->active_location_list[idx.read_start + bp_offset] ? 1 : 0);
         }
     }
     printf("]\n");

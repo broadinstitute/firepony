@@ -44,8 +44,10 @@ typedef nvbio::PackedVector<device_tag, 4> D_VectorDNA16;
 typedef H_VectorDNA16::stream_type H_StreamDNA16;
 typedef D_VectorDNA16::stream_type D_StreamDNA16;
 
-typedef nvbio::vector<device_tag, uint2> D_VectorU2;
-typedef nvbio::vector<host_tag, uint2> H_VectorU2;
+typedef nvbio::vector<device_tag, uint2> D_VectorU32_2;
+typedef nvbio::vector<host_tag, uint2> H_VectorU32_2;
+typedef nvbio::vector<device_tag, ushort2> D_VectorU16_2;
+typedef nvbio::vector<host_tag, ushort2> H_VectorU16_2;
 
 // we only use 1 bit per entry on the active location list
 // however, because we write to this using multiple threads that are scanning reads concurrently,

@@ -30,12 +30,12 @@ struct snp_filter_context
     // active reads for the VCF search
     D_VectorU32 active_read_ids;
     // active VCF range for each read
-    D_VectorU2 active_vcf_ranges;
+    D_VectorU32_2 active_vcf_ranges;
 
     struct view
     {
         D_VectorU32::plain_view_type active_read_ids;
-        D_VectorU2::plain_view_type active_vcf_ranges;
+        D_VectorU32_2::plain_view_type active_vcf_ranges;
     };
 
     operator view()
@@ -62,8 +62,9 @@ struct bqsr_context
     // sorted list of active reads
     D_VectorU32 active_read_list;
     // alignment windows for each read in reference coordinates
-    D_VectorU2 alignment_windows;
-
+    D_VectorU32_2 alignment_windows;
+    // alignment windows for each read in local sequence coordinates
+    D_VectorU16_2 sequence_alignment_windows;
 
     // list of active BP locations
     D_ActiveLocationList active_location_list;
@@ -93,7 +94,8 @@ struct bqsr_context
         DeviceSNPDatabase::const_view           db;
         reference_genome_device::const_view     reference;
         D_VectorU32::plain_view_type            active_read_list;
-        D_VectorU2::plain_view_type             alignment_windows;
+        D_VectorU32_2::plain_view_type          alignment_windows;
+        D_VectorU16_2::plain_view_type          sequence_alignment_windows;
         D_ActiveLocationList::plain_view_type   active_location_list;
         D_ReadOffsetList::plain_view_type       read_offset_list;
         D_VectorU8::plain_view_type             temp_storage;
@@ -109,6 +111,7 @@ struct bqsr_context
             reference,
             plain_view(active_read_list),
             plain_view(alignment_windows),
+            plain_view(sequence_alignment_windows),
             plain_view(active_location_list),
             plain_view(read_offset_list),
             plain_view(temp_storage),

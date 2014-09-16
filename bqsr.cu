@@ -95,7 +95,7 @@ int main(int argc, char **argv)
     dev_db.load(db);
 
 
-    printf("%lu variants\n", db.genome_positions.size());
+    printf("%lu variants\n", db.genome_start_positions.size());
     printf("reading BAM %s...\n", bam_name);
 
     BAMfile bam(bam_name);

@@ -25,7 +25,8 @@
 void SNPDatabase_refIDs::compute_sequence_offsets(const reference_genome& genome)
 {
     variant_sequence_ref_ids.resize(reference_sequence_names.size());
-    genome_positions.resize(reference_sequence_names.size());
+    genome_start_positions.resize(reference_sequence_names.size());
+    genome_stop_positions.resize(reference_sequence_names.size());
 
     for(unsigned int c = 0; c < reference_sequence_names.size(); c++)
     {
@@ -38,7 +39,8 @@ void SNPDatabase_refIDs::compute_sequence_offsets(const reference_genome& genome
         variant_sequence_ref_ids[c] = id;
 
         // store the genome offset for this VCF entry
-        genome_positions[c] = genome.ref_sequence_offsets[id] + sequence_positions[c] - 1; // sequence positions are 1-based, genome positions are 0-based
+        genome_start_positions[c] = genome.ref_sequence_offsets[id] + sequence_positions[c].x - 1; // sequence positions are 1-based, genome positions are 0-based
+        genome_stop_positions[c] = genome.ref_sequence_offsets[id] + sequence_positions[c].y - 1;
     }
 }
 
@@ -46,7 +48,8 @@ void DeviceSNPDatabase::load(const SNPDatabase_refIDs& ref)
 {
     variant_sequence_ref_ids = ref.variant_sequence_ref_ids;
     sequence_positions = ref.sequence_positions;
-    genome_positions = ref.genome_positions;
+    genome_start_positions = ref.genome_start_positions;
+    genome_stop_positions = ref.genome_stop_positions;
     reference_sequences = ref.reference_sequences;
     variants = ref.variants;
     ref_variant_index = ref.ref_variant_index;
@@ -126,7 +129,7 @@ void build_read_offset_list(bqsr_context *context,
 }
 
 // functor used to compute the alignment window list
-// for each read, compute the end of the alignment window in the reference
+// for each read, compute the end of the alignment window in the reference and the sequence
 struct compute_alignment_window : public bqsr_lambda
 {
     compute_alignment_window(bqsr_context::view ctx,
@@ -139,6 +142,7 @@ struct compute_alignment_window : public bqsr_lambda
         const BAM_CRQ_index& idx = batch.crq_index[read_index];
         const uint16 *offset_list = &ctx.read_offset_list[idx.read_start];
         uint2& output = ctx.alignment_windows[read_index];
+        ushort2& output_sequence = ctx.sequence_alignment_windows[read_index];
 
         // scan the offset list looking for the largest offset
         int c;
@@ -156,6 +160,9 @@ struct compute_alignment_window : public bqsr_lambda
             // transform the start position
             output.x = ctx.reference.ref_sequence_offsets[batch.alignment_sequence_IDs[read_index]] + batch.alignment_positions[read_index];
             output.y = output.x + offset_list[c];
+
+            output_sequence.x = batch.alignment_positions[read_index];
+            output_sequence.y = output_sequence.x + offset_list[c];
         }
     }
 };
@@ -165,6 +172,7 @@ void build_alignment_windows(bqsr_context *ctx, const BAM_alignment_batch_device
 {
     // set up the alignment window buffer
     ctx->alignment_windows.resize(batch.num_reads);
+    ctx->sequence_alignment_windows.resize(batch.num_reads);
     // compute alignment windows
     thrust::for_each(ctx->active_read_list.begin(),
                      ctx->active_read_list.end(),
@@ -187,13 +195,13 @@ struct compute_vcf_ranges : public bqsr_lambda
         // search for the starting range
         const uint32 *vcf_start;
         vcf_start = nvbio::lower_bound(alignment_window.x,
-                                       ctx.db.genome_positions.begin(),
-                                       ctx.db.genome_positions.size());
+                                       ctx.db.genome_start_positions.begin(),
+                                       ctx.db.genome_start_positions.size());
 
         // do a linear search to find the end of the VCF range
         // (there are generally very few VCF entries for an average read length --- and often none --- so this is expected to be faster than a binary search)
         const uint32 *vcf_end = vcf_start;
-        while(vcf_end < ctx.db.genome_positions + ctx.db.genome_positions.size() &&
+        while(vcf_end < ctx.db.genome_start_positions + ctx.db.genome_start_positions.size() &&
               *vcf_end < alignment_window.y)
         {
             vcf_end++;
@@ -204,20 +212,20 @@ struct compute_vcf_ranges : public bqsr_lambda
             // emit an empty VCF range
             vcf_range = make_uint2(uint32(-1), uint32(-1));
         } else {
-            if (vcf_end >= ctx.db.genome_positions + ctx.db.genome_positions.size())
+            if (vcf_end >= ctx.db.genome_start_positions + ctx.db.genome_start_positions.size())
                 vcf_end--;
 
-            vcf_range = make_uint2(vcf_start - ctx.db.genome_positions.begin(),
-                                   vcf_end - ctx.db.genome_positions.begin());
+            vcf_range = make_uint2(vcf_start - ctx.db.genome_start_positions.begin(),
+                                   vcf_end - ctx.db.genome_start_positions.begin());
         }
     }
 };
 
 struct vcf_active_predicate
 {
-    D_VectorU2::plain_view_type vcf_active;
+    D_VectorU32_2::plain_view_type vcf_active;
 
-    vcf_active_predicate(D_VectorU2::plain_view_type vcf_active)
+    vcf_active_predicate(D_VectorU32_2::plain_view_type vcf_active)
         : vcf_active(vcf_active)
     { }
 
@@ -235,6 +243,8 @@ struct filter_bps : public bqsr_lambda
     { }
 
 private:
+#if 0
+    // xxxnsubtil: GATK doesn't actually test the read data, it only seems to look at the coordinates
     // test a VCF entry (identified by index in the db) against a read
     NVBIO_HOST_DEVICE uint32 test_vcf(uint32 vcf_entry, const uint32 read_index, const uint32 read_bp_offset)
     {
@@ -256,6 +266,7 @@ private:
 
         return vcf_idx.variant_len;
     }
+#endif
 
 public:
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
@@ -265,8 +276,8 @@ public:
         const uint16 *offset_list = &ctx.read_offset_list[0];
 
         uint2 vcf_db_range = ctx.snp_filter.active_vcf_ranges[read_index];
-        uint2 vcf_range = make_uint2(ctx.db.genome_positions[vcf_db_range.x],
-                                      ctx.db.genome_positions[vcf_db_range.y]);
+        uint2 vcf_range = make_uint2(ctx.db.genome_start_positions[vcf_db_range.x],
+                                      ctx.db.genome_start_positions[vcf_db_range.y]);
 
         // traverse the list of reads together with the VCF list; when we find a match, stop
         for(uint32 bp = idx.read_start; bp < idx.read_start + idx.read_len; bp++)
@@ -304,18 +315,18 @@ public:
                     return;
                 }
 
-                vcf_range.x = ctx.db.genome_positions[vcf_db_range.x];
+                vcf_range.x = ctx.db.genome_start_positions[vcf_db_range.x];
             }
 
-            // if we found the start of a variant, then test it
+            // if we found the start of a variant, mark the corresponding BP range
             while (ref_offset == vcf_range.x)
             {
-                uint32 vcf_match_len = test_vcf(vcf_db_range.x, read_index, bp);
-                if (vcf_match_len)
+                uint32 vcf_len = ctx.db.genome_stop_positions[vcf_db_range.x];
+                if (vcf_len)
                 {
                     // turn off vcf_match_len BPs since they match the variant database
                     const uint32 start = idx.read_start;
-                    const uint32 end = start + vcf_match_len; // this is guaranteed to not be larger than the read len
+                    const uint32 end = nvbio::min(start + vcf_len, start + idx.read_len);
 
                     for(uint32 dead_bp = start; dead_bp < end; dead_bp++)
                         ctx.active_location_list[dead_bp] = 0;
@@ -332,9 +343,7 @@ public:
                     return;
                 }
 
-                vcf_range.x = ctx.db.genome_positions[vcf_db_range.x];
-
-                // move the BP counter forward
+                vcf_range.x = ctx.db.genome_start_positions[vcf_db_range.x];
             }
         }
     }

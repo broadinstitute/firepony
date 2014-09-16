@@ -32,8 +32,9 @@ struct SNPDatabase_refIDs : public nvbio::io::SNPDatabase
 {
     // maps a variant ID to a reference sequence ID
     H_VectorU32 variant_sequence_ref_ids;
-    // the coordinate of each VCF relative to the whole genome
-    H_VectorU32 genome_positions;
+    // the start and end coordinates of each VCF relative to the whole genome
+    H_VectorU32 genome_start_positions;
+    H_VectorU32 genome_stop_positions;
 
     void compute_sequence_offsets(const reference_genome& genome);
 };
@@ -43,10 +44,11 @@ struct DeviceSNPDatabase
 {
     // reference sequence ID for each variant
     D_VectorU32 variant_sequence_ref_ids;
-    // position of the variant in the genome (first base in genome is position 0)
-    D_VectorU32 genome_positions;
-    // position of the variant in the reference sequence (first base in the sequence is position 1)
-    D_VectorU32 sequence_positions;
+    // start and end coordinates of the variant in the genome (first base in genome is position 0)
+    D_VectorU32 genome_start_positions;
+    D_VectorU32 genome_stop_positions;
+    // start and stop position of the variant in the reference sequence (first base in the sequence is position 0)
+    D_VectorU32_2 sequence_positions;
 
     // packed reference sequences
     nvbio::PackedVector<device_tag, 4> reference_sequences;
@@ -60,8 +62,9 @@ struct DeviceSNPDatabase
     struct view
     {
         D_VectorU32::plain_view_type variant_sequence_ref_ids;
-        D_VectorU32::plain_view_type genome_positions;
-        D_VectorU32::plain_view_type sequence_positions;
+        D_VectorU32::plain_view_type genome_start_positions;
+        D_VectorU32::plain_view_type genome_stop_positions;
+        D_VectorU32_2::plain_view_type sequence_positions;
         D_VectorDNA16::plain_view_type reference_sequences;
         D_VectorDNA16::plain_view_type variants;
         nvbio::vector<device_tag, io::SNP_sequence_index>::plain_view_type ref_variant_index;
@@ -70,8 +73,9 @@ struct DeviceSNPDatabase
     struct const_view
     {
         D_VectorU32::const_plain_view_type variant_sequence_ref_ids;
-        D_VectorU32::const_plain_view_type genome_positions;
-        D_VectorU32::const_plain_view_type sequence_positions;
+        D_VectorU32::const_plain_view_type genome_start_positions;
+        D_VectorU32::const_plain_view_type genome_stop_positions;
+        D_VectorU32_2::const_plain_view_type sequence_positions;
         D_VectorDNA16::const_plain_view_type reference_sequences;
         D_VectorDNA16::const_plain_view_type variants;
         nvbio::vector<device_tag, io::SNP_sequence_index>::const_plain_view_type ref_variant_index;
@@ -81,7 +85,8 @@ struct DeviceSNPDatabase
     {
         view v = {
             plain_view(variant_sequence_ref_ids),
-            plain_view(genome_positions),
+            plain_view(genome_start_positions),
+            plain_view(genome_stop_positions),
             plain_view(sequence_positions),
             plain_view(reference_sequences),
             plain_view(variants),
@@ -95,7 +100,8 @@ struct DeviceSNPDatabase
     {
         const_view v = {
             plain_view(variant_sequence_ref_ids),
-            plain_view(genome_positions),
+            plain_view(genome_start_positions),
+            plain_view(genome_stop_positions),
             plain_view(sequence_positions),
             plain_view(reference_sequences),
             plain_view(variants),

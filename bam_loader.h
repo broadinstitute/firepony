@@ -190,6 +190,7 @@ struct BAM_alignment_batch_storage
     nvbio::vector<system_tag, uint32> read_groups;
     nvbio::vector<system_tag, uint32> alignment_positions; // relative to the sequence!
     nvbio::vector<system_tag, uint32> alignment_sequence_IDs;
+    nvbio::vector<system_tag, uint8> mapq;
 
     nvbio::vector<system_tag, BAM_CRQ_index> crq_index; // CRQ: cigars, reads, qual_start
 };
@@ -228,6 +229,7 @@ struct BAM_alignment_batch_host : public BAM_alignment_batch_storage<host_tag>
         flags.clear();
         alignment_positions.clear();
         alignment_sequence_IDs.clear();
+        mapq.clear();
 
         // read groups are special: they're initialized to zero
         read_groups.assign(batch_size, 0);
@@ -249,6 +251,7 @@ struct BAM_alignment_batch_host : public BAM_alignment_batch_storage<host_tag>
             flags.reserve(batch_size);
             alignment_positions.reserve(batch_size);
             alignment_sequence_IDs.reserve(batch_size);
+            mapq.reserve(batch_size);
         }
     }
 };
@@ -266,6 +269,7 @@ struct BAM_alignment_batch_device : public BAM_alignment_batch_storage<device_ta
         flags = batch.flags;
         alignment_positions = batch.alignment_positions;
         alignment_sequence_IDs = batch.alignment_sequence_IDs;
+        mapq = batch.mapq;
         read_groups = batch.read_groups;
         crq_index = batch.crq_index;
 
@@ -284,6 +288,7 @@ struct BAM_alignment_batch_device : public BAM_alignment_batch_storage<device_ta
         D_VectorU32::const_plain_view_type read_groups;
         D_VectorU32::const_plain_view_type alignment_positions;
         D_VectorU32::const_plain_view_type alignment_sequence_IDs;
+        D_VectorU8::const_plain_view_type mapq;
         D_VectorCRQIndex::const_plain_view_type crq_index;
     };
 
@@ -299,6 +304,7 @@ struct BAM_alignment_batch_device : public BAM_alignment_batch_storage<device_ta
                 plain_view(read_groups),
                 plain_view(alignment_positions),
                 plain_view(alignment_sequence_IDs),
+                plain_view(mapq),
                 plain_view(crq_index)
         };
 

@@ -294,6 +294,8 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
             batch->alignment_sequence_IDs.push_back(align.refID);
         }
 
+        batch->mapq.push_back(align.mapq());
+
         // figure out the CIGAR length and make sure we can store it
         const uint32 cigar_len = (align.flag_nc & 0xffff);
         //batch->cigars.resize(crq_index.cigar + cigar_len);

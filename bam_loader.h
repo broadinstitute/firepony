@@ -179,6 +179,8 @@ typedef nvbio::vector<host_tag, BAM_CRQ_index> H_VectorCRQIndex;
 template <typename system_tag>
 struct BAM_alignment_batch_storage
 {
+    uint32 num_reads;
+
     nvbio::vector<system_tag, BAM_cigar_op> cigars;
     nvbio::PackedVector<system_tag, 4> reads; //VectorDNA16<system_tag> reads;
     nvbio::vector<system_tag, uint8> qualities;
@@ -211,6 +213,8 @@ struct BAM_alignment_batch_host : public BAM_alignment_batch_storage<host_tag>
 
     void reset(uint32 batch_size, bool skip_headers)
     {
+        num_reads = 0;
+
         align_headers.clear();
         index.clear();
         crq_index.clear();
@@ -252,6 +256,8 @@ struct BAM_alignment_batch_device : public BAM_alignment_batch_storage<device_ta
 {
     void load(BAM_alignment_batch_host& batch)
     {
+        num_reads = batch.num_reads;
+
         cigars = batch.cigars;
         reads = batch.reads;
         qualities = batch.qualities;
@@ -267,6 +273,8 @@ struct BAM_alignment_batch_device : public BAM_alignment_batch_storage<device_ta
 
     struct const_view
     {
+        uint32 num_reads;
+
         D_VectorCigarOp::const_plain_view_type cigars;
         D_VectorDNA16::const_plain_view_type reads;
         D_VectorU8::const_plain_view_type qualities;
@@ -280,6 +288,8 @@ struct BAM_alignment_batch_device : public BAM_alignment_batch_storage<device_ta
     operator const_view() const
     {
         const_view v = {
+                num_reads,
+
                 plain_view(cigars),
                 plain_view(reads),
                 plain_view(qualities),

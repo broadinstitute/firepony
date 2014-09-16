@@ -23,7 +23,7 @@
 void bqsr_context::start_batch(BAM_alignment_batch_device& batch)
 {
     // initialize the read order with 0..N
-    active_read_list.resize(batch.crq_index.size());
+    active_read_list.resize(batch.num_reads);
     thrust::copy(thrust::make_counting_iterator(0),
                  thrust::make_counting_iterator(0) + batch.crq_index.size(),
                  active_read_list.begin());

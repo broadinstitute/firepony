@@ -164,7 +164,7 @@ struct compute_alignment_window : public bqsr_lambda
 void build_alignment_windows(bqsr_context *ctx, const BAM_alignment_batch_device& batch)
 {
     // set up the alignment window buffer
-    ctx->alignment_windows.resize(batch.crq_index.size());
+    ctx->alignment_windows.resize(batch.num_reads);
     // compute alignment windows
     thrust::for_each(ctx->active_read_list.begin(),
                      ctx->active_read_list.end(),

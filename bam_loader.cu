@@ -276,6 +276,8 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
             gzseek(fp, read_name_len, SEEK_CUR);
         }
 
+        batch->num_reads++;
+
         // push the CRQ index
         BAM_CRQ_index crq_index(batch->cigars.size(), align.num_cigar_ops(), batch->reads.size(), align.l_seq, batch->qualities.size());
         batch->crq_index.push_back(crq_index);

@@ -58,13 +58,13 @@ static uint32 extract_gamgee_flags(gamgee::Sam& record)
     if (record.unmapped())
         flags |= AlignmentFlags::UNMAP;
 
-    if (record.next_unmapped())
+    if (record.mate_unmapped())
         flags |= AlignmentFlags::MATE_UNMAP;
 
     if (record.reverse())
         flags |= AlignmentFlags::REVERSE;
 
-    if (record.next_reverse())
+    if (record.mate_reverse())
         flags |= AlignmentFlags::MATE_REVERSE;
 
     if (record.first())
@@ -185,6 +185,11 @@ bool gamgee_file::next_batch(alignment_batch *batch, uint32 data_mask, const uin
         if (data_mask & FLAGS)
         {
             h_batch->flags.push_back(extract_gamgee_flags(record));
+        }
+
+        if (data_mask & MAPQ)
+        {
+            h_batch->mapq.push_back(record.mapq());
         }
 
         if (data_mask & READ_GROUP)

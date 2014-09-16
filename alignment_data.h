@@ -76,9 +76,10 @@ enum BatchDataMask
     READS                = 0x080,
     QUALITIES            = 0x100,
     FLAGS                = 0x200,
+    MAPQ                 = 0x400,
 
     // list of tags that we require
-    READ_GROUP           = 0x400,
+    READ_GROUP           = 0x800,
 };
 
 template <typename system_tag>
@@ -123,6 +124,8 @@ struct alignment_batch_storage
 
     // alignment flags
     Vector(uint16) flags;
+    // mapping qualities
+    Vector(uint8) mapq;
 
     // read group ID
     Vector(uint32) read_group;
@@ -169,6 +172,8 @@ struct alignment_batch_host : public alignment_batch_storage<host_tag>
         qual_len.clear();
 
         flags.clear();
+        mapq.clear();
+
         read_group.clear();
 
         if (data_mask & NAME)
@@ -225,6 +230,11 @@ struct alignment_batch_host : public alignment_batch_storage<host_tag>
         if (data_mask & FLAGS)
         {
             flags.reserve(batch_size);
+        }
+
+        if (data_mask & MAPQ)
+        {
+            mapq.reserve(batch_size);
         }
 
         if (data_mask & READ_GROUP)
@@ -324,6 +334,13 @@ struct alignment_batch
             device.flags = host.flags;
         } else {
             device.flags.clear();
+        }
+
+        if (data_mask & MAPQ)
+        {
+            device.mapq = host.mapq;
+        } else {
+            device.mapq.clear();
         }
 
         if (data_mask & READ_GROUP)

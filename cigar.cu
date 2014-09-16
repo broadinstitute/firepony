@@ -18,6 +18,7 @@
 
 #include <nvbio/basic/primitives.h>
 #include <nvbio/basic/numbers.h>
+#include <nvbio/basic/dna.h>
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/functional.h>
 
@@ -203,6 +204,52 @@ struct cigar_coordinates_expand : public bqsr_lambda
     }
 };
 
+struct compute_is_snp : public bqsr_lambda_ref
+{
+    compute_is_snp(bqsr_context::view ctx,
+                   const reference_genome_device::const_view reference,
+                   const BAM_alignment_batch_device::const_view batch)
+        : bqsr_lambda_ref(ctx, reference, batch)
+    { }
+
+    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    {
+        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+
+        // figure out the cigar event range for this read
+        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
+        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
+
+        // fetch the alignment base in reference coordinates
+        const uint32 seq_id = batch.alignment_sequence_IDs[read_index];
+        const uint32 seq_base = reference.sequence_offsets[seq_id];
+        const uint32 align_offset = batch.alignment_positions[read_index];
+        const uint32 reference_alignment_start = seq_base + align_offset;
+
+        D_PackedReference reference_data(reference.genome_stream.m_sequence_stream);
+
+        // go through the cigar events looking for M
+        for(uint32 i = cigar_start; i < cigar_end; i++)
+        {
+            if(ctx.cigar.cigar_events[i] == cigar_event::M)
+            {
+                // load the read bp at this offset
+                const uint16 read_bp_idx = ctx.cigar.cigar_event_read_coordinates[i];
+                const uint8 read_bp = batch.reads[idx.read_start + read_bp_idx];
+
+                // load the corresponding sequence bp
+                const uint32 reference_bp_idx = reference_alignment_start + ctx.cigar.cigar_event_reference_coordinates[i];
+                const uint8 reference_bp = dna_to_iupac16(reference_data[reference_bp_idx]);
+
+                if (reference_bp != read_bp)
+                {
+                    ctx.cigar.is_snp[i] = 1;
+                }
+            }
+        }
+    }
+};
+
 void expand_cigars(bqsr_context *context, const reference_genome& reference, const BAM_alignment_batch_device& batch)
 {
     cigar_context& ctx = context->cigar;
@@ -233,6 +280,11 @@ void expand_cigars(bqsr_context *context, const reference_genome& reference, con
     ctx.read_window_clipped_no_insertions.resize(batch.num_reads);
     ctx.reference_window_clipped.resize(batch.num_reads);
 
+    ctx.is_snp.resize(expanded_cigar_len);
+
+    // is_snp requires zero initialization
+    thrust::fill(ctx.is_snp.m_storage.begin(), ctx.is_snp.m_storage.end(), 0);
+
     // expand the cigar ops first (xxxnsubtil: same as above, active read list is ignored)
     thrust::for_each(thrust::make_counting_iterator(0),
                      thrust::make_counting_iterator(0) + batch.cigars.size(),
@@ -243,6 +295,11 @@ void expand_cigars(bqsr_context *context, const reference_genome& reference, con
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
                      cigar_coordinates_expand(*context, batch));
+
+    // compute the SNP bit vector
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     compute_is_snp(*context, reference.device, batch));
 }
 
 void debug_cigar(bqsr_context *context, const reference_genome& reference, const BAM_alignment_batch_host& batch, int read_index)
@@ -291,6 +348,13 @@ void debug_cigar(bqsr_context *context, const reference_genome& reference, const
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
         printf("% 3d ", (int16) ctx.cigar_event_reference_coordinates[i]);
+    }
+    printf("]\n");
+
+    printf("    is snp                      = [ ");
+    for(uint32 i = cigar_start; i < cigar_end; i++)
+    {
+        printf("% 3d ", (uint8) ctx.is_snp[i]);
     }
     printf("]\n");
 

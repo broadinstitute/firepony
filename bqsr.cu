@@ -114,7 +114,7 @@ int main(int argc, char **argv)
         filter_snps(&context, batch);
 
         // generate cigar events and coordinates
-        expand_cigars(&context, batch);
+        expand_cigars(&context, reference, batch);
 
         // compute the base alignment quality for each read
         baq_reads(&context, reference, batch);

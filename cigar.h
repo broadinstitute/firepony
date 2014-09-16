@@ -71,6 +71,10 @@ struct cigar_context
     // alignment window in the reference, not including clipped bases (relative to base alignment position)
     D_VectorU16_2 reference_window_clipped;
 
+    // bit vector representing SNPs, one per cigar event
+    // (1 means reference mismatch, 0 means match or non-M cigar event)
+    D_PackedVector_1b is_snp;
+
     struct view
     {
         D_VectorU32::plain_view_type cigar_offsets;
@@ -80,6 +84,7 @@ struct cigar_context
         D_VectorU16_2::plain_view_type read_window_clipped;
         D_VectorU16_2::plain_view_type read_window_clipped_no_insertions;
         D_VectorU16_2::plain_view_type reference_window_clipped;
+        D_PackedVector_1b::plain_view_type is_snp;
     };
 
     operator view()
@@ -92,6 +97,7 @@ struct cigar_context
                 plain_view(read_window_clipped),
                 plain_view(read_window_clipped_no_insertions),
                 plain_view(reference_window_clipped),
+                plain_view(is_snp),
         };
 
         return v;

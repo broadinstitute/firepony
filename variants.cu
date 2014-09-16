@@ -19,7 +19,10 @@
 #include "bqsr_types.h"
 #include "bqsr_context.h"
 #include "variants.h"
-#include "util.h"
+
+#include "primitives/algorithms.h"
+#include "primitives/cuda.h"
+#include "primitives/parallel.h"
 
 void SNPDatabase_refIDs::compute_sequence_offsets(const reference_genome& genome)
 {
@@ -63,7 +66,7 @@ struct compute_read_offset_list : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
 
@@ -137,7 +140,7 @@ struct compute_alignment_window : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
         const uint16 *offset_list = &ctx.read_offset_list[idx.read_start];
@@ -187,21 +190,21 @@ struct compute_vcf_ranges : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const uint2& alignment_window = ctx.alignment_windows[read_index];
         uint2& vcf_range = ctx.snp_filter.active_vcf_ranges[read_index];
 
         // search for the starting range
         const uint32 *vcf_start;
-        vcf_start = nvbio::lower_bound(alignment_window.x,
-                                       ctx.db.genome_start_positions.begin(),
-                                       ctx.db.genome_start_positions.size());
+        vcf_start = bqsr::lower_bound(alignment_window.x,
+                                      ctx.db.genome_start_positions.begin(),
+                                      ctx.db.genome_start_positions.size());
 
         // do a linear search to find the end of the VCF range
         // (there are generally very few VCF entries for an average read length --- and often none --- so this is expected to be faster than a binary search)
         const uint32 *vcf_end = vcf_start;
-        while(vcf_end < ctx.db.genome_start_positions + ctx.db.genome_start_positions.size() &&
+        while(vcf_end < ctx.db.genome_start_positions.begin() + ctx.db.genome_start_positions.size() &&
               *vcf_end < alignment_window.y)
         {
             vcf_end++;
@@ -212,7 +215,7 @@ struct compute_vcf_ranges : public bqsr_lambda
             // emit an empty VCF range
             vcf_range = make_uint2(uint32(-1), uint32(-1));
         } else {
-            if (vcf_end >= ctx.db.genome_start_positions + ctx.db.genome_start_positions.size())
+            if (vcf_end >= ctx.db.genome_start_positions.begin() + ctx.db.genome_start_positions.size())
                 vcf_end--;
 
             vcf_range = make_uint2(vcf_start - ctx.db.genome_start_positions.begin(),
@@ -223,13 +226,13 @@ struct compute_vcf_ranges : public bqsr_lambda
 
 struct vcf_active_predicate
 {
-    D_VectorU32_2::plain_view_type vcf_active;
+    D_VectorU32_2::view vcf_active;
 
-    vcf_active_predicate(D_VectorU32_2::plain_view_type vcf_active)
+    vcf_active_predicate(D_VectorU32_2::view vcf_active)
         : vcf_active(vcf_active)
     { }
 
-    NVBIO_HOST_DEVICE bool operator() (const uint32 vcf_id)
+    CUDA_HOST_DEVICE bool operator() (const uint32 vcf_id)
     {
         return vcf_active[vcf_id].x != uint32(-1);
     }
@@ -246,7 +249,7 @@ private:
 #if 0
     // xxxnsubtil: GATK doesn't actually test the read data, it only seems to look at the coordinates
     // test a VCF entry (identified by index in the db) against a read
-    NVBIO_HOST_DEVICE uint32 test_vcf(uint32 vcf_entry, const uint32 read_index, const uint32 read_bp_offset)
+    CUDA_HOST_DEVICE uint32 test_vcf(uint32 vcf_entry, const uint32 read_index, const uint32 read_bp_offset)
     {
         const BAM_CRQ_index& idx = batch.crq_index[read_index];
         const io::SNP_sequence_index& vcf_idx = ctx.db.ref_variant_index[vcf_entry];
@@ -269,7 +272,7 @@ private:
 #endif
 
 public:
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const CRQ_index& idx = batch.crq_index(read_index);
         const uint2& alignment_window = ctx.alignment_windows[read_index];
@@ -326,7 +329,7 @@ public:
                 {
                     // turn off vcf_match_len BPs since they match the variant database
                     const uint32 start = idx.read_start;
-                    const uint32 end = nvbio::min(start + vcf_len, start + idx.read_len);
+                    const uint32 end = bqsr::min(start + vcf_len, start + idx.read_len);
 
                     for(uint32 dead_bp = start; dead_bp < end; dead_bp++)
                         ctx.active_location_list[dead_bp] = 0;
@@ -366,10 +369,10 @@ void filter_known_snps(bqsr_context *context, const alignment_batch& batch)
     context->temp_u32 = context->active_read_list;
 
     uint32 num_active;
-    num_active = bqsr_copy_if(context->temp_u32.begin(),
-                              context->temp_u32.size(),
-                              snp.active_read_ids.begin(),
-                              vcf_active_predicate(snp.active_vcf_ranges));
+    num_active = bqsr::copy_if(context->temp_u32.begin(),
+                               context->temp_u32.size(),
+                               snp.active_read_ids.begin(),
+                               vcf_active_predicate(snp.active_vcf_ranges));
 
     snp.active_read_ids.resize(num_active);
 

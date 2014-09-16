@@ -23,6 +23,9 @@
 #include "covariates.h"
 #include "covariates_bit_packing.h"
 
+#include "primitives/util.h"
+#include "primitives/parallel.h"
+
 #include <thrust/functional.h>
 
 // defines a covariate chain equivalent to GATK's RecalTable1
@@ -43,7 +46,7 @@ struct covariates_recaltable1
     } CovariateID;
 
     // extract a given covariate value from a key
-    static NVBIO_HOST_DEVICE uint32 decode(CovariateID id, uint32 key)
+    static CUDA_HOST_DEVICE uint32 decode(CovariateID id, uint32 key)
     {
         return chain::decode(key, id);
     }
@@ -79,7 +82,7 @@ struct covariate_gatherer
     bqsr_context::view& ctx;
     const alignment_batch_device::const_view& batch;
 
-    NVBIO_HOST_DEVICE covariate_gatherer(bqsr_context::view& ctx,
+    CUDA_HOST_DEVICE covariate_gatherer(bqsr_context::view& ctx,
                                          const alignment_batch_device::const_view& batch)
         : ctx(ctx), batch(batch)
     {
@@ -96,7 +99,7 @@ private:
 
     // returns false if we ran out of space
     template<GatherCovariatesMode MODE>
-    NVBIO_HOST_DEVICE bool process_read(bqsr_context::view ctx,
+    CUDA_HOST_DEVICE bool process_read(bqsr_context::view ctx,
                                         const alignment_batch_device::const_view batch,
                                         const uint32 read_index)
     {
@@ -195,9 +198,9 @@ private:
     }
 
 public:
-    NVBIO_HOST_DEVICE bool process(bqsr_context::view ctx,
+    CUDA_HOST_DEVICE bool process(bqsr_context::view ctx,
                                    const alignment_batch_device::const_view batch,
-                                   D_VectorU32::plain_view_type& active_read_list,
+                                   D_VectorU32::view& active_read_list,
                                    const uint32 read_id)
     {
         const uint32 read_index = active_read_list[read_id];
@@ -216,7 +219,7 @@ public:
 };
 
 template<typename covariate_chain>
-__global__ void covariates_kernel(D_VectorU32::plain_view_type active_read_list,
+__global__ void covariates_kernel(D_VectorU32::view active_read_list,
                                   bqsr_context::view ctx,
                                   const alignment_batch_device::const_view batch)
 {
@@ -269,7 +272,7 @@ __global__ void covariates_kernel(D_VectorU32::plain_view_type active_read_list,
 
 #if 0
 template<typename covariate_chain>
-void covariates_cpu(D_CovariateTable::plain_view_type output,
+void covariates_cpu(D_CovariateTable::view output,
                     bqsr_context::view ctx,
                     const alignment_batch_device::const_view batch)
 {
@@ -318,7 +321,7 @@ struct pingpong_read_lists
 
 struct read_is_valid
 {
-    NVBIO_HOST_DEVICE bool operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
         return (read_index != uint32(-1));
     }
@@ -358,7 +361,7 @@ void gather_covariates(bqsr_context *context, const alignment_batch& batch)
     // on the other hand, a large reads_per_thread value will cause divergence due to occasional flushes of the local storage into the mempool
     // the ideal value would cause each thread to run for as long as possible without flushing until the very end
     const uint32 reads_per_thread = 32;
-    const uint32 num_blocks = nvbio::util::divide_ri(read_lists.source().size(), threads_per_block * reads_per_thread);
+    const uint32 num_blocks = bqsr::divide_ri(read_lists.source().size(), threads_per_block * reads_per_thread);
 
     do {
         cv.mempool.clear();
@@ -378,10 +381,10 @@ void gather_covariates(bqsr_context *context, const alignment_batch& batch)
         table.pack(indices, temp_sorted);
 
         // compact the active read list
-        active_reads = bqsr_copy_if(read_lists.source().begin(),
-                                    read_lists.source().size(),
-                                    read_lists.destination().begin(),
-                                    read_is_valid());
+        active_reads = bqsr::copy_if(read_lists.source().begin(),
+                                     read_lists.source().size(),
+                                     read_lists.destination().begin(),
+                                     read_is_valid());
 
         read_lists.destination().resize(active_reads);
         read_lists.swap();

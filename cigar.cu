@@ -16,8 +16,8 @@
  *
  */
 
-#include <nvbio/basic/numbers.h>
 #include <nvbio/basic/dna.h>
+
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/functional.h>
 
@@ -27,10 +27,13 @@
 #include "alignment_data.h"
 #include "util.h"
 
+#include "primitives/cuda.h"
+#include "primitives/parallel.h"
+
 // compute the length of a given cigar operator
 struct cigar_op_len : public thrust::unary_function<const cigar_op&, uint32>
 {
-    NVBIO_HOST_DEVICE uint32 operator() (const cigar_op& op) const
+    CUDA_HOST_DEVICE uint32 operator() (const cigar_op& op) const
     {
         return op.len;
     }
@@ -44,7 +47,7 @@ struct cigar_op_expand : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 op_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 op_index)
     {
         const cigar_op& op = batch.cigars[op_index];
         const uint32 out_base = ctx.cigar.cigar_offsets[op_index];
@@ -88,9 +91,9 @@ struct cigar_op_compact : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 word_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 word_index)
     {
-        D_PackedVector_2b::plain_view_type& events = ctx.cigar.cigar_events;
+        D_PackedVector_2b::view& events = ctx.cigar.cigar_events;
         const uint8 *input = &ctx.temp_storage[word_index * D_PackedVector_2b::SYMBOLS_PER_WORD];
 
         for(uint32 i = 0; i < D_PackedVector_2b::SYMBOLS_PER_WORD; i++)
@@ -111,18 +114,18 @@ struct cigar_coordinates_expand : public bqsr_lambda
 
     // update a coordinate window when we reach a new valid offset for the window
     template<typename W, typename O>
-    NVBIO_FORCEINLINE NVBIO_HOST_DEVICE void update(W& window, O new_offset,
-                                                    bool update_start = true,
-                                                    bool update_end = true)
+    CUDA_HOST_DEVICE void update(W& window, O new_offset,
+                                 bool update_start = true,
+                                 bool update_end = true)
     {
         if (update_start)
-            window.x = nvbio::min(window.x, new_offset);
+            window.x = bqsr::min(window.x, new_offset);
 
         if (update_end)
-            window.y = nvbio::max(window.y, new_offset);
+            window.y = bqsr::max(window.y, new_offset);
     }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
         const cigar_op *cigar = &batch.cigars[idx.cigar_start];
@@ -234,7 +237,7 @@ struct compute_is_snp : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
 
@@ -279,7 +282,7 @@ struct count_snps : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const CRQ_index& idx = batch.crq_index(read_index);
         const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
@@ -302,7 +305,7 @@ struct count_indels : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
         const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
@@ -331,7 +334,7 @@ struct sanity_check_cigar_events : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
         const cigar_op *cigar = &batch.cigars[idx.cigar_start];
@@ -412,10 +415,10 @@ void expand_cigars(bqsr_context *context, const alignment_batch& batch)
     // mark the first offset as 0
     thrust::fill_n(ctx.cigar_offsets.begin(), 1, 0);
     // do an inclusive scan to compute all offsets + the total size
-    bqsr_inclusive_scan(thrust::make_transform_iterator(batch.device.cigars.begin(), cigar_op_len()),
-                        batch.device.cigars.size(),
-                        ctx.cigar_offsets.begin() + 1,
-                        thrust::plus<uint32>());
+    bqsr::inclusive_scan(thrust::make_transform_iterator(batch.device.cigars.begin(), cigar_op_len()),
+                         batch.device.cigars.size(),
+                         ctx.cigar_offsets.begin() + 1,
+                         thrust::plus<uint32>());
 
     // read back the last element, which contains the size of the buffer required
     uint32 expanded_cigar_len = ctx.cigar_offsets[batch.device.cigars.size()];

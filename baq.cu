@@ -18,9 +18,7 @@
 
 // base alignment quality calculations (gatk: BAQ.java)
 
-#include <nvbio/basic/types.h>
 #include <nvbio/basic/dna.h>
-#include <nvbio/basic/numbers.h>
 
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/iterator/zip_iterator.h>
@@ -34,7 +32,9 @@
 #include "alignment_data.h"
 #include "bqsr_context.h"
 #include "reference.h"
-#include "util.h"
+
+#include "primitives/util.h"
+#include "primitives/parallel.h"
 
 #if 0
 #include "baq-cpu.h"
@@ -60,7 +60,7 @@ struct compute_hmm_windows : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
         ushort2& out_read_window = ctx.baq.read_windows[read_index];
         uint2&   out_reference_window = ctx.baq.reference_windows[read_index];
@@ -83,7 +83,7 @@ struct compute_hmm_windows : public bqsr_lambda
         uint32 readStart = reference_window.x + seq_to_alignment_offset; // always clipped
 
         // reference window for HMM
-        uint32 start = nvbio::max(readStart - offset - first_insertion_offset, 0u);
+        uint32 start = bqsr::max(readStart - offset - first_insertion_offset, 0u);
         uint32 stop = reference_window.y + seq_to_alignment_offset + offset + last_insertion_offset;
 
         if (stop > ref_length)
@@ -134,7 +134,7 @@ struct hmm_common : public bqsr_lambda
     uint32 *outputState;
 
     template<typename Tuple>
-    NVBIO_HOST_DEVICE void setup(const Tuple& hmm_index)
+    CUDA_HOST_DEVICE void setup(const Tuple& hmm_index)
     {
         const uint32 read_index    = thrust::get<0>(hmm_index);
         const uint32 matrix_index  = thrust::get<1>(hmm_index);
@@ -215,7 +215,7 @@ struct hmm_common : public bqsr_lambda
         queryStart = 0;
     }
 
-    NVBIO_HOST_DEVICE int set_u(const int b, const int i, const int k)
+    CUDA_HOST_DEVICE int set_u(const int b, const int i, const int k)
     {
         int x = i - b;
         x = x > 0 ? x : 0;
@@ -223,23 +223,23 @@ struct hmm_common : public bqsr_lambda
     }
 
     // computes a matrix offset for forwardMatrix or backwardMatrix
-    NVBIO_HOST_DEVICE int off(int i, int j = 0)
+    CUDA_HOST_DEVICE int off(int i, int j = 0)
     {
         return i * 6 * (2 * MAX_BAND_WIDTH + 1) + j;
     }
 
     // computes the required HMM matrix size for the given read length
-    NVBIO_HOST_DEVICE static uint32 matrix_size(const uint32 read_len)
+    CUDA_HOST_DEVICE static uint32 matrix_size(const uint32 read_len)
     {
         return (read_len + 1) * 6 * (2 * MAX_BAND_WIDTH + 1);
     }
 
-    NVBIO_HOST_DEVICE static double qual2prob(uint8 q)
+    CUDA_HOST_DEVICE static double qual2prob(uint8 q)
     {
         return pow(10.0, -q/10.0);
     }
 
-    NVBIO_HOST_DEVICE static double calcEpsilon(uint8 ref, uint8 read, uint8 qualB)
+    CUDA_HOST_DEVICE static double calcEpsilon(uint8 ref, uint8 read, uint8 qualB)
     {
         double qual = qual2prob(qualB < MIN_BASE_QUAL ? MIN_BASE_QUAL : qualB);
         double e = (ref == read ? 1 - qual : qual * EM);
@@ -255,7 +255,7 @@ struct hmm_glocal_forward : public hmm_common
     { }
 
     template<typename Tuple>
-    NVBIO_HOST_DEVICE void operator() (const Tuple& hmm_index)
+    CUDA_HOST_DEVICE void operator() (const Tuple& hmm_index)
     {
         const uint32 read_index = thrust::get<0>(hmm_index);
 
@@ -397,7 +397,7 @@ struct hmm_glocal_backward : public hmm_common
     { }
 
     template<typename Tuple>
-    NVBIO_HOST_DEVICE void operator() (const Tuple& hmm_index)
+    CUDA_HOST_DEVICE void operator() (const Tuple& hmm_index)
     {
         const uint32 read_index = thrust::get<0>(hmm_index);
 
@@ -499,7 +499,7 @@ struct hmm_glocal_map : public hmm_common
     { }
 
     template<typename Tuple>
-    NVBIO_HOST_DEVICE void operator() (const Tuple& hmm_index)
+    CUDA_HOST_DEVICE void operator() (const Tuple& hmm_index)
     {
         const uint32 read_index = thrust::get<0>(hmm_index);
 
@@ -576,7 +576,7 @@ struct compute_hmm_matrix_size : public thrust::unary_function<uint32, uint32>, 
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE uint32 operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE uint32 operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
         return hmm_common::matrix_size(idx.read_len);
@@ -590,7 +590,7 @@ struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, u
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE uint32 operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE uint32 operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
         return idx.read_len + 2;
@@ -604,7 +604,7 @@ struct read_needs_baq : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE bool operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
         if (ctx.cigar.num_errors[read_index] != 0)
             return true;
@@ -620,7 +620,7 @@ struct read_flat_baq : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
         if (ctx.baq.qualities.size() == 0)
         {
@@ -653,10 +653,10 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     // collect the reads that we need to compute BAQ for
     active_baq_read_list.resize(context->active_read_list.size());
 
-    num_active = bqsr_copy_if(context->active_read_list.begin(),
-                              context->active_read_list.size(),
-                              active_baq_read_list.begin(),
-                              read_needs_baq(*context, batch.device));
+    num_active = bqsr::copy_if(context->active_read_list.begin(),
+                               context->active_read_list.size(),
+                               active_baq_read_list.begin(),
+                               read_needs_baq(*context, batch.device));
 
     active_baq_read_list.resize(num_active);
 
@@ -665,21 +665,21 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     // first offset is zero
     thrust::fill_n(baq.matrix_index.begin(), 1, 0);
     // do an inclusive scan to compute all offsets + the total size
-    bqsr_inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
-                                                        compute_hmm_matrix_size(*context, batch.device)),
-                        num_active,
-                        baq.matrix_index.begin() + 1,
-                        thrust::plus<uint32>());
+    bqsr::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
+                                                         compute_hmm_matrix_size(*context, batch.device)),
+                         num_active,
+                         baq.matrix_index.begin() + 1,
+                         thrust::plus<uint32>());
 
     // compute the index and size of the HMM scaling factors
     baq.scaling_index.resize(num_active + 1);
     // first offset is zero
     thrust::fill_n(baq.scaling_index.begin(), 1, 0);
-    bqsr_inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
-                                                        compute_hmm_scaling_factor_size(*context, batch.device)),
-                        num_active,
-                        baq.scaling_index.begin() + 1,
-                        thrust::plus<uint32>());
+    bqsr::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
+                                                         compute_hmm_scaling_factor_size(*context, batch.device)),
+                         num_active,
+                         baq.scaling_index.begin() + 1,
+                         thrust::plus<uint32>());
 
     // read back the last elements, which contain the size of the buffer required
     uint32 matrix_len = baq.matrix_index[num_active];

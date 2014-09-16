@@ -40,7 +40,7 @@ void bqsr_context::start_batch(alignment_batch& batch)
 
 struct read_active_predicate
 {
-    NVBIO_HOST_DEVICE bool operator() (const uint32 index)
+    CUDA_HOST_DEVICE bool operator() (const uint32 index)
     {
         return index != uint32(-1);
     }
@@ -52,11 +52,11 @@ void bqsr_context::compact_active_read_list(void)
     uint32 num_active;
 
     temp_u32 = active_read_list;
-    num_active = nvbio::copy_if(temp_u32.size(),
-                                temp_u32.begin(),
-                                active_read_list.begin(),
-                                read_active_predicate(),
-                                temp_storage);
+    num_active = bqsr::copy_if(temp_u32.size(),
+                               temp_u32.begin(),
+                               active_read_list.begin(),
+                               read_active_predicate(),
+                               temp_storage);
 
     active_read_list.resize(num_active);
 }

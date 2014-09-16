@@ -17,6 +17,10 @@
  */
 
 #include "bqsr_types.h"
+
+#include "primitives/cuda.h"
+#include "primitives/util.h"
+
 #include "util.h"
 
 uint32 bqsr_string_hash(const char* s)
@@ -30,15 +34,15 @@ uint32 bqsr_string_hash(const char* s)
 // the following two structures are the result of a couple of hours trying to do this with templates...
 struct pack_uint8_to_2bit_vector
 {
-    D_PackedVector_2b::plain_view_type dest;
-    D_VectorU8::plain_view_type src;
+    D_PackedVector_2b::view dest;
+    D_VectorU8::view src;
 
-    pack_uint8_to_2bit_vector(D_PackedVector_2b::plain_view_type dest,
-                              D_VectorU8::plain_view_type src)
+    pack_uint8_to_2bit_vector(D_PackedVector_2b::view dest,
+                              D_VectorU8::view src)
         : dest(dest), src(src)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 word_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 word_index)
     {
         const uint8 *input = &src[word_index * D_PackedVector_2b::SYMBOLS_PER_WORD];
         for(uint32 i = 0; i < D_PackedVector_2b::SYMBOLS_PER_WORD; i++)
@@ -50,15 +54,15 @@ struct pack_uint8_to_2bit_vector
 
 struct pack_uint8_to_1bit_vector
 {
-    D_PackedVector_1b::plain_view_type dest;
-    D_VectorU8::plain_view_type src;
+    D_PackedVector_1b::view dest;
+    D_VectorU8::view src;
 
-    pack_uint8_to_1bit_vector(D_PackedVector_1b::plain_view_type dest,
-                              D_VectorU8::plain_view_type src)
+    pack_uint8_to_1bit_vector(D_PackedVector_1b::view dest,
+                              D_VectorU8::view src)
         : dest(dest), src(src)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 word_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 word_index)
     {
         const uint8 *input = &src[word_index * D_PackedVector_1b::SYMBOLS_PER_WORD];
         for(uint32 i = 0; i < D_PackedVector_1b::SYMBOLS_PER_WORD; i++)
@@ -72,7 +76,7 @@ struct pack_uint8_to_1bit_vector
 template<typename D_PackedVector_Dest>
 static void pack_prepare_storage(D_VectorU8& src, uint32 num_elements)
 {
-    src.resize(nvbio::util::divide_ri(num_elements, D_PackedVector_Dest::SYMBOLS_PER_WORD) * D_PackedVector_Dest::SYMBOLS_PER_WORD);
+    src.resize(bqsr::divide_ri(num_elements, D_PackedVector_Dest::SYMBOLS_PER_WORD) * D_PackedVector_Dest::SYMBOLS_PER_WORD);
 }
 
 // prepare temp_storage to store num_elements to be packed into a 1-bit vector
@@ -91,14 +95,14 @@ void pack_to_2bit(D_PackedVector_2b& dest, D_VectorU8& src)
 {
     dest.resize(src.size());
     thrust::for_each(thrust::make_counting_iterator(0),
-                     thrust::make_counting_iterator(0) + nvbio::util::divide_ri(src.size(), D_PackedVector_2b::SYMBOLS_PER_WORD),
-                     pack_uint8_to_2bit_vector(nvbio::plain_view(dest), nvbio::plain_view(src)));
+                     thrust::make_counting_iterator(0) + bqsr::divide_ri(src.size(), D_PackedVector_2b::SYMBOLS_PER_WORD),
+                     pack_uint8_to_2bit_vector(dest, src));
 }
 
 void pack_to_1bit(D_PackedVector_1b& dest, D_VectorU8& src)
 {
     dest.resize(src.size());
     thrust::for_each(thrust::make_counting_iterator(0),
-                     thrust::make_counting_iterator(0) + nvbio::util::divide_ri(src.size(), D_PackedVector_1b::SYMBOLS_PER_WORD),
-                     pack_uint8_to_1bit_vector(nvbio::plain_view(dest), nvbio::plain_view(src)));
+                     thrust::make_counting_iterator(0) + bqsr::divide_ri(src.size(), D_PackedVector_1b::SYMBOLS_PER_WORD),
+                     pack_uint8_to_1bit_vector(dest, src));
 }

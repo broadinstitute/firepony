@@ -18,11 +18,6 @@
 
 #pragma once
 
-#include <stdint.h>
-
-#include <nvbio/basic/vector.h>
-#include <nvbio/basic/packed_vector.h>
-
 // help the eclipse error parser deal with CUDA keywords
 #ifdef __CDT_PARSER__
 #define __global__
@@ -34,6 +29,8 @@
 #define __restrict__
 #endif
 
+#include <stdint.h>
+
 typedef uint64_t uint64;
 typedef int64_t int64;
 typedef uint32_t uint32;
@@ -43,24 +40,31 @@ typedef int16_t int16;
 typedef uint8_t uint8;
 typedef int8_t int8;
 
-typedef nvbio::host_tag host_tag;
+#include "primitives/cuda.h"
+#include "primitives/vector.h"
+#include "primitives/packed_stream.h"
+#include "primitives/packed_vector.h"
+
+typedef bqsr::host_tag host_tag;
 
 //#define RUN_ON_CPU
 #ifdef RUN_ON_CPU
 #if THRUST_DEVICE_SYSTEM != THRUST_DEVICE_SYSTEM_OMP
 #error must build with -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP
 #endif
-typedef nvbio::host_tag target_system_tag;
+typedef nvbio::host_tag nvbio_target_system_tag;
+typedef host_tag target_system_tag;
 #else
-typedef nvbio::device_tag target_system_tag;
+typedef nvbio::device_tag nvbio_target_system_tag;
+typedef bqsr::device_tag target_system_tag;
 #endif
 
 struct bqsr_context;
 
-template <typename T> using D_Vector = nvbio::vector<target_system_tag, T>;
-template <typename T> using H_Vector = nvbio::vector<host_tag, T>;
-template <uint32 bits> using D_PackedVector = nvbio::PackedVector<target_system_tag, bits>;
-template <uint32 bits> using H_PackedVector = nvbio::PackedVector<host_tag, bits>;
+template <typename T> using D_Vector = bqsr::vector<target_system_tag, T>;
+template <typename T> using H_Vector = bqsr::vector<host_tag, T>;
+template <uint32 bits> using D_PackedVector = bqsr::packed_vector<target_system_tag, bits>;
+template <uint32 bits> using H_PackedVector = bqsr::packed_vector<host_tag, bits>;
 
 typedef D_Vector<uint8> D_VectorU8;
 typedef H_Vector<uint8> H_VectorU8;
@@ -89,8 +93,8 @@ typedef H_PackedVector<2> H_PackedVector_2b;
 typedef D_PackedVector<2> D_PackedVector_2b;
 
 // this is evil: endianess between reference data and sequence data doesn't seem to match...
-typedef nvbio::PackedVector<host_tag, 2, true>::const_stream_type H_PackedReference;
-typedef nvbio::PackedVector<target_system_tag, 2, true>::const_stream_type D_PackedReference;
+typedef nvbio::PackedVector<nvbio::host_tag, 2, true>::const_stream_type H_PackedReference;
+typedef nvbio::PackedVector<nvbio_target_system_tag, 2, true>::const_stream_type D_PackedReference;
 
 typedef D_Vector<uint2> D_VectorU32_2;
 typedef H_Vector<uint2> H_VectorU32_2;
@@ -103,8 +107,8 @@ typedef H_Vector<ushort2> H_VectorU16_2;
 // sizing this to 4 bits per symbol ensures that, because input reads are padded to a dword boundary
 typedef D_VectorDNA16 D_ActiveLocationList;
 typedef H_VectorDNA16 H_ActiveLocationList;
-typedef D_ActiveLocationList::plain_view_type D_ActiveLocationStream;
-typedef H_ActiveLocationList::plain_view_type H_ActiveLocationStream;
+typedef D_ActiveLocationList::view D_ActiveLocationStream;
+typedef H_ActiveLocationList::view H_ActiveLocationStream;
 
 struct cigar_op
 {
@@ -123,7 +127,7 @@ struct cigar_op
         OP_X     = 8,
     };
 
-    NVBIO_HOST_DEVICE char ascii_op(void) const
+    CUDA_HOST_DEVICE char ascii_op(void) const
     {
         return op == 0 ? 'M' :
                op == 1 ? 'I' :

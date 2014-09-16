@@ -45,29 +45,29 @@ struct baq_context
 
     struct view
     {
-        D_VectorU16_2::plain_view_type read_windows;
-        D_VectorU32_2::plain_view_type reference_windows;
-        D_VectorU8::plain_view_type qualities;
-        D_VectorU32::plain_view_type state;
-        D_VectorF64::plain_view_type forward;
-        D_VectorF64::plain_view_type backward;
-        D_VectorU32::plain_view_type matrix_index;
-        D_VectorF64::plain_view_type scaling;
-        D_VectorU32::plain_view_type scaling_index;
+        D_VectorU16_2::view read_windows;
+        D_VectorU32_2::view reference_windows;
+        D_VectorU8::view qualities;
+        D_VectorU32::view state;
+        D_VectorF64::view forward;
+        D_VectorF64::view backward;
+        D_VectorU32::view matrix_index;
+        D_VectorF64::view scaling;
+        D_VectorU32::view scaling_index;
     };
 
     operator view()
     {
         view v = {
-                plain_view(read_windows),
-                plain_view(reference_windows),
-                plain_view(qualities),
-                plain_view(state),
-                plain_view(forward),
-                plain_view(backward),
-                plain_view(matrix_index),
-                plain_view(scaling),
-                plain_view(scaling_index),
+                read_windows,
+                reference_windows,
+                qualities,
+                state,
+                forward,
+                backward,
+                matrix_index,
+                scaling,
+                scaling_index,
         };
 
         return v;

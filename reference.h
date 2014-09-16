@@ -42,14 +42,14 @@ struct reference_genome_device
     struct const_view
     {
         const nvbio::io::SequenceDataDevice::const_plain_view_type genome_stream;
-        const D_VectorU32::const_plain_view_type sequence_offsets;
+        const D_VectorU32::const_view sequence_offsets;
     };
 
     operator const_view() const
     {
         const_view v = {
                 nvbio::plain_view(*d_ref),
-                nvbio::plain_view(sequence_offsets)
+                sequence_offsets,
         };
 
         return v;

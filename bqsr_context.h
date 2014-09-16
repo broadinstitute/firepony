@@ -89,16 +89,16 @@ struct bqsr_context
         alignment_header::const_view            bam_header;
         DeviceSNPDatabase::const_view           db;
         reference_genome_device::const_view     reference;
-        D_VectorU32::plain_view_type            active_read_list;
-        D_VectorU32_2::plain_view_type          alignment_windows;
-        D_VectorU16_2::plain_view_type          sequence_alignment_windows;
-        D_ActiveLocationList::plain_view_type   active_location_list;
-        D_VectorU16::plain_view_type            read_offset_list;
-        D_VectorU8::plain_view_type             temp_storage;
-        D_VectorU32::plain_view_type            temp_u32;
-        D_VectorU32::plain_view_type            temp_u32_2;
-        D_VectorU32::plain_view_type            temp_u32_3;
-        D_VectorU32::plain_view_type            temp_u32_4;
+        D_VectorU32::view                       active_read_list;
+        D_VectorU32_2::view                     alignment_windows;
+        D_VectorU16_2::view                     sequence_alignment_windows;
+        D_ActiveLocationList::view              active_location_list;
+        D_VectorU16::view                       read_offset_list;
+        D_VectorU8::view                        temp_storage;
+        D_VectorU32::view                       temp_u32;
+        D_VectorU32::view                       temp_u32_2;
+        D_VectorU32::view                       temp_u32_3;
+        D_VectorU32::view                       temp_u32_4;
         snp_filter_context::view                snp_filter;
         cigar_context::view                     cigar;
         baq_context::view                       baq;
@@ -111,16 +111,16 @@ struct bqsr_context
             bam_header,
             db,
             reference.device,
-            plain_view(active_read_list),
-            plain_view(alignment_windows),
-            plain_view(sequence_alignment_windows),
-            plain_view(active_location_list),
-            plain_view(read_offset_list),
-            plain_view(temp_storage),
-            plain_view(temp_u32),
-            plain_view(temp_u32_2),
-            plain_view(temp_u32_3),
-            plain_view(temp_u32_4),
+            active_read_list,
+            alignment_windows,
+            sequence_alignment_windows,
+            active_location_list,
+            read_offset_list,
+            temp_storage,
+            temp_u32,
+            temp_u32_2,
+            temp_u32_3,
+            temp_u32_4,
             snp_filter,
             cigar,
             baq,

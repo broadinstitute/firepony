@@ -26,6 +26,8 @@
 #include "bqsr_types.h"
 #include "util.h"
 
+#include "primitives/cuda.h"
+
 // contains information referenced by an alignment data batch
 // xxxnsubtil: a better name might be in order
 struct alignment_header
@@ -39,13 +41,13 @@ struct alignment_header
 
     struct const_view
     {
-        nvbio::vector<target_system_tag, uint32>::const_plain_view_type chromosome_lengths;
+        bqsr::vector<target_system_tag, uint32>::const_view chromosome_lengths;
     };
 
     operator const_view() const
     {
         const_view v = {
-                plain_view(d_chromosome_lengths),
+                d_chromosome_lengths,
         };
 
         return v;
@@ -105,9 +107,9 @@ struct CRQ_index
     const uint32& read_start, read_len;
     const uint32& qual_start, qual_len;
 
-    NVBIO_HOST_DEVICE CRQ_index(const uint32& cigar_start, const uint32& cigar_len,
-                                const uint32& read_start, const uint32& read_len,
-                                const uint32& qual_start, const uint32& qual_len)
+    CUDA_HOST_DEVICE CRQ_index(const uint32& cigar_start, const uint32& cigar_len,
+                               const uint32& read_start, const uint32& read_len,
+                               const uint32& qual_start, const uint32& qual_len)
         : cigar_start(cigar_start),
           cigar_len(cigar_len),
           read_start(read_start),
@@ -120,8 +122,8 @@ struct CRQ_index
 template <typename system_tag>
 struct alignment_batch_storage
 {
-    template <typename T> using Vector = nvbio::vector<system_tag, T>;
-    template <uint32 bits> using PackedVector = nvbio::PackedVector<system_tag, bits>;
+    template <typename T> using Vector = bqsr::vector<system_tag, T>;
+    template <uint32 bits> using PackedVector = bqsr::packed_vector<system_tag, bits>;
 
     uint32 num_reads;
 
@@ -163,9 +165,9 @@ struct alignment_batch_storage
     Vector<uint32> read_group;
 
     // prevent storage creation on the device
-    NVBIO_HOST alignment_batch_storage() { }
+    CUDA_HOST alignment_batch_storage() { }
 
-    NVBIO_HOST_DEVICE const CRQ_index crq_index(uint32 read_id) const
+    CUDA_HOST_DEVICE const CRQ_index crq_index(uint32 read_id) const
     {
         return CRQ_index(cigar_start[read_id],
                          cigar_len[read_id],
@@ -182,25 +184,25 @@ struct alignment_batch_device : public alignment_batch_storage<target_system_tag
     {
         uint32 num_reads;
 
-        D_Vector<uint32>::const_plain_view_type chromosome;
-        D_Vector<uint32>::const_plain_view_type alignment_start;
-        D_Vector<uint32>::const_plain_view_type alignment_stop;
-        D_Vector<uint32>::const_plain_view_type mate_chromosome;
-        D_Vector<uint32>::const_plain_view_type mate_alignment_start;
-        D_Vector<cigar_op>::const_plain_view_type cigars;
-        D_Vector<uint32>::const_plain_view_type cigar_start;
-        D_Vector<uint32>::const_plain_view_type cigar_len;
-        D_PackedVector<4>::const_plain_view_type reads;
-        D_Vector<uint32>::const_plain_view_type read_start;
-        D_Vector<uint32>::const_plain_view_type read_len;
-        D_Vector<uint8>::const_plain_view_type qualities;
-        D_Vector<uint32>::const_plain_view_type qual_start;
-        D_Vector<uint32>::const_plain_view_type qual_len;
-        D_Vector<uint16>::const_plain_view_type flags;
-        D_Vector<uint8>::const_plain_view_type mapq;
-        D_Vector<uint32>::const_plain_view_type read_group;
+        D_Vector<uint32>::const_view chromosome;
+        D_Vector<uint32>::const_view alignment_start;
+        D_Vector<uint32>::const_view alignment_stop;
+        D_Vector<uint32>::const_view mate_chromosome;
+        D_Vector<uint32>::const_view mate_alignment_start;
+        D_Vector<cigar_op>::const_view cigars;
+        D_Vector<uint32>::const_view cigar_start;
+        D_Vector<uint32>::const_view cigar_len;
+        D_PackedVector<4>::const_view reads;
+        D_Vector<uint32>::const_view read_start;
+        D_Vector<uint32>::const_view read_len;
+        D_Vector<uint8>::const_view qualities;
+        D_Vector<uint32>::const_view qual_start;
+        D_Vector<uint32>::const_view qual_len;
+        D_Vector<uint16>::const_view flags;
+        D_Vector<uint8>::const_view mapq;
+        D_Vector<uint32>::const_view read_group;
 
-        NVBIO_HOST_DEVICE const CRQ_index crq_index(uint32 read_id) const
+        CUDA_HOST_DEVICE const CRQ_index crq_index(uint32 read_id) const
         {
             return CRQ_index(cigar_start[read_id],
                              cigar_len[read_id],
@@ -216,23 +218,23 @@ struct alignment_batch_device : public alignment_batch_storage<target_system_tag
         const_view v = {
                 num_reads,
 
-                plain_view(chromosome),
-                plain_view(alignment_start),
-                plain_view(alignment_stop),
-                plain_view(mate_chromosome),
-                plain_view(mate_alignment_start),
-                plain_view(cigars),
-                plain_view(cigar_start),
-                plain_view(cigar_len),
-                plain_view(reads),
-                plain_view(read_start),
-                plain_view(read_len),
-                plain_view(qualities),
-                plain_view(qual_start),
-                plain_view(qual_len),
-                plain_view(flags),
-                plain_view(mapq),
-                plain_view(read_group),
+                chromosome,
+                alignment_start,
+                alignment_stop,
+                mate_chromosome,
+                mate_alignment_start,
+                cigars,
+                cigar_start,
+                cigar_len,
+                reads,
+                read_start,
+                read_len,
+                qualities,
+                qual_start,
+                qual_len,
+                flags,
+                mapq,
+                read_group,
         };
 
         return v;

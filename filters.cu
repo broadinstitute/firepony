@@ -16,14 +16,14 @@
  *
  */
 
-#include <nvbio/basic/types.h>
-#include <nvbio/io/sequence/sequence_sam.h> // for read flags
 #include <nvbio/strings/alphabet.h>
+
+#include "primitives/parallel.h"
 
 #include "bqsr_types.h"
 #include "bqsr_context.h"
+#include "alignment_data.h"
 #include "filters.h"
-#include "util.h"
 
 // filter if any of the flags are set
 template<uint32 flags>
@@ -34,7 +34,7 @@ struct filter_if_any_set : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE bool operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
         if ((batch.flags[read_index] & flags) != 0)
         {
@@ -53,7 +53,7 @@ struct filter_mapq : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE bool operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
         if (batch.mapq[read_index] == 0 ||
             batch.mapq[read_index] == 255)
@@ -73,12 +73,12 @@ struct filter_malformed_reads : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE bool operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
 
         // read is not flagged as unmapped...
-        if (!(batch.flags[read_index] & nvbio::io::SAMFlag_SegmentUnmapped))
+        if (!(batch.flags[read_index] & AlignmentFlags::UNMAP))
         {
             // ... but reference sequence ID is invalid (GATK: checkInvalidAlignmentStart)
             if (batch.chromosome[read_index] == uint32(-1))
@@ -153,7 +153,7 @@ struct filter_malformed_cigars : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE bool operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
 
@@ -264,10 +264,10 @@ void filter_reads(bqsr_context *context, const alignment_batch& batch)
     // - FailsVendorQualityCheckFilter
     // - NotPrimaryAlignmentFilter
     // - UnmappedReadFilter
-    filter_if_any_set<nvbio::io::SAMFlag_Duplicate |
-                      nvbio::io::SAMFlag_FailedQC |
-                      nvbio::io::SAMFlag_SegmentUnmapped |
-                      nvbio::io::SAMFlag_SecondaryAlignment> flags_filter(*context, batch.device);
+    filter_if_any_set<AlignmentFlags::DUPLICATE |
+                      AlignmentFlags::QC_FAIL |
+                      AlignmentFlags::UNMAP |
+                      AlignmentFlags::SECONDARY> flags_filter(*context, batch.device);
 
     // corresponds to the GATK filters MappingQualityUnavailable and MappingQualityZero
     filter_mapq mapq_filter(*context, batch.device);
@@ -281,28 +281,28 @@ void filter_reads(bqsr_context *context, const alignment_batch& batch)
     context->temp_u32.resize(active_read_list.size());
 
     // apply the flags filter, copying from active_read_list into temp_u32
-    num_active = bqsr_copy_if(active_read_list.begin(),
-                              active_read_list.size(),
-                              temp_u32.begin(),
-                              flags_filter);
+    num_active = bqsr::copy_if(active_read_list.begin(),
+                               active_read_list.size(),
+                               temp_u32.begin(),
+                               flags_filter);
 
     // apply the mapq filters, copying from temp_u32 into active_read_list
-    num_active = bqsr_copy_if(temp_u32.begin(),
-                              temp_u32.size(),
-                              active_read_list.begin(),
-                              mapq_filter);
+    num_active = bqsr::copy_if(temp_u32.begin(),
+                               temp_u32.size(),
+                               active_read_list.begin(),
+                               mapq_filter);
 
     // apply the malformed read filters, copying from active_read_list into temp_u32
-    num_active = bqsr_copy_if(active_read_list.begin(),
-                              num_active,
-                              temp_u32.begin(),
-                              malformed_read_filter);
+    num_active = bqsr::copy_if(active_read_list.begin(),
+                               num_active,
+                               temp_u32.begin(),
+                               malformed_read_filter);
 
     // apply the malformed cigar filters, copying from temp_u32 into active_read_list
-    num_active = bqsr_copy_if(temp_u32.begin(),
-                              num_active,
-                              active_read_list.begin(),
-                              malformed_cigar_filter);
+    num_active = bqsr::copy_if(temp_u32.begin(),
+                               num_active,
+                               active_read_list.begin(),
+                               malformed_cigar_filter);
 
     // resize active_read_list
     active_read_list.resize(num_active);
@@ -318,7 +318,7 @@ struct filter_non_regular_bases : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
 
@@ -350,7 +350,7 @@ struct filter_low_quality_bases : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
 

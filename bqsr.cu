@@ -16,8 +16,6 @@
  *
  */
 
-#include <nvbio/basic/types.h>
-#include <nvbio/basic/vector.h>
 #include <nvbio/basic/dna.h>
 #include <nvbio/io/sequence/sequence.h>
 #include <nvbio/io/sequence/sequence_access.h>

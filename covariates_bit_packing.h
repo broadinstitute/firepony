@@ -22,6 +22,8 @@
 #include "bqsr_context.h"
 #include "covariates.h"
 
+#include "primitives/cuda.h"
+
 #define BITMASK(bits) ((1 << bits) - 1)
 
 // base covariate class
@@ -45,10 +47,10 @@ struct covariate
 
 protected:
     template<typename K>
-    static NVBIO_HOST_DEVICE uint32 build_key(uint32 input_key, K data,
-                                              bqsr_context::view ctx,
-                                              const alignment_batch_device::const_view batch,
-                                              uint32 read_index, uint16 bp_offset, uint32 cigar_event_index)
+    static CUDA_HOST_DEVICE uint32 build_key(uint32 input_key, K data,
+                                             bqsr_context::view ctx,
+                                             const alignment_batch_device::const_view batch,
+                                             uint32 read_index, uint16 bp_offset, uint32 cigar_event_index)
     {
         // add in our bits
         uint32 out = input_key | (((data) & BITMASK(bits)) << offset);
@@ -57,7 +59,7 @@ protected:
     }
 
 public:
-    static NVBIO_HOST_DEVICE uint32 decode(uint32 input_key, uint32 target_index)
+    static CUDA_HOST_DEVICE uint32 decode(uint32 input_key, uint32 target_index)
     {
         if (target_index == index)
         {
@@ -81,15 +83,15 @@ struct covariate_null
         next_offset = 0
     };
 
-    static NVBIO_HOST_DEVICE uint32 encode(bqsr_context::view ctx,
-                                           const alignment_batch_device::const_view batch,
-                                           uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
-                                           uint32 input_key = 0)
+    static CUDA_HOST_DEVICE uint32 encode(bqsr_context::view ctx,
+                                          const alignment_batch_device::const_view batch,
+                                          uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
+                                          uint32 input_key = 0)
     {
         return input_key;
     }
 
-    static NVBIO_HOST_DEVICE uint32 decode(uint32 input_key, uint32 target_index)
+    static CUDA_HOST_DEVICE uint32 decode(uint32 input_key, uint32 target_index)
     {
         return 0;
     }
@@ -105,10 +107,10 @@ struct covariate_null
 template<typename PreviousCovariate = covariate_null>
 struct covariate_ReadGroup : public covariate<PreviousCovariate, 8>
 {
-    static NVBIO_HOST_DEVICE uint32 encode(bqsr_context::view ctx,
-                                           const alignment_batch_device::const_view batch,
-                                           uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
-                                           uint32 input_key = 0)
+    static CUDA_HOST_DEVICE uint32 encode(bqsr_context::view ctx,
+                                          const alignment_batch_device::const_view batch,
+                                          uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
+                                          uint32 input_key = 0)
     {
         uint8 key = (uint8) batch.read_group[read_index];
         return covariate<PreviousCovariate, 8>::build_key(input_key, key,
@@ -131,10 +133,10 @@ struct covariate_ReadGroup : public covariate<PreviousCovariate, 8>
 template <typename PreviousCovariate = covariate_null>
 struct covariate_EventType : public covariate<PreviousCovariate, 2>
 {
-    static NVBIO_HOST_DEVICE uint32 encode(bqsr_context::view ctx,
-                                           const alignment_batch_device::const_view batch,
-                                           uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
-                                           uint32 input_key = 0)
+    static CUDA_HOST_DEVICE uint32 encode(bqsr_context::view ctx,
+                                          const alignment_batch_device::const_view batch,
+                                          uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
+                                          uint32 input_key = 0)
     {
         uint8 key = ctx.cigar.cigar_events[cigar_event_index];
         return covariate<PreviousCovariate, 2>::build_key(input_key, key,
@@ -157,10 +159,10 @@ struct covariate_EventType : public covariate<PreviousCovariate, 2>
 template <typename PreviousCovariate = covariate_null>
 struct covariate_QualityScore : public covariate<PreviousCovariate, 8>
 {
-    static NVBIO_HOST_DEVICE uint32 encode(bqsr_context::view ctx,
-                                           const alignment_batch_device::const_view batch,
-                                           uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
-                                           uint32 input_key = 0)
+    static CUDA_HOST_DEVICE uint32 encode(bqsr_context::view ctx,
+                                          const alignment_batch_device::const_view batch,
+                                          uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
+                                          uint32 input_key = 0)
     {
         const CRQ_index idx = batch.crq_index(read_index);
         uint8 key = batch.qualities[idx.qual_start + bp_offset];
@@ -185,10 +187,10 @@ struct covariate_QualityScore : public covariate<PreviousCovariate, 8>
 template <typename PreviousCovariate = covariate_null>
 struct covariate_EmpiricalQuality : public covariate<PreviousCovariate, 8>
 {
-    static NVBIO_HOST_DEVICE uint32 encode(bqsr_context::view ctx,
-                                           const alignment_batch_device::const_view batch,
-                                           uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
-                                           uint32 input_key = 0)
+    static CUDA_HOST_DEVICE uint32 encode(bqsr_context::view ctx,
+                                          const alignment_batch_device::const_view batch,
+                                          uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
+                                          uint32 input_key = 0)
     {
         const CRQ_index idx = batch.crq_index(read_index);
         uint8 key = ctx.baq.qualities[idx.qual_start + bp_offset];

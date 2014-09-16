@@ -55,8 +55,8 @@ struct D_CovariateTable
 
     struct view
     {
-        D_VectorU32::plain_view_type keys;
-        D_VectorU32::plain_view_type observations;
+        D_VectorU32::view keys;
+        D_VectorU32::view observations;
 
         view(D_CovariateTable& table)
             : keys(table.keys),
@@ -108,14 +108,14 @@ struct D_CovariatePool : public D_CovariateTable
 
     struct view : public D_CovariateTable::view
     {
-        D_VectorU32::plain_view_type items_allocated;
+        D_VectorU32::view items_allocated;
 
         view(D_CovariatePool& pool)
             : D_CovariateTable::view(pool),
-              items_allocated(plain_view(pool.items_allocated))
+              items_allocated(pool.items_allocated)
         { }
 
-        NVBIO_DEVICE uint32 allocate(const uint32 num_items)
+        CUDA_DEVICE uint32 allocate(const uint32 num_items)
         {
             uint32 old;
 
@@ -144,16 +144,16 @@ struct D_LocalCovariateTable
 
     uint32 num_items;
 
-    NVBIO_HOST_DEVICE D_LocalCovariateTable()
+    CUDA_HOST_DEVICE D_LocalCovariateTable()
         : num_items(0)
     { }
 
-    NVBIO_HOST_DEVICE uint32 size(void) const
+    CUDA_HOST_DEVICE uint32 size(void) const
     {
         return num_items;
     }
 
-    NVBIO_HOST_DEVICE bool exists(uint32 index)
+    CUDA_HOST_DEVICE bool exists(uint32 index)
     {
         if (index < num_items)
             return true;
@@ -161,7 +161,7 @@ struct D_LocalCovariateTable
         return false;
     }
 
-    NVBIO_HOST_DEVICE bool insert(uint32 key, uint32 target_index)
+    CUDA_HOST_DEVICE bool insert(uint32 key, uint32 target_index)
     {
         if (num_items == LOCAL_TABLE_SIZE - 1)
         {
@@ -199,7 +199,7 @@ struct D_LocalCovariateTable
         return true;
     }
 
-    NVBIO_HOST_DEVICE int find_insertion_point(uint32 key)
+    CUDA_HOST_DEVICE int find_insertion_point(uint32 key)
     {
         uint32 i;
 

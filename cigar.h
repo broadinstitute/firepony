@@ -78,29 +78,29 @@ struct cigar_context
 
     struct view
     {
-        D_VectorU32::plain_view_type cigar_offsets;
-        D_PackedVector_2b::plain_view_type cigar_events;
-        D_VectorU16::plain_view_type cigar_event_read_coordinates;
-        D_VectorU16::plain_view_type cigar_event_reference_coordinates;
-        D_VectorU16_2::plain_view_type read_window_clipped;
-        D_VectorU16_2::plain_view_type read_window_clipped_no_insertions;
-        D_VectorU16_2::plain_view_type reference_window_clipped;
-        D_PackedVector_1b::plain_view_type is_snp;
-        D_VectorU16::plain_view_type num_errors;
+        D_VectorU32::view cigar_offsets;
+        D_PackedVector_2b::view cigar_events;
+        D_VectorU16::view cigar_event_read_coordinates;
+        D_VectorU16::view cigar_event_reference_coordinates;
+        D_VectorU16_2::view read_window_clipped;
+        D_VectorU16_2::view read_window_clipped_no_insertions;
+        D_VectorU16_2::view reference_window_clipped;
+        D_PackedVector_1b::view is_snp;
+        D_VectorU16::view num_errors;
     };
 
     operator view()
     {
         view v = {
-                plain_view(cigar_offsets),
-                plain_view(cigar_events),
-                plain_view(cigar_event_read_coordinates),
-                plain_view(cigar_event_reference_coordinates),
-                plain_view(read_window_clipped),
-                plain_view(read_window_clipped_no_insertions),
-                plain_view(reference_window_clipped),
-                plain_view(is_snp),
-                plain_view(num_errors),
+                cigar_offsets,
+                cigar_events,
+                cigar_event_read_coordinates,
+                cigar_event_reference_coordinates,
+                read_window_clipped,
+                read_window_clipped_no_insertions,
+                reference_window_clipped,
+                is_snp,
+                num_errors,
         };
 
         return v;

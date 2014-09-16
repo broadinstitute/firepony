@@ -29,5 +29,6 @@ variants.h
 )
 
 cuda_add_executable(bqsr ${bqsr_srcs})
-target_link_libraries(bqsr nvbio zlibstatic crcstatic ${SYSTEM_LINK_LIBRARIES})
+target_link_libraries(bqsr nvbio zlibstatic crcstatic ${gamgee_LIB} ${SYSTEM_LINK_LIBRARIES})
+add_dependencies(bqsr gamgee)
 

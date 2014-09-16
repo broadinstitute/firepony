@@ -160,6 +160,11 @@ struct packed_vector
         return *this;
     }
 
+    stream_type stream_at_index(const index_type i)
+    {
+        return stream_type(thrust::raw_pointer_cast(&m_storage.front()), i);
+    }
+
     bqsr::vector<system_tag, uint32> m_storage;
     index_type                       m_size;
 };

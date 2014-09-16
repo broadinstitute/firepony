@@ -16,11 +16,10 @@
  *
  */
 
-#include <nvbio/basic/primitives.h>
-
 #include "bqsr_types.h"
 #include "bqsr_context.h"
 #include "variants.h"
+#include "util.h"
 
 void SNPDatabase_refIDs::compute_sequence_offsets(const reference_genome& genome)
 {
@@ -367,11 +366,11 @@ void filter_known_snps(bqsr_context *context, const alignment_batch& batch)
     context->temp_u32 = context->active_read_list;
 
     uint32 num_active;
-    num_active = nvbio::copy_if(context->temp_u32.size(),
-                                context->temp_u32.begin(),
-                                snp.active_read_ids.begin(),
-                                vcf_active_predicate(plain_view(snp.active_vcf_ranges)),
-                                context->temp_storage);
+    num_active = bqsr_copy_if(context->temp_u32.begin(),
+                              context->temp_u32.size(),
+                              snp.active_read_ids.begin(),
+                              vcf_active_predicate(snp.active_vcf_ranges));
+
     snp.active_read_ids.resize(num_active);
 
     // finally apply the VCF filter

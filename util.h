@@ -75,3 +75,28 @@ struct string_database
         }
     };
 };
+
+#include <thrust/scan.h>
+#include <thrust/copy.h>
+
+// simplified version of thrust::inclusive_scan
+template <typename InputIterator, typename OutputIterator, typename Predicate>
+inline void bqsr_inclusive_scan(InputIterator first,
+                                size_t len,
+                                OutputIterator result,
+                                Predicate op)
+{
+    thrust::inclusive_scan(first, first + len, result, op);
+}
+
+// simplified version of thrust::copy_if
+template <typename InputIterator, typename OutputIterator, typename Predicate>
+inline size_t bqsr_copy_if(InputIterator first,
+                           size_t len,
+                           OutputIterator result,
+                           Predicate op)
+{
+    InputIterator last;
+    last = thrust::copy_if(first, first + len, result, op);
+    return last - result;
+}

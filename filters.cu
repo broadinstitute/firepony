@@ -17,13 +17,13 @@
  */
 
 #include <nvbio/basic/types.h>
-#include <nvbio/basic/primitives.h>
 #include <nvbio/io/sequence/sequence_sam.h> // for read flags
 #include <nvbio/strings/alphabet.h>
 
 #include "bqsr_types.h"
 #include "bqsr_context.h"
 #include "filters.h"
+#include "util.h"
 
 // filter if any of the flags are set
 template<uint32 flags>
@@ -281,32 +281,28 @@ void filter_reads(bqsr_context *context, const alignment_batch& batch)
     context->temp_u32.resize(active_read_list.size());
 
     // apply the flags filter, copying from active_read_list into temp_u32
-    num_active = nvbio::copy_if(active_read_list.size(),
-                                active_read_list.begin(),
-                                temp_u32.begin(),
-                                flags_filter,
-                                context->temp_storage);
+    num_active = bqsr_copy_if(active_read_list.begin(),
+                              active_read_list.size(),
+                              temp_u32.begin(),
+                              flags_filter);
 
     // apply the mapq filters, copying from temp_u32 into active_read_list
-    num_active = nvbio::copy_if(num_active,
-                                temp_u32.begin(),
-                                active_read_list.begin(),
-                                mapq_filter,
-                                context->temp_storage);
+    num_active = bqsr_copy_if(temp_u32.begin(),
+                              temp_u32.size(),
+                              active_read_list.begin(),
+                              mapq_filter);
 
     // apply the malformed read filters, copying from active_read_list into temp_u32
-    num_active = nvbio::copy_if(num_active,
-                                active_read_list.begin(),
-                                temp_u32.begin(),
-                                malformed_read_filter,
-                                context->temp_storage);
+    num_active = bqsr_copy_if(active_read_list.begin(),
+                              num_active,
+                              temp_u32.begin(),
+                              malformed_read_filter);
 
     // apply the malformed cigar filters, copying from temp_u32 into active_read_list
-    num_active = nvbio::copy_if(num_active,
-                                temp_u32.begin(),
-                                active_read_list.begin(),
-                                malformed_cigar_filter,
-                                context->temp_storage);
+    num_active = bqsr_copy_if(temp_u32.begin(),
+                              num_active,
+                              active_read_list.begin(),
+                              malformed_cigar_filter);
 
     // resize active_read_list
     active_read_list.resize(num_active);

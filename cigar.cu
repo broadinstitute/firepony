@@ -16,7 +16,6 @@
  *
  */
 
-#include <nvbio/basic/primitives.h>
 #include <nvbio/basic/numbers.h>
 #include <nvbio/basic/dna.h>
 #include <thrust/iterator/transform_iterator.h>
@@ -26,6 +25,7 @@
 #include "bqsr_types.h"
 #include "bqsr_context.h"
 #include "alignment_data.h"
+#include "util.h"
 
 // compute the length of a given cigar operator
 struct cigar_op_len : public thrust::unary_function<const cigar_op&, uint32>
@@ -412,11 +412,10 @@ void expand_cigars(bqsr_context *context, const alignment_batch& batch)
     // mark the first offset as 0
     thrust::fill_n(ctx.cigar_offsets.begin(), 1, 0);
     // do an inclusive scan to compute all offsets + the total size
-    nvbio::inclusive_scan(batch.device.cigars.size(),
-                          thrust::make_transform_iterator(batch.device.cigars.begin(), cigar_op_len()),
-                          ctx.cigar_offsets.begin() + 1,    // the first output is 0
-                          thrust::plus<uint32>(),
-                          context->temp_storage);
+    bqsr_inclusive_scan(thrust::make_transform_iterator(batch.device.cigars.begin(), cigar_op_len()),
+                        batch.device.cigars.size(),
+                        ctx.cigar_offsets.begin() + 1,
+                        thrust::plus<uint32>());
 
     // read back the last element, which contains the size of the buffer required
     uint32 expanded_cigar_len = ctx.cigar_offsets[batch.device.cigars.size()];

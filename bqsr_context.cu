@@ -16,9 +16,8 @@
  *
  */
 
-#include <nvbio/basic/primitives.h>
-
 #include "bqsr_context.h"
+#include "util.h"
 
 void bqsr_context::start_batch(alignment_batch& batch)
 {

@@ -20,7 +20,6 @@
 
 #include <nvbio/basic/types.h>
 #include <nvbio/basic/dna.h>
-#include <nvbio/basic/primitives.h>
 #include <nvbio/basic/numbers.h>
 
 #include <thrust/iterator/transform_iterator.h>
@@ -35,6 +34,7 @@
 #include "alignment_data.h"
 #include "bqsr_context.h"
 #include "reference.h"
+#include "util.h"
 
 #if 0
 #include "baq-cpu.h"
@@ -653,11 +653,10 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     // collect the reads that we need to compute BAQ for
     active_baq_read_list.resize(context->active_read_list.size());
 
-    num_active = nvbio::copy_if(context->active_read_list.size(),
-                                context->active_read_list.begin(),
-                                active_baq_read_list.begin(),
-                                read_needs_baq(*context, batch.device),
-                                context->temp_storage);
+    num_active = bqsr_copy_if(context->active_read_list.begin(),
+                              context->active_read_list.size(),
+                              active_baq_read_list.begin(),
+                              read_needs_baq(*context, batch.device));
 
     active_baq_read_list.resize(num_active);
 
@@ -666,23 +665,21 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     // first offset is zero
     thrust::fill_n(baq.matrix_index.begin(), 1, 0);
     // do an inclusive scan to compute all offsets + the total size
-    nvbio::inclusive_scan(num_active,
-                          thrust::make_transform_iterator(active_baq_read_list.begin(),
-                                                          compute_hmm_matrix_size(*context, batch.device)),
-                          baq.matrix_index.begin() + 1,
-                          thrust::plus<uint32>(),
-                          context->temp_storage);
+    bqsr_inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
+                                                        compute_hmm_matrix_size(*context, batch.device)),
+                        num_active,
+                        baq.matrix_index.begin() + 1,
+                        thrust::plus<uint32>());
 
     // compute the index and size of the HMM scaling factors
     baq.scaling_index.resize(num_active + 1);
     // first offset is zero
     thrust::fill_n(baq.scaling_index.begin(), 1, 0);
-    nvbio::inclusive_scan(num_active,
-                          thrust::make_transform_iterator(active_baq_read_list.begin(),
-                                                          compute_hmm_scaling_factor_size(*context, batch.device)),
-                          baq.scaling_index.begin() + 1,
-                          thrust::plus<uint32>(),
-                          context->temp_storage);
+    bqsr_inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
+                                                        compute_hmm_scaling_factor_size(*context, batch.device)),
+                        num_active,
+                        baq.scaling_index.begin() + 1,
+                        thrust::plus<uint32>());
 
     // read back the last elements, which contain the size of the buffer required
     uint32 matrix_len = baq.matrix_index[num_active];

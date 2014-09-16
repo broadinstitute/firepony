@@ -23,7 +23,6 @@
 #include "covariates.h"
 #include "covariates_bit_packing.h"
 
-#include <nvbio/basic/primitives.h>
 #include <thrust/functional.h>
 
 // defines a covariate chain equivalent to GATK's RecalTable1
@@ -379,11 +378,11 @@ void gather_covariates(bqsr_context *context, const alignment_batch& batch)
         table.pack(indices, temp_sorted);
 
         // compact the active read list
-        active_reads = nvbio::copy_if(read_lists.source().size(),
-                                      read_lists.source().begin(),
-                                      read_lists.destination().begin(),
-                                      read_is_valid(),
-                                      context->temp_storage);
+        active_reads = bqsr_copy_if(read_lists.source().begin(),
+                                    read_lists.source().size(),
+                                    read_lists.destination().begin(),
+                                    read_is_valid());
+
         read_lists.destination().resize(active_reads);
         read_lists.swap();
     } while(active_reads);

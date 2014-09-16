@@ -26,6 +26,8 @@ variants.cu
 variants.h
 )
 
+nvbio_add_module_directory(primitives)
+
 cuda_add_executable(bqsr ${bqsr_srcs})
 target_link_libraries(bqsr nvbio zlibstatic crcstatic ${gamgee_LIB} ${SYSTEM_LINK_LIBRARIES})
 add_dependencies(bqsr gamgee)

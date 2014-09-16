@@ -89,7 +89,7 @@ public:
         }
 
         valid_size += bytes_read;
-        assert(valid_size < buffer.size() - 1);
+        assert(valid_size <= buffer.size() - 1);
         buffer[valid_size] = 0;
 
         return true;

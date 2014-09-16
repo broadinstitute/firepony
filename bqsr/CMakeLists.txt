@@ -17,7 +17,11 @@ filters.h
 filters.cu
 gamgee_loader.cu
 gamgee_loader.h
+mmap.h
+mmap.cu
 sequence_data.h
+serialization.h
+serialization_inl.h
 string_database.h
 string_database.cu
 util.cu
@@ -44,5 +48,5 @@ primitives/vector.h
 )
 
 cuda_add_executable(bqsr ${bqsr_sources})
-target_link_libraries(bqsr ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+target_link_libraries(bqsr rt ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
 add_dependencies(bqsr gamgee zlib)

@@ -20,6 +20,7 @@
 
 #include <gamgee/sam_reader.h>
 #include "alignment_data.h"
+#include "sequence_data.h"
 
 struct gamgee_alignment_file
 {
@@ -37,3 +38,5 @@ public:
     bool next_batch(alignment_batch *batch, uint32 data_mask, const uint32 batch_size = 100000);
     const char *get_sequence_name(uint32 id);
 };
+
+bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 data_mask);

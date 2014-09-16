@@ -1,8 +1,7 @@
 nvbio_module(bqsr)
 
 addsources(
-gamgee_loader.cu
-gamgee_loader.h
+alignment_data.h
 baq.cu
 baq.h
 bqsr.cu
@@ -18,8 +17,11 @@ covariates_table.cu
 covariates.cu
 filters.h
 filters.cu
+gamgee_loader.cu
+gamgee_loader.h
 reference.cu
 reference.h
+sequence_data.h
 util.cu
 util.h
 variants.cu

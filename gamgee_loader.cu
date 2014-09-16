@@ -19,9 +19,18 @@
 #include <gamgee/sam.h>
 #include <gamgee/sam_iterator.h>
 #include <gamgee/sam_tag.h>
+#include <gamgee/fastq.h>
+#include <gamgee/fastq_iterator.h>
+#include <gamgee/fastq_reader.h>
+
+#include <string>
 
 #include "gamgee_loader.h"
 #include "util.h"
+#include "alignment_data.h"
+#include "sequence_data.h"
+
+#include "from_nvbio/dna.h"
 
 gamgee_alignment_file::gamgee_alignment_file(const char *fname)
     : file(std::string(fname))
@@ -223,4 +232,61 @@ bool gamgee_alignment_file::next_batch(alignment_batch *batch, uint32 data_mask,
 const char *gamgee_alignment_file::get_sequence_name(uint32 id)
 {
     return gamgee_header.sequence_name(id).c_str();
+}
+
+#include <thrust/iterator/transform_iterator.h>
+
+struct iupac16 : public thrust::unary_function<char, uint8>
+{
+    uint8 operator() (char in)
+    {
+        return from_nvbio::char_to_iupac16(in);
+    }
+};
+
+// loader for sequence data
+bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 data_mask)
+{
+    sequence_data_host& h = output->host;
+    output->data_mask = data_mask;
+
+    printf("loading %s...\n", filename);
+
+    for (gamgee::Fastq& record : gamgee::FastqReader(std::string(filename)))
+    {
+        printf("... %s (%lu bases)\n", record.name().c_str(), record.sequence().size());
+
+        h.num_sequences++;
+
+        if (data_mask & SequenceDataMask::BASES)
+        {
+            std::string sequence = record.sequence();
+
+            const size_t seq_start = h.bases.size();
+            const size_t seq_len = sequence.size();
+
+            h.sequence_bp_start.push_back(seq_start);
+            h.sequence_bp_len.push_back(seq_len);
+
+            h.bases.resize(seq_start + seq_len);
+
+            bqsr::assign(sequence.size(),
+                         thrust::make_transform_iterator(sequence.begin(), iupac16()),
+                         h.bases.stream_at_index(seq_start));
+        }
+
+        if (data_mask & SequenceDataMask::QUALITIES)
+        {
+            assert(!"unimplemented");
+            return false;
+        }
+
+        if (data_mask & SequenceDataMask::NAMES)
+        {
+            uint32 seq_id = h.sequence_names.insert(record.name());
+            h.sequence_id.push_back(seq_id);
+        }
+    }
+
+    return true;
 }

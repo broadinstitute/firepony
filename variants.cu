@@ -200,7 +200,7 @@ struct compute_vcf_ranges : public bqsr_lambda
 
         // search for the starting range
         const uint32 *vcf_start;
-        vcf_start = nvbio::upper_bound(alignment_window.x,
+        vcf_start = nvbio::lower_bound(alignment_window.x,
                                        ctx.db.genome_positions.begin(),
                                        ctx.db.genome_positions.size());
 

@@ -117,7 +117,7 @@ struct covariate_EventType : public covariate<PreviousCovariate, 2>
                                            uint32 read_index, uint16 bp, uint32 cigar_ev,
                                            uint32 input_key = 0)
     {
-        uint8 key = ctx.cigar.cigar_ops[cigar_ev];
+        uint8 key = ctx.cigar.cigar_events[cigar_ev];
         return covariate<PreviousCovariate, 2>::build_key(input_key, key,
                                                           ctx, batch, read_index, bp, cigar_ev);
     }
@@ -186,7 +186,7 @@ __global__ void covariates_kernel(covariate_chain covariates,
 
         for(uint32 ev = cigar_start; ev < cigar_end; ev++)
         {
-            uint16 bp = ctx.cigar.cigar_op_read_coordinates[ev];
+            uint16 bp = ctx.cigar.cigar_event_read_coordinates[ev];
             if (bp != uint16(-1))
             {
                 uint32 key = covariates.encode(ctx, batch, read_index, bp, ev);

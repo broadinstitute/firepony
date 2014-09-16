@@ -68,6 +68,9 @@ struct cigar_op_expand : public bqsr_lambda
             case cigar_op::OP_P:
                 ctx.cigar.cigar_events[out_base + i] = cigar_event::D;
                 break;
+
+            case cigar_op::OP_S:
+                ctx.cigar.cigar_events[out_base + i] = cigar_event::S;
             }
         }
     }
@@ -82,17 +85,37 @@ struct cigar_coordinates_expand : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
+    // update a coordinate window when we reach a new valid offset for the window
+    template<typename W, typename O>
+    NVBIO_FORCEINLINE NVBIO_HOST_DEVICE void update(W& window, O new_offset,
+                                                    bool update_start = true,
+                                                    bool update_end = true)
+    {
+        if (update_start)
+            window.x = nvbio::min(window.x, new_offset);
+
+        if (update_end)
+            window.y = nvbio::max(window.y, new_offset);
+    }
+
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const BAM_CRQ_index& idx = batch.crq_index[read_index];
         const cigar_op *cigar = &batch.cigars[idx.cigar_start];
 
         uint32 base = ctx.cigar.cigar_offsets[idx.cigar_start];
-        uint16 *output_read_coordinates = &ctx.cigar.cigar_op_read_coordinates[base];
-        uint16 *output_reference_coordinates = &ctx.cigar.cigar_op_reference_coordinates[base];
+        uint16 *output_read_coordinates = &ctx.cigar.cigar_event_read_coordinates[base];
+        uint16 *output_reference_coordinates = &ctx.cigar.cigar_event_reference_coordinates[base];
+
+        ushort2 read_window_clipped = make_ushort2(uint16(~0), 0);
+        ushort2 read_window_clipped_no_insertions = make_ushort2(uint16(~0), 0);
+        ushort2 reference_window_clipped = make_ushort2(uint16(~0), 0);
 
         uint16 read_offset = 0;
         uint16 reference_offset = 0;
+
+        bool leading_clips = true;
+        bool trailing_clips = false;
 
         for(uint32 c = 0; c < idx.cigar_len; c++)
         {
@@ -103,8 +126,14 @@ struct cigar_coordinates_expand : public bqsr_lambda
             case cigar_op::OP_X:
                 for(uint32 i = 0; i < cigar[c].len; i++)
                 {
+                    leading_clips = false;
+
                     *output_read_coordinates++ = read_offset;
                     *output_reference_coordinates++ = reference_offset;
+
+                    update(read_window_clipped, read_offset);
+                    update(read_window_clipped_no_insertions, read_offset);
+                    update(reference_window_clipped, reference_offset);
 
                     read_offset++;
                     reference_offset++;
@@ -115,8 +144,19 @@ struct cigar_coordinates_expand : public bqsr_lambda
             case cigar_op::OP_S:
                 for(uint32 i = 0; i < cigar[c].len; i++)
                 {
-                    *output_read_coordinates++ = uint16(-1);
+                    // if we're in a clipping region, then we're either in the leading or trailing clipping region
+                    trailing_clips = !leading_clips;
+
+                    *output_read_coordinates++ = read_offset;
                     *output_reference_coordinates++ = uint16(-1);
+
+                    // if we haven't reached the trailing clipping region yet...
+                    if (!trailing_clips)
+                    {
+                        // ... then update the end of the read windows
+                        update(read_window_clipped, read_offset, false, true);
+                        update(read_window_clipped_no_insertions, read_offset, false, true);
+                    }
 
                     read_offset++;
                 }
@@ -127,8 +167,15 @@ struct cigar_coordinates_expand : public bqsr_lambda
             case cigar_op::OP_I:
                 for(uint32 i = 0; i < cigar[c].len; i++)
                 {
+                    leading_clips = false;
+
                     *output_read_coordinates++ = read_offset;
                     *output_reference_coordinates++ = uint16(-1);
+
+                    // update the trailing clipped read region
+                    update(read_window_clipped, read_offset);
+
+                    // the no-insertion window never moves with I
 
                     read_offset++;
                 }
@@ -143,12 +190,16 @@ struct cigar_coordinates_expand : public bqsr_lambda
                     *output_read_coordinates++ = uint16(-1);
                     *output_reference_coordinates++ = reference_offset;
 
+                    update(reference_window_clipped, reference_offset);
+
                     reference_offset++;
                 }
-
-                break;
             }
         }
+
+        ctx.cigar.read_window_clipped[read_index] = read_window_clipped;
+        ctx.cigar.read_window_clipped_no_insertions[read_index] = read_window_clipped_no_insertions;
+        ctx.cigar.reference_window_clipped[read_index] = reference_window_clipped;
     }
 };
 
@@ -174,9 +225,13 @@ void expand_cigars(bqsr_context *context, const BAM_alignment_batch_device& batc
     uint32 expanded_cigar_len = ctx.cigar_offsets[batch.cigars.size()];
 
     // make sure we have enough room for the expanded cigars
-    ctx.cigar_ops.resize(expanded_cigar_len);
-    ctx.cigar_op_reference_coordinates.resize(expanded_cigar_len);
-    ctx.cigar_op_read_coordinates.resize(expanded_cigar_len);
+    ctx.cigar_events.resize(expanded_cigar_len);
+    ctx.cigar_event_reference_coordinates.resize(expanded_cigar_len);
+    ctx.cigar_event_read_coordinates.resize(expanded_cigar_len);
+
+    ctx.read_window_clipped.resize(batch.num_reads);
+    ctx.read_window_clipped_no_insertions.resize(batch.num_reads);
+    ctx.reference_window_clipped.resize(batch.num_reads);
 
     // expand the cigar ops first (xxxnsubtil: same as above, active read list is ignored)
     thrust::for_each(thrust::make_counting_iterator(0),

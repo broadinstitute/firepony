@@ -118,6 +118,28 @@ struct filter_malformed_reads : public bqsr_lambda
             return false;
         }
 
+        // read has no read group
+        // (GATK: checkHasReadGroup)
+        if (batch.read_groups[read_index] == uint32(-1))
+        {
+            return false;
+        }
+
+        // read has different number of bases and base qualities
+        // (GATK: checkMismatchBasesAndQuals)
+        // xxxnsubtil: note that this is meaningless for BAM, but it's here anyway in case we end up parsing SAM files
+        if (idx.qual_len != idx.read_len)
+        {
+            return false;
+        }
+
+        // read has no base sequence stored in the file
+        // (GATK: checkSeqStored)
+        if (idx.read_len == 0)
+        {
+            return false;
+        }
+
         // CIGAR contains N operators
         // (GATK: checkCigarIsSupported)
         for(uint32 i = idx.cigar_start; i < idx.cigar_start + idx.cigar_len; i++)

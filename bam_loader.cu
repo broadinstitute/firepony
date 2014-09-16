@@ -279,14 +279,14 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
         batch->num_reads++;
 
         // push the CRQ index
-        BAM_CRQ_index crq_index(batch->cigars.size(), align.num_cigar_ops(), batch->reads.size(), align.l_seq, batch->qualities.size());
+        BAM_CRQ_index crq_index(batch->cigars.size(), align.num_cigar_ops(), batch->reads.size(), align.l_seq, batch->qualities.size(), align.l_seq);
         batch->crq_index.push_back(crq_index);
 
         // push the alignment position
         batch->alignment_positions.push_back(align.pos); // BAM pos is 0-based
 
         // make sure the refID is valid and push it
-        if (align.refID < 0 || uint32(align.refID) >= header.n_ref)
+        if (align.refID < 0 || align.refID >= header.n_ref)
         {
             // push an invalid refID
             batch->alignment_sequence_IDs.push_back(uint32(-1));

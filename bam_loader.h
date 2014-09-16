@@ -182,20 +182,21 @@ struct BAM_CRQ_index
 {
     uint32 cigar_start, cigar_len;
     uint32 read_start, read_len;
-    uint32 qual_start;
+    uint32 qual_start, qual_len; // qual_len is always the same as read_len for BAM, but not necessarily for SAM
 
     NVBIO_HOST_DEVICE BAM_CRQ_index()
         : cigar_start(0), cigar_len(0),
           read_start(0), read_len(0),
-          qual_start(0)
+          qual_start(0), qual_len(0)
     { }
 
     NVBIO_HOST_DEVICE BAM_CRQ_index(uint32 cigar_start, uint32 cigar_len,
                                     uint32 read_start, uint32 read_len,
-                                    uint32 qual_start)
+                                    uint32 qual_start, uint32 qual_len)
         : cigar_start(cigar_start), cigar_len(cigar_len),
           read_start(read_start), read_len(read_len),
-          qual_start(qual_start) { }
+          qual_start(qual_start), qual_len(qual_len)
+    { }
 };
 
 typedef nvbio::vector<device_tag, BAM_CRQ_index> D_VectorCRQIndex;
@@ -215,7 +216,7 @@ struct BAM_alignment_batch_storage
     nvbio::vector<system_tag, uint32> alignment_sequence_IDs;
     nvbio::vector<system_tag, uint8> mapq;
 
-    nvbio::vector<system_tag, BAM_CRQ_index> crq_index; // CRQ: cigars, reads, qual_start
+    nvbio::vector<system_tag, BAM_CRQ_index> crq_index; // CRQ: cigars, reads, qualities
 };
 
 struct BAM_alignment_index

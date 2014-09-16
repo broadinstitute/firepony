@@ -251,7 +251,7 @@ struct filter_malformed_cigars : public bqsr_lambda
 };
 
 // apply read filters to the batch
-void filter_reads(bqsr_context *context, const BAM_alignment_batch_device& batch)
+void filter_reads(bqsr_context *context, const BAM_alignment_batch& batch)
 {
     D_VectorU32& active_read_list = context->active_read_list;
     D_VectorU32& temp_u32 = context->temp_u32;
@@ -266,13 +266,13 @@ void filter_reads(bqsr_context *context, const BAM_alignment_batch_device& batch
     filter_if_any_set<nvbio::io::SAMFlag_Duplicate |
                       nvbio::io::SAMFlag_FailedQC |
                       nvbio::io::SAMFlag_SegmentUnmapped |
-                      nvbio::io::SAMFlag_SecondaryAlignment> flags_filter(*context, batch);
+                      nvbio::io::SAMFlag_SecondaryAlignment> flags_filter(*context, batch.device);
 
     // corresponds to the GATK filters MappingQualityUnavailable and MappingQualityZero
-    filter_mapq mapq_filter(*context, batch);
+    filter_mapq mapq_filter(*context, batch.device);
     // corresponds to the GATK filter MalformedReadFilter
-    filter_malformed_reads malformed_read_filter(*context, batch);
-    filter_malformed_cigars malformed_cigar_filter(*context, batch);
+    filter_malformed_reads malformed_read_filter(*context, batch.device);
+    filter_malformed_cigars malformed_cigar_filter(*context, batch.device);
 
     start_count = active_read_list.size();
 

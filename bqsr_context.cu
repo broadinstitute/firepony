@@ -20,22 +20,22 @@
 
 #include "bqsr_context.h"
 
-void bqsr_context::start_batch(BAM_alignment_batch_device& batch)
+void bqsr_context::start_batch(BAM_alignment_batch& batch)
 {
     // initialize the read order with 0..N
-    active_read_list.resize(batch.num_reads);
+    active_read_list.resize(batch.host.num_reads);
     thrust::copy(thrust::make_counting_iterator(0),
-                 thrust::make_counting_iterator(0) + batch.crq_index.size(),
+                 thrust::make_counting_iterator(0) + batch.host.crq_index.size(),
                  active_read_list.begin());
 
     // set up the active location list to cover all of the current batch
-    active_location_list.resize(batch.reads.size());
+    active_location_list.resize(batch.host.reads.size());
     // mark all BPs as active
     thrust::fill(active_location_list.m_storage.begin(),
                  active_location_list.m_storage.end(),
                  0xffffffff);
 
-    stats.total_reads += batch.num_reads;
+    stats.total_reads += batch.host.num_reads;
 }
 #if 0
 

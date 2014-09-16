@@ -45,7 +45,7 @@ struct bqsr_context
 {
     BAM_header& bam_header;
     const DeviceSNPDatabase& db;
-    const reference_genome_device& reference;
+    const reference_genome& reference;
 
     // sorted list of active reads
     D_VectorU32 active_read_list;
@@ -74,7 +74,7 @@ struct bqsr_context
 
     bqsr_context(BAM_header& bam_header,
                  const DeviceSNPDatabase& db,
-                 const reference_genome_device& reference)
+                 const reference_genome& reference)
         : bam_header(bam_header),
           db(db),
           reference(reference)
@@ -102,7 +102,7 @@ struct bqsr_context
         view v = {
             bam_header,
             db,
-            reference,
+            reference.device,
             plain_view(active_read_list),
             plain_view(alignment_windows),
             plain_view(sequence_alignment_windows),
@@ -118,7 +118,7 @@ struct bqsr_context
         return v;
     }
 
-    void start_batch(BAM_alignment_batch_device& batch);
+    void start_batch(BAM_alignment_batch& batch);
 #if 0
     void compact_active_read_list(void);
 #endif
@@ -137,14 +137,4 @@ struct bqsr_lambda
     { }
 };
 
-struct bqsr_lambda_ref : public bqsr_lambda
-{
-    reference_genome_device::const_view reference;
-
-    bqsr_lambda_ref(bqsr_context::view ctx,
-                    const reference_genome_device::const_view reference,
-                    const BAM_alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch),
-          reference(reference)
-    { }
-};
+void debug_read(bqsr_context *context, const BAM_alignment_batch& batch, int read_id);

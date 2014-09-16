@@ -215,9 +215,10 @@ bool BAMfile::init(void)
 #undef GZREAD
 }
 
-bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, const uint32 batch_size)
+bool BAMfile::next_batch(BAM_alignment_batch *batch, bool skip_headers, const uint32 batch_size)
 {
-    batch->reset(batch_size, skip_headers);
+    BAM_alignment_batch_host *h_batch = &batch->host;
+    h_batch->reset(batch_size, skip_headers);
 
     // temp vector for translating CIGARs
     nvbio::vector<host_tag, uint32> cigar_temp(64);
@@ -234,11 +235,11 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
         if (!skip_headers)
         {
             // allocate space for another read
-            batch->align_headers.resize(read_id + 1);
+            h_batch->align_headers.resize(read_id + 1);
         }
 
         // figure out storage for the alignment header: either a temp stack object or the output object
-        BAM_alignment_header& align = (skip_headers ? discard_alignment : batch->align_headers[read_id]);
+        BAM_alignment_header& align = (skip_headers ? discard_alignment : h_batch->align_headers[read_id]);
 
 // utility macro to read in a value from disk
 #define GZREAD(field)                                           \
@@ -262,39 +263,39 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
         GZREAD(align.next_pos);
         GZREAD(align.tlen);
 
-        const uint32 read_name_off = batch->names.size();
+        const uint32 read_name_off = h_batch->names.size();
 
         if (!skip_headers)
         {
             const uint32 read_name_len = align.l_read_name();
 
-            batch->names.resize(read_name_off + read_name_len + 1);
-            readData(&batch->names[read_name_off], read_name_len, __LINE__);
-            batch->names[read_name_off + read_name_len] = '\0';
+            h_batch->names.resize(read_name_off + read_name_len + 1);
+            readData(&h_batch->names[read_name_off], read_name_len, __LINE__);
+            h_batch->names[read_name_off + read_name_len] = '\0';
         } else {
             const uint32 read_name_len = align.bin_mq_nl & 0xff;
             gzseek(fp, read_name_len, SEEK_CUR);
         }
 
-        batch->num_reads++;
+        h_batch->num_reads++;
 
         // push the CRQ index
-        BAM_CRQ_index crq_index(batch->cigars.size(), align.num_cigar_ops(), batch->reads.size(), align.l_seq, batch->qualities.size(), align.l_seq);
-        batch->crq_index.push_back(crq_index);
+        BAM_CRQ_index crq_index(h_batch->cigars.size(), align.num_cigar_ops(), h_batch->reads.size(), align.l_seq, h_batch->qualities.size(), align.l_seq);
+        h_batch->crq_index.push_back(crq_index);
 
         // push the alignment position
-        batch->alignment_positions.push_back(align.pos); // BAM pos is 0-based
+        h_batch->alignment_positions.push_back(align.pos); // BAM pos is 0-based
 
         // make sure the refID is valid and push it
         if (align.refID < 0 || align.refID >= header.n_ref)
         {
             // push an invalid refID
-            batch->alignment_sequence_IDs.push_back(uint32(-1));
+            h_batch->alignment_sequence_IDs.push_back(uint32(-1));
         } else {
-            batch->alignment_sequence_IDs.push_back(align.refID);
+            h_batch->alignment_sequence_IDs.push_back(align.refID);
         }
 
-        batch->mapq.push_back(align.mapq());
+        h_batch->mapq.push_back(align.mapq());
 
         // figure out the CIGAR length and make sure we can store it
         const uint32 cigar_len = (align.flag_nc & 0xffff);
@@ -311,7 +312,7 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
                 op.op = cigar_temp[c] & 0xf;
                 op.len = cigar_temp[c] >> 4;
 
-                batch->cigars.push_back(op);
+                h_batch->cigars.push_back(op);
             }
         }
 
@@ -320,8 +321,8 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
         const uint32 padded_read_len_bp = ((align.l_seq + 7) / 8) * 8;
 
         // make sure we have enough memory, then read in the sequence
-        batch->reads.resize(crq_index.read_start + padded_read_len_bp);
-        uint32 *storage = (uint32 *)batch->reads.addrof(crq_index.read_start);
+        h_batch->reads.resize(crq_index.read_start + padded_read_len_bp);
+        uint32 *storage = (uint32 *)h_batch->reads.addrof(crq_index.read_start);
         readData(storage, align.l_seq / 2, __LINE__);
 
         // swap nibbles since nvbio expects them swapped
@@ -334,27 +335,27 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
         }
 
         // read in quality data
-        batch->qualities.resize(crq_index.read_start + align.l_seq);
-        readData(&batch->qualities[crq_index.read_start], align.l_seq, __LINE__);
+        h_batch->qualities.resize(crq_index.read_start + align.l_seq);
+        readData(&h_batch->qualities[crq_index.read_start], align.l_seq, __LINE__);
 
         // store the flags for each
-        batch->flags.push_back(align.flags());
+        h_batch->flags.push_back(align.flags());
 
         // compute auxiliary data size
         const uint32 aux_len = align.block_size - (gztell(fp) - read_block_start);
 
         // read in aux data
-        const uint32 aux_start = batch->aux_data.size();
-        batch->aux_data.resize(aux_start + aux_len);
-        readData(&batch->aux_data[aux_start], aux_len, __LINE__);
+        const uint32 aux_start = h_batch->aux_data.size();
+        h_batch->aux_data.resize(aux_start + aux_len);
+        readData(&h_batch->aux_data[aux_start], aux_len, __LINE__);
 
         // push the header index and read in aux data
-        BAM_alignment_index idx(batch->aux_data.size(), aux_len, read_name_off);
-        batch->index.push_back(idx);
+        BAM_alignment_index idx(h_batch->aux_data.size(), aux_len, read_name_off);
+        h_batch->index.push_back(idx);
 
         // walk the aux data looking for the read group
-        char *aux_ptr = &batch->aux_data[aux_start];
-        while(aux_ptr < &batch->aux_data[aux_start + aux_len])
+        char *aux_ptr = &h_batch->aux_data[aux_start];
+        while(aux_ptr < &h_batch->aux_data[aux_start + aux_len])
         {
             BAM_alignment_tag *tag = (BAM_alignment_tag *) aux_ptr;
             aux_ptr += 3;
@@ -411,9 +412,9 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
                 if (header.rg_name_to_id.find(h) == header.rg_name_to_id.end())
                 {
                     // invalid read group
-                    batch->read_groups[read_id] = uint32(-1);
+                    h_batch->read_groups[read_id] = uint32(-1);
                 } else {
-                    batch->read_groups[read_id] = header.rg_name_to_id[h];
+                    h_batch->read_groups[read_id] = header.rg_name_to_id[h];
                 }
             }
 

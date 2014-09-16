@@ -120,12 +120,12 @@ struct compute_read_offset_list : public bqsr_lambda
 
 // for each read, compute the offset of each read BP relative to the base alignment position of the read
 void build_read_offset_list(bqsr_context *context,
-                            const BAM_alignment_batch_device& batch)
+                            const BAM_alignment_batch& batch)
 {
-    context->read_offset_list.resize(batch.reads.size());
+    context->read_offset_list.resize(batch.device.reads.size());
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
-                     compute_read_offset_list(*context, batch));
+                     compute_read_offset_list(*context, batch.device));
 }
 
 // functor used to compute the alignment window list
@@ -169,15 +169,15 @@ struct compute_alignment_window : public bqsr_lambda
 };
 
 // for each read, compute the end of the alignment window in the reference
-void build_alignment_windows(bqsr_context *ctx, const BAM_alignment_batch_device& batch)
+void build_alignment_windows(bqsr_context *ctx, const BAM_alignment_batch& batch)
 {
     // set up the alignment window buffer
-    ctx->alignment_windows.resize(batch.num_reads);
-    ctx->sequence_alignment_windows.resize(batch.num_reads);
+    ctx->alignment_windows.resize(batch.device.num_reads);
+    ctx->sequence_alignment_windows.resize(batch.device.num_reads);
     // compute alignment windows
     thrust::for_each(ctx->active_read_list.begin(),
                      ctx->active_read_list.end(),
-                     compute_alignment_window(*ctx, batch));
+                     compute_alignment_window(*ctx, batch.device));
 }
 
 struct compute_vcf_ranges : public bqsr_lambda
@@ -350,34 +350,33 @@ public:
     }
 };
 
-// filter out the known SNPs from the active BP list
+// filter out known SNPs from the active BP list
 // for each BP in batch, set the corresponding bit in active_loc_list to zero if it matches a known SNP
-void filter_snps(bqsr_context *context,
-                 const BAM_alignment_batch_device& batch)
+void filter_known_snps(bqsr_context *context, const BAM_alignment_batch& batch)
 {
     snp_filter_context& snp = context->snp_filter;
 
     // compute the VCF ranges for each read
-    snp.active_vcf_ranges.resize(batch.crq_index.size());
+    snp.active_vcf_ranges.resize(batch.device.crq_index.size());
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
-                     compute_vcf_ranges(*context, batch));
+                     compute_vcf_ranges(*context, batch.device));
 
     // build a list of reads with active VCF ranges
     snp.active_read_ids.resize(context->active_read_list.size());
     context->temp_u32 = context->active_read_list;
 
     uint32 num_active;
-    num_active = nvbio::cuda::copy_if(context->temp_u32.size(),
-                                      context->temp_u32.begin(),
-                                      snp.active_read_ids.begin(),
-                                      vcf_active_predicate(plain_view(snp.active_vcf_ranges)),
-                                      context->temp_storage);
+    num_active = nvbio::copy_if(context->temp_u32.size(),
+                                context->temp_u32.begin(),
+                                snp.active_read_ids.begin(),
+                                vcf_active_predicate(plain_view(snp.active_vcf_ranges)),
+                                context->temp_storage);
     snp.active_read_ids.resize(num_active);
 
     // finally apply the VCF filter
     // this will create zeros in the active location list for each BP that matches a known variant
     thrust::for_each(snp.active_read_ids.begin(),
                      snp.active_read_ids.end(),
-                     filter_bps(*context, batch));
+                     filter_bps(*context, batch.device));
 }

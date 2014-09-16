@@ -109,5 +109,5 @@ struct cigar_context
     }
 };
 
-void expand_cigars(bqsr_context *context, const reference_genome& reference, const BAM_alignment_batch_device& batch);
-void debug_cigar(bqsr_context *context, const reference_genome& reference, const BAM_alignment_batch_host& batch, int read_index);
+void expand_cigars(bqsr_context *context, const BAM_alignment_batch& batch);
+void debug_cigar(bqsr_context *context, const BAM_alignment_batch& batch, int read_index);

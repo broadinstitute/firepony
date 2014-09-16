@@ -89,17 +89,15 @@ int main(int argc, char **argv)
 
     BAMfile bam(bam_name);
 
-    BAM_alignment_batch_host h_batch;
-    BAM_alignment_batch_device batch;
+    BAM_alignment_batch batch;
 
-    bqsr_context context(bam.header, dev_db, reference.device);
+    bqsr_context context(bam.header, dev_db, reference);
 
-    //while(bam.next_batch(&h_batch, true, 20000000))
-    //while(bam.next_batch(&h_batch, true, 2000000))
-    while(bam.next_batch(&h_batch, true, 1))
+    while(bam.next_batch(&batch, true, 100000))
+//    while(bam.next_batch(&batch, false, 500))
     {
         // load the next batch on the device
-        batch.load(h_batch);
+        batch.download();
         context.start_batch(batch);
 
         // build read offset list
@@ -110,14 +108,18 @@ int main(int argc, char **argv)
         // apply read filters
         filter_reads(&context, batch);
 
+        // apply per-BP filters
+        filter_bases(&context, batch);
+
         // filter known SNPs from active_loc_list
-        filter_snps(&context, batch);
+        filter_known_snps(&context, batch);
 
         // generate cigar events and coordinates
-        expand_cigars(&context, reference, batch);
+        expand_cigars(&context, batch);
 
         // compute the base alignment quality for each read
-        baq_reads(&context, reference, batch);
+        baq_reads(&context, batch);
+
         // build covariate tables
         gather_covariates(&context, batch);
 
@@ -174,17 +176,19 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void debug_read(bqsr_context *context, const reference_genome& genome, const BAM_alignment_batch_host& batch, int read_id)
+void debug_read(bqsr_context *context, const BAM_alignment_batch& batch, int read_id)
 {
+    const BAM_alignment_batch_host& h_batch = batch.host;
+
     uint32 read_index = context->active_read_list[read_id];
 
-    io::SequenceDataView view = plain_view(*genome.h_ref);
+    io::SequenceDataView view = plain_view(*(context->reference.h_ref));
     H_PackedReference reference_stream(view.m_sequence_stream);
-    const BAM_CRQ_index& idx = batch.crq_index[read_index];
+    const BAM_CRQ_index& idx = h_batch.crq_index[read_index];
 
     printf("== read order %d read %d\n", read_id, read_index);
 
-    printf("name = [%s]\n", &batch.names[batch.index[read_index].name]);
+    printf("name = [%s]\n", &h_batch.names[h_batch.index[read_index].name]);
 
     printf("  offset list = [ ");
     for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
@@ -194,14 +198,14 @@ void debug_read(bqsr_context *context, const reference_genome& genome, const BAM
     }
     printf("]\n");
 
-    debug_cigar(context, genome, batch, read_index);
-    debug_baq(context, genome, batch, read_index);
+    debug_cigar(context, batch, read_index);
+    debug_baq(context, batch, read_index);
 
     const uint2 alignment_window = context->alignment_windows[read_index];
     printf("  sequence name [%s]\n  sequence base [%u]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
-            &view.m_name_stream[view.m_name_index[batch.alignment_sequence_IDs[read_index]]],
-            genome.sequence_offsets[batch.alignment_sequence_IDs[read_index]],
-            batch.alignment_positions[read_index],
+            &view.m_name_stream[view.m_name_index[h_batch.alignment_sequence_IDs[read_index]]],
+            context->reference.sequence_offsets[h_batch.alignment_sequence_IDs[read_index]],
+            h_batch.alignment_positions[read_index],
             alignment_window.x,
             alignment_window.y);
 
@@ -210,4 +214,3 @@ void debug_read(bqsr_context *context, const reference_genome& genome, const BAM
 
     printf("\n");
 }
-

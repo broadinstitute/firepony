@@ -227,12 +227,11 @@ struct cigar_coordinates_expand : public bqsr_lambda
     }
 };
 
-struct compute_is_snp : public bqsr_lambda_ref
+struct compute_is_snp : public bqsr_lambda
 {
     compute_is_snp(bqsr_context::view ctx,
-                   const reference_genome_device::const_view reference,
                    const BAM_alignment_batch_device::const_view batch)
-        : bqsr_lambda_ref(ctx, reference, batch)
+        : bqsr_lambda(ctx, batch)
     { }
 
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
@@ -245,11 +244,11 @@ struct compute_is_snp : public bqsr_lambda_ref
 
         // fetch the alignment base in reference coordinates
         const uint32 seq_id = batch.alignment_sequence_IDs[read_index];
-        const uint32 seq_base = reference.sequence_offsets[seq_id];
+        const uint32 seq_base = ctx.reference.sequence_offsets[seq_id];
         const uint32 align_offset = batch.alignment_positions[read_index];
         const uint32 reference_alignment_start = seq_base + align_offset;
 
-        D_PackedReference reference_data(reference.genome_stream.m_sequence_stream);
+        D_PackedReference reference_data(ctx.reference.genome_stream.m_sequence_stream);
 
         // go through the cigar events looking for M
         for(uint32 i = cigar_start; i < cigar_end; i++)
@@ -401,26 +400,26 @@ struct sanity_check_cigar_events : public bqsr_lambda
 };
 #endif
 
-void expand_cigars(bqsr_context *context, const reference_genome& reference, const BAM_alignment_batch_device& batch)
+void expand_cigars(bqsr_context *context, const BAM_alignment_batch& batch)
 {
     cigar_context& ctx = context->cigar;
 
     // compute the offsets of each expanded cigar op
     // xxxnsubtil: we ignore the active read list here, so we do unnecessary work
     // might want to revisit this
-    ctx.cigar_offsets.resize(batch.cigars.size() + 1);
+    ctx.cigar_offsets.resize(batch.device.cigars.size() + 1);
 
     // mark the first offset as 0
     thrust::fill_n(ctx.cigar_offsets.begin(), 1, 0);
     // do an inclusive scan to compute all offsets + the total size
-    nvbio::inclusive_scan(batch.cigars.size(),
-                          thrust::make_transform_iterator(batch.cigars.begin(), cigar_op_len()),
+    nvbio::inclusive_scan(batch.device.cigars.size(),
+                          thrust::make_transform_iterator(batch.device.cigars.begin(), cigar_op_len()),
                           ctx.cigar_offsets.begin() + 1,    // the first output is 0
                           thrust::plus<uint32>(),
                           context->temp_storage);
 
     // read back the last element, which contains the size of the buffer required
-    uint32 expanded_cigar_len = ctx.cigar_offsets[batch.cigars.size()];
+    uint32 expanded_cigar_len = ctx.cigar_offsets[batch.device.cigars.size()];
 
     // make sure we have enough room for the expanded cigars
     // note: temporary storage must be padded to a multiple of the word size, since we'll pack whole words at a time
@@ -430,12 +429,12 @@ void expand_cigars(bqsr_context *context, const reference_genome& reference, con
     ctx.cigar_event_reference_coordinates.resize(expanded_cigar_len);
     ctx.cigar_event_read_coordinates.resize(expanded_cigar_len);
 
-    ctx.read_window_clipped.resize(batch.num_reads);
-    ctx.read_window_clipped_no_insertions.resize(batch.num_reads);
-    ctx.reference_window_clipped.resize(batch.num_reads);
+    ctx.read_window_clipped.resize(batch.device.num_reads);
+    ctx.read_window_clipped_no_insertions.resize(batch.device.num_reads);
+    ctx.reference_window_clipped.resize(batch.device.num_reads);
 
     ctx.is_snp.resize(expanded_cigar_len);
-    ctx.num_errors.resize(batch.num_reads);
+    ctx.num_errors.resize(batch.device.num_reads);
 
     // is_snp and num_errors require zero initialization
     thrust::fill(ctx.is_snp.m_storage.begin(), ctx.is_snp.m_storage.end(), 0);
@@ -443,8 +442,8 @@ void expand_cigars(bqsr_context *context, const reference_genome& reference, con
 
     // expand the cigar ops into temp storage (xxxnsubtil: same as above, active read list is ignored)
     thrust::for_each(thrust::make_counting_iterator(0),
-                     thrust::make_counting_iterator(0) + batch.cigars.size(),
-                     cigar_op_expand(*context, batch));
+                     thrust::make_counting_iterator(0) + batch.device.cigars.size(),
+                     cigar_op_expand(*context, batch.device));
 
     // pack the cigar into a 2-bit vector
     // the index here is a 32-bit word index to be filled by each thread
@@ -455,35 +454,37 @@ void expand_cigars(bqsr_context *context, const reference_genome& reference, con
 #ifdef CUDA_DEBUG
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
-                     sanity_check_cigar_events(*context, batch));
+                     sanity_check_cigar_events(*context, batch.device));
 #endif
 
     // now expand the coordinates per read
     // this avoids having to deal with boundary condtions within reads
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
-                     cigar_coordinates_expand(*context, batch));
+                     cigar_coordinates_expand(*context, batch.device));
 
     // compute the SNP bit vector
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
-                     compute_is_snp(*context, reference.device, batch));
+                     compute_is_snp(*context, batch.device));
 
     // compute the number of errors
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
-                     count_snps(*context, batch));
+                     count_snps(*context, batch.device));
 
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
-                     count_indels(*context, batch));
+                     count_indels(*context, batch.device));
 }
 
-void debug_cigar(bqsr_context *context, const reference_genome& reference, const BAM_alignment_batch_host& batch, int read_index)
+void debug_cigar(bqsr_context *context, const BAM_alignment_batch& batch, int read_index)
 {
-    BAM_CRQ_index idx = batch.crq_index[read_index];
+    const BAM_alignment_batch_host& h_batch = batch.host;
+
+    BAM_CRQ_index idx = h_batch.crq_index[read_index];
     cigar_context& ctx = context->cigar;
-    io::SequenceDataView view = plain_view(*reference.h_ref);
+    io::SequenceDataView view = plain_view(*(context->reference.h_ref));
     H_PackedReference reference_stream(view.m_sequence_stream);
 
     printf("  cigar info:\n");
@@ -491,7 +492,7 @@ void debug_cigar(bqsr_context *context, const reference_genome& reference, const
     printf("    cigar                       = [");
     for(uint32 i = idx.cigar_start; i < idx.cigar_start + idx.cigar_len; i++)
     {
-        cigar_op op = batch.cigars[i];
+        cigar_op op = h_batch.cigars[i];
         printf("%d%c", op.len, op.ascii_op());
     }
     printf("]\n");
@@ -535,9 +536,22 @@ void debug_cigar(bqsr_context *context, const reference_genome& reference, const
     }
     printf("]\n");
 
-    const uint32 ref_sequence_id = batch.alignment_sequence_IDs[read_index];
+    printf("    active location list        = [ ");
+    for(uint32 i = cigar_start; i < cigar_end; i++)
+    {
+        uint16 bp_offset = ctx.cigar_event_read_coordinates[i];
+        if (bp_offset == uint16(-1))
+        {
+            printf("   - ");
+        } else {
+            printf("% 3d ", (uint8) context->active_location_list[idx.read_start + bp_offset]);
+        }
+    }
+    printf("]\n");
+
+    const uint32 ref_sequence_id = h_batch.alignment_sequence_IDs[read_index];
     const uint32 ref_sequence_base = view.m_sequence_index[ref_sequence_id];
-    const uint32 ref_sequence_offset = ref_sequence_base + batch.alignment_positions[read_index];
+    const uint32 ref_sequence_offset = ref_sequence_base + h_batch.alignment_positions[read_index];
 
     printf("    reference sequence data     = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
@@ -557,7 +571,7 @@ void debug_cigar(bqsr_context *context, const reference_genome& reference, const
         {
             base = '-';
         } else {
-            base = iupac16_to_char(batch.reads[idx.read_start + read_bp]);
+            base = iupac16_to_char(h_batch.reads[idx.read_start + read_bp]);
             if (ctx.cigar_events[i] == cigar_event::S)
             {
                 // display soft-clipped bases in lowercase
@@ -578,7 +592,7 @@ void debug_cigar(bqsr_context *context, const reference_genome& reference, const
         {
             printf("    ");
         } else {
-            printf("% 3d ", batch.qualities[idx.read_start + read_bp]);
+            printf("% 3d ", h_batch.qualities[idx.read_start + read_bp]);
         }
     }
     printf("]\n");

@@ -136,10 +136,10 @@ struct DeviceSNPDatabase
 };
 
 void build_read_offset_list(bqsr_context *context,
-                            const BAM_alignment_batch_device& batch);
+                            const BAM_alignment_batch& batch);
 
 void build_alignment_windows(bqsr_context *ctx,
-                             const BAM_alignment_batch_device& batch);
+                             const BAM_alignment_batch& batch);
 
-void filter_snps(bqsr_context *context,
-                 const BAM_alignment_batch_device& batch);
+void filter_known_snps(bqsr_context *context,
+                 const BAM_alignment_batch& batch);

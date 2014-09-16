@@ -173,6 +173,9 @@ struct BAM_alignment_batch_storage
 {
     uint32 num_reads;
 
+    NVBIO_HOST BAM_alignment_batch_storage()
+    { }
+
     nvbio::vector<system_tag, cigar_op> cigars;
     nvbio::PackedVector<system_tag, 4> reads; //VectorDNA16<system_tag> reads;
     nvbio::vector<system_tag, uint8> qualities;
@@ -265,7 +268,7 @@ struct BAM_alignment_batch_device : public BAM_alignment_batch_storage<device_ta
 
     }
 
-    NVBIO_HOST_DEVICE BAM_alignment_batch_device() { }
+    NVBIO_HOST BAM_alignment_batch_device() { }
 
     struct const_view
     {
@@ -301,6 +304,18 @@ struct BAM_alignment_batch_device : public BAM_alignment_batch_storage<device_ta
         return v;
     }
 };
+
+struct BAM_alignment_batch
+{
+    BAM_alignment_batch_host host;
+    BAM_alignment_batch_device device;
+
+    void download(void)
+    {
+        device.load(host);
+    }
+};
+
 /*
 struct BAM_alignment_batch_device_view
 {
@@ -353,7 +368,7 @@ public:
     BAMfile(const char *fname);
     ~BAMfile();
 
-    bool next_batch(BAM_alignment_batch_host *batch, bool skip_headers = false, const uint32 batch_size = 100000);
+    bool next_batch(BAM_alignment_batch *batch, bool skip_headers = false, const uint32 batch_size = 100000);
 
 private:
     bool readData(void *output, unsigned int len, int line);

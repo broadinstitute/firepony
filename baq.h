@@ -74,5 +74,5 @@ struct baq_context
     }
 };
 
-void baq_reads(bqsr_context *context, const reference_genome& reference, const BAM_alignment_batch_device& batch);
-void debug_baq(bqsr_context *context, const reference_genome& genome, const BAM_alignment_batch_host& batch, int read_index);
+void baq_reads(bqsr_context *context, const BAM_alignment_batch& batch);
+void debug_baq(bqsr_context *context, const BAM_alignment_batch& batch, int read_index);

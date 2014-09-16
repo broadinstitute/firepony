@@ -54,13 +54,12 @@ using namespace nvbio;
 
 #define GAP_OPEN_PROBABILITY (pow(10.0, (-40.0)/10.))
 #define GAP_EXTENSION_PROBABILITY 0.1
-// ola
-struct compute_hmm_windows : public bqsr_lambda_ref
+
+struct compute_hmm_windows : public bqsr_lambda
 {
     compute_hmm_windows(bqsr_context::view ctx,
-                        const reference_genome_device::const_view reference,
                         const BAM_alignment_batch_device::const_view batch)
-        : bqsr_lambda_ref(ctx, reference, batch)
+        : bqsr_lambda(ctx, batch)
     { }
 
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
@@ -70,8 +69,8 @@ struct compute_hmm_windows : public bqsr_lambda_ref
 
         // grab reference sequence window in the genome
         const uint32 ref_ID = batch.alignment_sequence_IDs[read_index];
-        const uint32 ref_base = reference.sequence_offsets[ref_ID];
-        const uint32 ref_length = reference.sequence_offsets[ref_ID + 1] - ref_base;
+        const uint32 ref_base = ctx.reference.sequence_offsets[ref_ID];
+        const uint32 ref_length = ctx.reference.sequence_offsets[ref_ID + 1] - ref_base;
 
         const uint32 seq_to_alignment_offset = batch.alignment_positions[read_index];
 
@@ -109,12 +108,11 @@ struct compute_hmm_windows : public bqsr_lambda_ref
 };
 
 // encapsulates common state for the HMM algorithm
-struct hmm_common : public bqsr_lambda_ref
+struct hmm_common : public bqsr_lambda
 {
     hmm_common(bqsr_context::view ctx,
-               const reference_genome_device::const_view reference,
                const BAM_alignment_batch_device::const_view batch)
-        : bqsr_lambda_ref(ctx, reference, batch)
+        : bqsr_lambda(ctx, batch)
     { }
 
     int bandWidth, bandWidth2;
@@ -203,7 +201,7 @@ struct hmm_common : public bqsr_lambda_ref
 //        printf("queryStart = %u queryLen = %u\n", queryStart, queryLen);
 
         queryBases = D_StreamDNA16(batch.reads.stream(), idx.read_start + queryStart);
-        referenceBases = D_PackedReference(reference.genome_stream.m_sequence_stream, referenceStart);
+        referenceBases = D_PackedReference(ctx.reference.genome_stream.m_sequence_stream, referenceStart);
         inputQualities = &batch.qualities[idx.qual_start] + queryStart;
 
         if (ctx.baq.qualities.size() > 0)
@@ -254,9 +252,8 @@ struct hmm_common : public bqsr_lambda_ref
 struct hmm_glocal_forward : public hmm_common
 {
     hmm_glocal_forward(bqsr_context::view ctx,
-                       const reference_genome_device::const_view reference,
                        const BAM_alignment_batch_device::const_view batch)
-        : hmm_common(ctx, reference, batch)
+        : hmm_common(ctx, batch)
     { }
 
     template<typename Tuple>
@@ -397,9 +394,8 @@ struct hmm_glocal_forward : public hmm_common
 struct hmm_glocal_backward : public hmm_common
 {
     hmm_glocal_backward(bqsr_context::view ctx,
-                        const reference_genome_device::const_view reference,
                         const BAM_alignment_batch_device::const_view batch)
-        : hmm_common(ctx, reference, batch)
+        : hmm_common(ctx, batch)
     { }
 
     template<typename Tuple>
@@ -500,9 +496,8 @@ struct hmm_glocal_backward : public hmm_common
 struct hmm_glocal_map : public hmm_common
 {
     hmm_glocal_map(bqsr_context::view ctx,
-                   const reference_genome_device::const_view reference,
                    const BAM_alignment_batch_device::const_view batch)
-        : hmm_common(ctx, reference, batch)
+        : hmm_common(ctx, batch)
     { }
 
     template<typename Tuple>
@@ -651,7 +646,7 @@ struct read_flat_baq : public bqsr_lambda
     }
 };
 
-void baq_reads(bqsr_context *context, const reference_genome& reference, const BAM_alignment_batch_device& batch)
+void baq_reads(bqsr_context *context, const BAM_alignment_batch& batch)
 {
     struct baq_context& baq = context->baq;
     D_VectorU32& active_baq_read_list = context->temp_u32;
@@ -663,7 +658,7 @@ void baq_reads(bqsr_context *context, const reference_genome& reference, const B
     num_active = nvbio::copy_if(context->active_read_list.size(),
                                 context->active_read_list.begin(),
                                 active_baq_read_list.begin(),
-                                read_needs_baq(*context, batch),
+                                read_needs_baq(*context, batch.device),
                                 context->temp_storage);
 
     active_baq_read_list.resize(num_active);
@@ -675,7 +670,7 @@ void baq_reads(bqsr_context *context, const reference_genome& reference, const B
     // do an inclusive scan to compute all offsets + the total size
     nvbio::inclusive_scan(num_active,
                           thrust::make_transform_iterator(active_baq_read_list.begin(),
-                                                          compute_hmm_matrix_size(*context, batch)),
+                                                          compute_hmm_matrix_size(*context, batch.device)),
                           baq.matrix_index.begin() + 1,
                           thrust::plus<uint32>(),
                           context->temp_storage);
@@ -686,7 +681,7 @@ void baq_reads(bqsr_context *context, const reference_genome& reference, const B
     thrust::fill_n(baq.scaling_index.begin(), 1, 0);
     nvbio::inclusive_scan(num_active,
                           thrust::make_transform_iterator(active_baq_read_list.begin(),
-                                                          compute_hmm_scaling_factor_size(*context, batch)),
+                                                          compute_hmm_scaling_factor_size(*context, batch.device)),
                           baq.scaling_index.begin() + 1,
                           thrust::plus<uint32>(),
                           context->temp_storage);
@@ -719,11 +714,11 @@ void baq_reads(bqsr_context *context, const reference_genome& reference, const B
 //    printf("]\n");
 //    fflush(stdout);
 
-    baq.read_windows.resize(batch.num_reads);
-    baq.reference_windows.resize(batch.num_reads);
+    baq.read_windows.resize(batch.device.num_reads);
+    baq.reference_windows.resize(batch.device.num_reads);
 
-    baq.state.resize(batch.qualities.size());
-    baq.qualities.resize(batch.qualities.size());
+    baq.state.resize(batch.device.qualities.size());
+    baq.qualities.resize(batch.device.qualities.size());
 
     thrust::fill(baq.state.begin(), baq.state.end(), uint32(-1));
     thrust::fill(baq.qualities.begin(), baq.qualities.end(), uint8(-1));
@@ -732,7 +727,7 @@ void baq_reads(bqsr_context *context, const reference_genome& reference, const B
     // note: this is used both for real BAQ and flat BAQ, so we use the full active read list
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
-                     compute_hmm_windows(*context, reference.device, batch));
+                     compute_hmm_windows(*context, batch.device));
 
     // initialize matrices and scaling factors
     thrust::fill_n(baq.forward.begin(), baq.forward.size(), 0.0);
@@ -746,7 +741,7 @@ void baq_reads(bqsr_context *context, const reference_genome& reference, const B
                      thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
                                                                   baq.matrix_index.end(),
                                                                   baq.scaling_index.end())),
-                     hmm_glocal_forward(*context, reference.device, batch));
+                     hmm_glocal_forward(*context, batch.device));
 
     // run the backward portion
     thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
@@ -755,7 +750,7 @@ void baq_reads(bqsr_context *context, const reference_genome& reference, const B
                      thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
                                                                   baq.matrix_index.end(),
                                                                   baq.scaling_index.end())),
-                     hmm_glocal_backward(*context, reference.device, batch));
+                     hmm_glocal_backward(*context, batch.device));
 
     // use the computed state to map qualities
     thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
@@ -764,12 +759,12 @@ void baq_reads(bqsr_context *context, const reference_genome& reference, const B
                      thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
                                                                   baq.matrix_index.end(),
                                                                   baq.scaling_index.end())),
-                     hmm_glocal_map(*context, reference.device, batch));
+                     hmm_glocal_map(*context, batch.device));
 
     // for any reads that we did *not* compute a BAQ, mark the base pairs as having no BAQ uncertainty
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
-                     read_flat_baq(*context, batch));
+                     read_flat_baq(*context, batch.device));
 
     context->stats.baq_reads += num_active;
 
@@ -793,11 +788,13 @@ void baq_reads(bqsr_context *context, const reference_genome& reference, const B
 #endif
 }
 
-void debug_baq(bqsr_context *context, const reference_genome& genome, const BAM_alignment_batch_host& batch, int read_index)
+void debug_baq(bqsr_context *context, const BAM_alignment_batch& batch, int read_index)
 {
+    const BAM_alignment_batch_host& h_batch = batch.host;
+
     printf("  BAQ info:\n");
 
-    const BAM_CRQ_index& idx = batch.crq_index[read_index];
+    const BAM_CRQ_index& idx = h_batch.crq_index[read_index];
 
     ushort2 read_window = context->baq.read_windows[read_index];
     uint2 reference_window = context->baq.reference_windows[read_index];
@@ -806,8 +803,8 @@ void debug_baq(bqsr_context *context, const reference_genome& genome, const BAM_
     printf("    absolute reference window   = [ %u %u ]\n", reference_window.x, reference_window.y);
     //printf("    sequence base: %u\n", genome.sequence_offsets[batch.alignment_sequence_IDs[read_index]]);
     printf("    relative reference window   = [ %u %u ]\n",
-            reference_window.x - genome.sequence_offsets[batch.alignment_sequence_IDs[read_index]],
-            reference_window.y - genome.sequence_offsets[batch.alignment_sequence_IDs[read_index]]);
+            reference_window.x - context->reference.sequence_offsets[h_batch.alignment_sequence_IDs[read_index]],
+            reference_window.y - context->reference.sequence_offsets[h_batch.alignment_sequence_IDs[read_index]]);
 
     printf("    BAQ state                   = [ ");
     for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)

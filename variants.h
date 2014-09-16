@@ -28,6 +28,29 @@
 #include "reference.h"
 #include "util.h"
 
+struct snp_filter_context
+{
+    // active reads for the VCF search
+    D_VectorU32 active_read_ids;
+    // active VCF range for each read
+    D_VectorU32_2 active_vcf_ranges;
+
+    struct view
+    {
+        D_VectorU32::plain_view_type active_read_ids;
+        D_VectorU32_2::plain_view_type active_vcf_ranges;
+    };
+
+    operator view()
+    {
+        view v = {
+            plain_view(active_read_ids),
+            plain_view(active_vcf_ranges)
+        };
+        return v;
+    }
+};
+
 struct SNPDatabase_refIDs : public nvbio::io::SNPDatabase
 {
     // maps a variant ID to a reference sequence ID

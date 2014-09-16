@@ -62,7 +62,7 @@ void init_cuda(void)
     cudaGetDeviceProperties(&prop, dev);
 
     printf("CUDA runtime version: %d.%d\n", runtime_version / 1000, runtime_version % 100);
-    printf("device: %s (%d MB)\n", prop.name, prop.totalGlobalMem / (1024 * 1024));
+    printf("device: %s (%lu MB)\n", prop.name, prop.totalGlobalMem / (1024 * 1024));
 }
 
 int main(int argc, char **argv)
@@ -223,7 +223,7 @@ void debug_read(bqsr_context *context, const alignment_batch& batch, int read_id
     debug_baq(context, batch, read_index);
 
     const uint2 alignment_window = context->alignment_windows[read_index];
-    printf("  sequence name [%s]\n  sequence base [%u]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
+    printf("  sequence name [%s]\n  sequence base [%lu]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
             context->reference.host.sequence_names.lookup(h_batch.chromosome[read_index]).c_str(),
             context->reference.host.sequence_bp_start[h_batch.chromosome[read_index]],
             h_batch.alignment_start[read_index],

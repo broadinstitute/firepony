@@ -66,12 +66,7 @@ struct SNPDatabase
     // quality value assigned to each variant
     H_VectorU8 variant_qualities;
 
-    SNPDatabase()
-    {
-        reference_sequences.clear();
-        variants.clear();
-        ref_variant_index.clear();
-    }
+    SNPDatabase();
 };
 
 // loads variant data from file_name and appends to output

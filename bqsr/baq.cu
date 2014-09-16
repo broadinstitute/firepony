@@ -256,8 +256,6 @@ struct hmm_glocal_forward : public hmm_common
     template<typename Tuple>
     CUDA_HOST_DEVICE void operator() (const Tuple& hmm_index)
     {
-        const uint32 read_index = thrust::get<0>(hmm_index);
-
         int i, k;
 
         hmm_common::setup(hmm_index);
@@ -398,8 +396,6 @@ struct hmm_glocal_backward : public hmm_common
     template<typename Tuple>
     CUDA_HOST_DEVICE void operator() (const Tuple& hmm_index)
     {
-        const uint32 read_index = thrust::get<0>(hmm_index);
-
         int i, k;
 
         hmm_common::setup(hmm_index);
@@ -500,8 +496,6 @@ struct hmm_glocal_map : public hmm_common
     template<typename Tuple>
     CUDA_HOST_DEVICE void operator() (const Tuple& hmm_index)
     {
-        const uint32 read_index = thrust::get<0>(hmm_index);
-
         int i, k;
 
         hmm_common::setup(hmm_index);
@@ -796,7 +790,7 @@ void debug_baq(bqsr_context *context, const alignment_batch& batch, int read_ind
     printf("    read window                 = [ %u %u ]\n", read_window.x, read_window.y);
     printf("    absolute reference window   = [ %u %u ]\n", reference_window.x, reference_window.y);
     //printf("    sequence base: %u\n", genome.sequence_offsets[batch.alignment_sequence_IDs[read_index]]);
-    printf("    relative reference window   = [ %u %u ]\n",
+    printf("    relative reference window   = [ %lu %lu ]\n",
             reference_window.x - context->reference.host.sequence_bp_start[h_batch.chromosome[read_index]],
             reference_window.y - context->reference.host.sequence_bp_start[h_batch.chromosome[read_index]]);
 

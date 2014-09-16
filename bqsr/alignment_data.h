@@ -169,8 +169,11 @@ struct alignment_batch_storage
 
     // prevent storage creation on the device
     CUDA_HOST alignment_batch_storage() { }
+};
 
-    CUDA_HOST_DEVICE const CRQ_index crq_index(uint32 read_id) const
+struct alignment_batch_device : public alignment_batch_storage<target_system_tag>
+{
+    CUDA_DEVICE const CRQ_index crq_index(uint32 read_id) const
     {
         return CRQ_index(cigar_start[read_id],
                          cigar_len[read_id],
@@ -179,10 +182,7 @@ struct alignment_batch_storage
                          qual_start[read_id],
                          qual_len[read_id]);
     }
-};
 
-struct alignment_batch_device : public alignment_batch_storage<target_system_tag>
-{
     struct const_view
     {
         uint32 num_reads;
@@ -248,6 +248,16 @@ struct alignment_batch_host : public alignment_batch_storage<host_tag>
 {
     // data that never gets copied to the device
     H_Vector<std::string> name;
+
+    CUDA_HOST const CRQ_index crq_index(uint32 read_id) const
+    {
+        return CRQ_index(cigar_start[read_id],
+                         cigar_len[read_id],
+                         read_start[read_id],
+                         read_len[read_id],
+                         qual_start[read_id],
+                         qual_len[read_id]);
+    }
 
     void reset(uint32 data_mask, uint32 batch_size)
     {

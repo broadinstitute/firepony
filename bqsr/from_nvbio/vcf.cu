@@ -30,6 +30,13 @@
 
 namespace from_nvbio {
 
+SNPDatabase::SNPDatabase()
+{
+    reference_sequences.clear();
+    variants.clear();
+    ref_variant_index.clear();
+}
+
 // parse the INFO field looking for an END tag
 // INFO is a set of ID=val entries separated by semicolons
 // returns false if a parse error occurs

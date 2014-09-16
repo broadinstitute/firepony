@@ -37,6 +37,11 @@ typedef nvbio::device_tag target_system_tag;
 
 struct bqsr_context;
 
+template <typename T> using D_Vector = nvbio::vector<target_system_tag, T>;
+template <typename T> using H_Vector = nvbio::vector<host_tag, T>;
+template <uint32 bits> using D_PackedVector = nvbio::PackedVector<target_system_tag, bits>;
+template <uint32 bits> using H_PackedVector = nvbio::PackedVector<host_tag, bits>;
+
 typedef nvbio::vector<target_system_tag, uint8> D_VectorU8;
 typedef nvbio::vector<host_tag, uint8> H_VectorU8;
 typedef nvbio::vector<target_system_tag, uint16> D_VectorU16;

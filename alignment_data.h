@@ -85,53 +85,47 @@ enum BatchDataMask
 template <typename system_tag>
 struct alignment_batch_storage
 {
-//    template <typename T> using Vector = nvbio::vector<system_tag, T>;
-//    template <uint32 bits> using PackedVector = nvbio::PackedVector<system_tag, bits>;
-    // ugly war for org.eclipse.cdt.internal.core.index.composite.CompositingNotImplementedError
-#define Vector(T) nvbio::vector<system_tag, T>
-#define PackedVector(bits) nvbio::PackedVector<system_tag, bits>
+    template <typename T> using Vector = nvbio::vector<system_tag, T>;
+    template <uint32 bits> using PackedVector = nvbio::PackedVector<system_tag, bits>;
 
     uint32 num_reads;
 
     // chromosome index of the read
-    Vector(uint32) chromosome;
+    Vector<uint32> chromosome;
     // the reference position of the first base in the read
-    Vector(uint32) alignment_start;
+    Vector<uint32> alignment_start;
     // (1-based and inclusive) alignment stop position
-    Vector(uint32) alignment_stop;
+    Vector<uint32> alignment_stop;
     // integer representation of the mate's chromosome
-    Vector(uint32) mate_chromosome;
+    Vector<uint32> mate_chromosome;
     // (1-based and inclusive) mate's alignment start position
-    Vector(uint32) mate_alignment_start;
+    Vector<uint32> mate_alignment_start;
 
     // cigar ops
-    Vector(cigar_op) cigar;
+    Vector<cigar_op> cigars;
     // cigar index vectors
-    Vector(uint32) cigar_start;
-    Vector(uint32) cigar_len;
+    Vector<uint32> cigar_start;
+    Vector<uint32> cigar_len;
 
     // read data (4 bits per base pair)
-    PackedVector(4) reads;
+    PackedVector<4> reads;
     // read index vectors
-    Vector(uint32) read_start;
-    Vector(uint32) read_len;
+    Vector<uint32> read_start;
+    Vector<uint32> read_len;
 
     // quality data
-    Vector(uint8) qualities;
+    Vector<uint8> qualities;
     // quality index vectors
-    Vector(uint32) qual_start;
-    Vector(uint32) qual_len;
+    Vector<uint32> qual_start;
+    Vector<uint32> qual_len;
 
     // alignment flags
-    Vector(uint16) flags;
+    Vector<uint16> flags;
     // mapping qualities
-    Vector(uint8) mapq;
+    Vector<uint8> mapq;
 
     // read group ID
-    Vector(uint32) read_group;
-
-#undef Vector
-#undef PackedVector
+    Vector<uint32> read_group;
 
     // prevent storage creation on the device
     NVBIO_HOST alignment_batch_storage() { }
@@ -141,12 +135,8 @@ typedef alignment_batch_storage<target_system_tag> alignment_batch_device;
 
 struct alignment_batch_host : public alignment_batch_storage<host_tag>
 {
-//    template <typename T> using Vector = nvbio::vector<host_tag, T>;
-    // ugly war for org.eclipse.cdt.internal.core.index.composite.CompositingNotImplementedError
-#define Vector(T) nvbio::vector<host_tag, T>
-
     // data that never gets copied to the device
-    Vector(std::string) name;
+    H_Vector<std::string> name;
 
     void reset(uint32 data_mask, uint32 batch_size)
     {

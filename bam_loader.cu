@@ -260,7 +260,7 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
         batch->crq_index.push_back(crq_index);
 
         // push the alignment position
-        batch->alignment_positions.push_back(align.pos);
+        batch->alignment_positions.push_back(align.pos); // BAM pos is 0-based
         batch->alignment_sequence_IDs.push_back(align.refID);
 
         // figure out the CIGAR length and make sure we can store it

@@ -16,7 +16,7 @@
  *
  */
 
-#include <nvbio/basic/cuda/primitives.h>
+#include <nvbio/basic/primitives.h>
 
 #include "bqsr_types.h"
 #include "bqsr_context.h"
@@ -204,9 +204,6 @@ struct compute_vcf_ranges : public bqsr_lambda
                                        ctx.db.genome_positions.begin(),
                                        ctx.db.genome_positions.size());
 
-        /*printf("read %d window [%u,%u] vcf_start %p vcf pos %u (begin %p -> off %ld)\n",
-                read_index, alignment_window.x, alignment_window.y, vcf_start, *vcf_start, ctx.db.genome_positions.begin(), vcf_start - ctx.db.genome_positions.begin());
-*/
         // do a linear search to find the end of the VCF range
         // (there are generally very few VCF entries for an average read length --- and often none --- so this is expected to be faster than a binary search)
         const uint32 *vcf_end = vcf_start;
@@ -222,7 +219,7 @@ struct compute_vcf_ranges : public bqsr_lambda
             vcf_range = make_uint2(uint32(-1), uint32(-1));
         } else {
             vcf_range = make_uint2(vcf_start - ctx.db.genome_positions.begin(),
-                                   vcf_end - vcf_start);
+                                   vcf_end - ctx.db.genome_positions.begin());
         }
     }
 };
@@ -264,6 +261,7 @@ private:
         for(uint32 i = 0; i < vcf_idx.variant_len; i++)
         {
             if (batch.reads[idx.read_start + read_bp_offset + i] != ctx.db.variants[vcf_idx.variant_start + i])
+            //if (batch.reads[idx.read_start + read_bp_offset + i] != ctx.db.reference_sequences[vcf_idx.reference_start + i])
                 return 0;
         }
 
@@ -329,8 +327,8 @@ public:
                 if (vcf_match_len)
                 {
                     // turn off vcf_match_len BPs since they match the variant database
-                    const uint32 start = alignment_window.x + offset_list[bp];
-                    const uint32 end = nvbio::min(start + vcf_match_len, alignment_window.x + idx.read_len);
+                    const uint32 start = idx.read_start;
+                    const uint32 end = start + vcf_match_len; // this is guaranteed to not be larger than the read len
 
                     for(uint32 dead_bp = start; dead_bp < end; dead_bp++)
                         ctx.snp_filter.active_location_list[dead_bp] = 0;
@@ -350,28 +348,6 @@ public:
                 vcf_range.x = ctx.db.genome_positions[vcf_db_range.x];
 
                 // move the BP counter forward
-            }
-        }
-    }
-};
-
-struct bpdebug : public bqsr_lambda
-{
-    bpdebug(bqsr_context::view ctx,
-            const BAM_alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
-    { }
-
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_id)
-    {
-        const uint32 read_index = ctx.read_order[read_id];
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
-
-        for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
-        {
-            if (ctx.snp_filter.active_location_list[i] == 0)
-            {
-                printf("read %d inactive bp %d\n", read_index, i - idx.read_start);
             }
         }
     }

@@ -48,6 +48,9 @@ int main(int argc, char **argv)
     // load the reference genome
     const char *ref_name = "hs37d5";
     const char *vcf_name = "/home/nsubtil/hg96/ALL.chr20.integrated_phase1_v3.20101123.snps_indels_svs.genotypes-stripped.vcf";
+    //const char *vcf_name = "/home/nsubtil/hg96/one-variant.vcf";
+    const char *bam_name = "/home/nsubtil/hg96/HG00096.chrom20.ILLUMINA.bwa.GBR.low_coverage.20120522.bam";
+    //const char *bam_name = "/home/nsubtil/hg96/one-read.bam";
 
     struct reference_genome genome;
 
@@ -72,9 +75,9 @@ int main(int argc, char **argv)
     bqsr_context ctx(dev_db, genome.device);
 
     printf("%lu variants\n", db.genome_positions.size());
-    printf("reading BAM...\n");
+    printf("reading BAM %s...\n", bam_name);
 
-    BAMfile bam("/home/nsubtil/hg96/HG00096.chrom20.ILLUMINA.bwa.GBR.low_coverage.20120522.bam");
+    BAMfile bam(bam_name);
 
     BAM_alignment_batch_host h_batch;
     BAM_alignment_batch_device batch;
@@ -115,6 +118,7 @@ int main(int argc, char **argv)
         H_VectorU32 h_read_order = ctx.read_order;
         for(uint32 read_id = 0; read_id < 50 && read_id < h_read_order.size(); read_id++)
         {
+            io::SequenceDataView view = plain_view(*genome.h_ref);
             const uint32 read_index = h_read_order[read_id];
 
             const BAM_CRQ_index& idx = h_batch.crq_index[read_index];
@@ -130,20 +134,31 @@ int main(int argc, char **argv)
             {
                 printf("%d ", h_read_offset_list[i]);
             }
-            printf("]\n  sequence base [%u] sequence offset [%u] alignment window [%u, %u]\n",
+            printf("]\n  sequence name [%s] sequence base [%u] sequence offset [%u] alignment window [%u, %u]\n",
+                    &view.m_name_stream[view.m_name_index[h_batch.alignment_sequence_IDs[read_index]]],
                     genome.ref_sequence_offsets[h_batch.alignment_sequence_IDs[read_index]],
                     h_batch.alignment_positions[read_index],
                     h_alignment_windows[read_index].x,
                     h_alignment_windows[read_index].y);
-            printf("  active VCF range: [%u, %u]\n", h_vcf_ranges[read_index].x, h_vcf_ranges[read_index].y);
+            printf("  active VCF range: [%u, %u[\n", h_vcf_ranges[read_index].x, h_vcf_ranges[read_index].y);
         }
 #endif
 
-#if 1
-        printf("active VCF ranges: %d out of %d reads (%f %)\n",
+#if 0
+        printf("active VCF ranges: %lu out of %lu reads (%f %%)\n",
                 ctx.snp_filter.active_read_ids.size(),
                 ctx.read_order.size(),
                 100.0 * float(ctx.snp_filter.active_read_ids.size()) / ctx.read_order.size());
+
+        H_ActiveLocationList h_bplist = ctx.snp_filter.active_location_list;
+        uint32 zeros = 0;
+        for(uint32 i = 0; i < h_bplist.size(); i++)
+        {
+            if (h_bplist[i] == 0)
+                zeros++;
+        }
+
+        printf("active BPs: %u out of %u (%f %%)\n", h_bplist.size() - zeros, h_bplist.size(), 100.0 * float(h_bplist.size() - zeros) / float(h_bplist.size()));
 #endif
         alignments += h_batch.crq_index.size();
     }

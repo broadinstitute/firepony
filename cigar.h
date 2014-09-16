@@ -75,6 +75,9 @@ struct cigar_context
     // (1 means reference mismatch, 0 means match or non-M cigar event)
     D_PackedVector_1b is_snp;
 
+    // number of errors for each read
+    D_VectorU16 num_errors;
+
     struct view
     {
         D_VectorU32::plain_view_type cigar_offsets;
@@ -85,6 +88,7 @@ struct cigar_context
         D_VectorU16_2::plain_view_type read_window_clipped_no_insertions;
         D_VectorU16_2::plain_view_type reference_window_clipped;
         D_PackedVector_1b::plain_view_type is_snp;
+        D_VectorU16::plain_view_type num_errors;
     };
 
     operator view()
@@ -98,6 +102,7 @@ struct cigar_context
                 plain_view(read_window_clipped_no_insertions),
                 plain_view(reference_window_clipped),
                 plain_view(is_snp),
+                plain_view(num_errors),
         };
 
         return v;

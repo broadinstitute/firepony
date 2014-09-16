@@ -273,6 +273,56 @@ struct compute_is_snp : public bqsr_lambda_ref
     }
 };
 
+struct count_snps : public bqsr_lambda
+{
+    count_snps(bqsr_context::view ctx,
+               const BAM_alignment_batch_device::const_view batch)
+        : bqsr_lambda(ctx, batch)
+    { }
+
+    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    {
+        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
+        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
+
+        uint32 sum = 0;
+        for(uint32 i = cigar_start; i < cigar_end; i++)
+        {
+            sum += ctx.cigar.is_snp[i];
+        }
+
+        ctx.cigar.num_errors[read_index] += sum;
+    }
+};
+
+struct count_indels : public bqsr_lambda
+{
+    count_indels(bqsr_context::view ctx,
+                 const BAM_alignment_batch_device::const_view batch)
+        : bqsr_lambda(ctx, batch)
+    { }
+
+    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
+    {
+        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
+        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
+
+        uint32 sum = 0;
+        for(uint32 i = cigar_start; i < cigar_end; i++)
+        {
+            if (ctx.cigar.cigar_events[i] == cigar_event::I ||
+                ctx.cigar.cigar_events[i] == cigar_event::D)
+            {
+                sum++;
+            }
+        }
+
+        ctx.cigar.num_errors[read_index] += sum;
+    }
+};
+
 #ifdef CUDA_DEBUG
 // debug aid: sanity check that the expanded cigar events match what we expect
 struct sanity_check_cigar_events : public bqsr_lambda
@@ -385,9 +435,11 @@ void expand_cigars(bqsr_context *context, const reference_genome& reference, con
     ctx.reference_window_clipped.resize(batch.num_reads);
 
     ctx.is_snp.resize(expanded_cigar_len);
+    ctx.num_errors.resize(batch.num_reads);
 
-    // is_snp requires zero initialization
+    // is_snp and num_errors require zero initialization
     thrust::fill(ctx.is_snp.m_storage.begin(), ctx.is_snp.m_storage.end(), 0);
+    thrust::fill(ctx.num_errors.begin(), ctx.num_errors.end(), 0);
 
     // expand the cigar ops into temp storage (xxxnsubtil: same as above, active read list is ignored)
     thrust::for_each(thrust::make_counting_iterator(0),
@@ -416,6 +468,15 @@ void expand_cigars(bqsr_context *context, const reference_genome& reference, con
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
                      compute_is_snp(*context, reference.device, batch));
+
+    // compute the number of errors
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     count_snps(*context, batch));
+
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     count_indels(*context, batch));
 }
 
 void debug_cigar(bqsr_context *context, const reference_genome& reference, const BAM_alignment_batch_host& batch, int read_index)
@@ -532,6 +593,9 @@ void debug_cigar(bqsr_context *context, const reference_genome& reference, const
     ushort2 reference_window_clipped = ctx.reference_window_clipped[read_index];
     printf("    clipped reference window    = [ % 3d, % 3d ]\n",
                 reference_window_clipped.x, reference_window_clipped.y);
+
+    uint16 err = ctx.num_errors[read_index];
+    printf("    number of errors            = [ % 3d ]\n", err);
 
     printf("\n");
 }

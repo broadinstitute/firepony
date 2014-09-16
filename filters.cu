@@ -140,13 +140,109 @@ struct filter_malformed_reads : public bqsr_lambda
             return false;
         }
 
-        // CIGAR contains N operators
-        // (GATK: checkCigarIsSupported)
+        return true;
+    }
+};
+
+// implements another part of the GATK MalformedReadFilter
+struct filter_malformed_cigars : public bqsr_lambda
+{
+    filter_malformed_cigars(bqsr_context::view ctx,
+                            const BAM_alignment_batch_device::const_view batch)
+        : bqsr_lambda(ctx, batch)
+    { }
+
+    NVBIO_HOST_DEVICE bool operator() (const uint32 read_index)
+    {
+        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+
+        // state for CIGAR sanity checks
+        enum {
+            LEADING_HARD_CLIPS,
+            LEADING_SOFT_CLIPS,
+            NO_CLIPS,
+            TRAILING_SOFT_CLIPS,
+            TRAILING_HARD_CLIPS,
+        } clip_state = LEADING_HARD_CLIPS;
+
         for(uint32 i = idx.cigar_start; i < idx.cigar_start + idx.cigar_len; i++)
         {
-            if (batch.cigars[i].op == BAM_cigar_op::OP_N)
+            const struct cigar_op& ce = batch.cigars[i];
+
+            // CIGAR contains N operators
+            // (GATK: checkCigarIsSupported)
+            if (ce.op == cigar_op::OP_N)
             {
                 return false;
+            }
+
+            // CIGAR contains improperly placed soft or hard clipping operators
+            // (this is not part of GATK but we rely on it for cigar expansion)
+            if (ce.op == cigar_op::OP_H)
+            {
+                switch(clip_state)
+                {
+                case LEADING_HARD_CLIPS:
+                    // no state change
+                    break;
+
+                case LEADING_SOFT_CLIPS:
+                    // H in leading soft clip region is invalid
+                    return false;
+
+                case NO_CLIPS:
+                case TRAILING_SOFT_CLIPS:
+                    // first H after a non-clip operator enters the hard clipping region
+                    clip_state = TRAILING_HARD_CLIPS;
+                    break;
+
+                case TRAILING_HARD_CLIPS:
+                    // no state change
+                    break;
+                }
+            } else if (ce.op == cigar_op::OP_S) {
+                switch(clip_state)
+                {
+                case LEADING_HARD_CLIPS:
+                    // first S enters the leading soft clipping region
+                    clip_state = LEADING_SOFT_CLIPS;
+                    break;
+
+                case LEADING_SOFT_CLIPS:
+                    // no change
+                    break;
+
+                case NO_CLIPS:
+                    // first S after a non-clip operator enters the trailing soft clipping region
+                    clip_state = TRAILING_SOFT_CLIPS;
+                    break;
+
+                case TRAILING_SOFT_CLIPS:
+                    // no change
+                    break;
+
+                case TRAILING_HARD_CLIPS:
+                    // we've entered the hard clip region, S not expected
+                    return false;
+                }
+            } else {
+                switch(clip_state)
+                {
+                case LEADING_HARD_CLIPS:
+                case LEADING_SOFT_CLIPS:
+                    // first non-clip operator enters the no-clipping region
+                    clip_state = NO_CLIPS;
+                    break;
+
+                case NO_CLIPS:
+                    // no change
+                    break;
+
+                case TRAILING_SOFT_CLIPS:
+                case TRAILING_HARD_CLIPS:
+                    // non-clip operator in a trailing clipping region is invalid
+                    return false;
+                }
             }
         }
 
@@ -176,6 +272,7 @@ void filter_reads(bqsr_context *context, const BAM_alignment_batch_device& batch
     filter_mapq mapq_filter(*context, batch);
     // corresponds to the GATK filter MalformedReadFilter
     filter_malformed_reads malformed_read_filter(*context, batch);
+    filter_malformed_cigars malformed_cigar_filter(*context, batch);
 
     start_count = active_read_list.size();
 
@@ -203,9 +300,15 @@ void filter_reads(bqsr_context *context, const BAM_alignment_batch_device& batch
                                 malformed_read_filter,
                                 context->temp_storage);
 
-    // resize temp_u32 and copy back into active_read_list
-    temp_u32.resize(num_active);
-    active_read_list = temp_u32;
+    // apply the malformed cigar filters, copying from temp_u32 into active_read_list
+    num_active = nvbio::copy_if(num_active,
+                                temp_u32.begin(),
+                                active_read_list.begin(),
+                                malformed_cigar_filter,
+                                context->temp_storage);
+
+    // resize active_read_list
+    active_read_list.resize(num_active);
 
     context->stats.filtered_reads += start_count - num_active;
 }

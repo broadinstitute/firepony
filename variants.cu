@@ -61,9 +61,8 @@ struct compute_read_offset_list : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_id)
+    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const uint32 read_index = ctx.read_order[read_id];
         const BAM_CRQ_index& idx = batch.crq_index[read_index];
 
         const BAM_cigar_op *cigar = &batch.cigars[idx.cigar_start];
@@ -146,10 +145,8 @@ struct compute_alignment_window : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_id)
+    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const uint32 read_index = ctx.read_order[read_id];
-
         const BAM_CRQ_index& idx = batch.crq_index[read_index];
         const uint16 *offset_list = &ctx.snp_filter.read_offset_list[idx.read_start];
         uint2& output = ctx.alignment_windows[read_index];
@@ -180,6 +177,8 @@ void build_alignment_windows(bqsr_context *ctx, const BAM_alignment_batch_device
     ctx->alignment_windows.resize(batch.reads.size());
     thrust::for_each(ctx->read_order.begin(),
                      ctx->read_order.end(),
+    // set up the alignment window buffer
+    ctx->alignment_windows.resize(batch.crq_index.size());
                      compute_alignment_window(*ctx, batch));
 }
 
@@ -191,10 +190,8 @@ struct compute_vcf_ranges : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_id)
+    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const uint32 read_index = ctx.read_order[read_id];
-
         const uint2& alignment_window = ctx.alignment_windows[read_index];
         uint2& vcf_range = ctx.snp_filter.active_vcf_ranges[read_index];
 
@@ -269,10 +266,8 @@ private:
     }
 
 public:
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_id)
+    NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const uint32 read_index = ctx.read_order[read_id];
-
         const BAM_CRQ_index& idx = batch.crq_index[read_index];
         const uint2& alignment_window = ctx.alignment_windows[read_index];
         const uint16 *offset_list = &ctx.snp_filter.read_offset_list[read_index];
@@ -361,9 +356,9 @@ void filter_snps(bqsr_context *context,
     snp_filter_context& snp = context->snp_filter;
 
     // compute the VCF ranges for each read
-    snp.active_vcf_ranges.resize(context->read_order.size());
     thrust::for_each(context->read_order.begin(),
                      context->read_order.end(),
+    snp.active_vcf_ranges.resize(batch.crq_index.size());
                      compute_vcf_ranges(*context, batch));
 
     // build a list of reads with active VCF ranges

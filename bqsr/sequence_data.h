@@ -21,7 +21,6 @@
 #include "bqsr_types.h"
 #include "string_database.h"
 #include "mmap.h"
-#include "serialization.h"
 
 #include "primitives/cuda.h"
 

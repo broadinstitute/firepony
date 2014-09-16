@@ -40,6 +40,10 @@ namespace serialization
     template <> size_t serialized_size(const std::vector<std::string>& vec);
     template <typename T> size_t serialized_size(const bqsr::vector<host_tag, T>& vec);
 //    template <typename system_tag, uint32 bits> size_t serialized_size(bqsr::packed_vector<system_tag, bits>& vec);
+
+    template <typename T> void *unwrap_vector_from_view(T& view, void *in);
+    template <typename T> void *unwrap_packed_vector_view(T& view, void *in);
+
 };
 
 #include "serialization_inl.h"

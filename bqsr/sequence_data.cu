@@ -16,6 +16,7 @@
  *
  */
 
+#include "serialization.h"
 #include "sequence_data.h"
 
 size_t sequence_data::serialized_size(void)
@@ -57,19 +58,6 @@ void *sequence_data::serialize(void *out)
     return out;
 }
 
-template <typename T>
-static void *unwrap_view(T& view, void *in)
-{
-    uint64 size;
-
-    in = serialization::decode(&size, in);
-
-    view = T(typename T::iterator(in), typename T::size_type(size));
-    in = (void *) (static_cast<typename T::pointer>(in) + size);
-
-    return in;
-}
-
 void sequence_data::unserialize(shared_memory_file& shm)
 {
     void *in = shm.data;
@@ -86,12 +74,12 @@ void sequence_data::unserialize(shared_memory_file& shm)
     host.bases = bqsr::packed_vector<host_tag, 4>::const_view(in, m_size);
     in = static_cast<uint32*>(in) + divide_ri(m_size, bqsr::packed_vector<host_tag, 4>::SYMBOLS_PER_WORD);
 
-    in = unwrap_view(host.qualities, in);
-    in = unwrap_view(host.sequence_id, in);
-    in = unwrap_view(host.sequence_bp_start, in);
-    in = unwrap_view(host.sequence_bp_len, in);
-    in = unwrap_view(host.sequence_qual_start, in);
-    in = unwrap_view(host.sequence_qual_len, in);
+    in = serialization::unwrap_vector_view(host.qualities, in);
+    in = serialization::unwrap_vector_view(host.sequence_id, in);
+    in = serialization::unwrap_vector_view(host.sequence_bp_start, in);
+    in = serialization::unwrap_vector_view(host.sequence_bp_len, in);
+    in = serialization::unwrap_vector_view(host.sequence_qual_start, in);
+    in = serialization::unwrap_vector_view(host.sequence_qual_len, in);
 
     host_mmap_container = shm;
 }

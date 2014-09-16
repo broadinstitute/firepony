@@ -36,6 +36,8 @@ struct string_database
     // inserts a string into the database, returning the new ID
     // if string already exists, returns the existing ID
     uint32 insert(const std::string& string);
+    // returns the number of distinct strings in the database
+    size_t size(void) const;
 
     // computes a hash of a string
     static uint32 hash(const char* s);

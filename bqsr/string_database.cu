@@ -65,6 +65,11 @@ uint32 string_database::insert(const std::string& string)
     return id;
 };
 
+size_t string_database::size(void) const
+{
+    return string_identifiers.size();
+}
+
 uint32 string_database::hash(const char* s)
 {
     uint32 h = 0;

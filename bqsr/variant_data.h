@@ -141,5 +141,9 @@ struct variant_database
 
     variant_database_device device;
 
+    size_t serialized_size(void);
+    void *serialize(void *out);
+    void unserialize(shared_memory_file& shm);
+
     size_t download(void);
 };

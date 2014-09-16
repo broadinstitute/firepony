@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "primitives/util.h"
+
 // serialization primitives
 namespace serialization {
 
@@ -170,5 +172,34 @@ inline size_t serialized_size(const bqsr::vector<host_tag, T>& vec)
 //{
 //    return serialized_size(vec.m_size) + serialized_size(vec.m_storage);
 //}
+
+template <typename T>
+inline void *unwrap_vector_view(T& view, void *in)
+{
+    uint64 size;
+
+    in = serialization::decode(&size, in);
+
+    view = T(typename T::iterator(in), typename T::size_type(size));
+    in = (void *) (static_cast<typename T::pointer>(in) + size);
+
+    return in;
+}
+
+template <typename T>
+inline void *unwrap_packed_vector_view(T& view, void *in)
+{
+    uint64 temp;
+    uint32 m_size;
+    in = serialization::decode(&m_size, in);
+    in = serialization::decode(&temp, in);
+
+    assert(temp == divide_ri(m_size, T::SYMBOLS_PER_WORD));
+
+    view = T(in, m_size);
+    in = static_cast<uint32*>(in) + divide_ri(m_size, T::SYMBOLS_PER_WORD);
+
+    return in;
+}
 
 } // namespace serialization

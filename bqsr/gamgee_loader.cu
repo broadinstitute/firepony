@@ -259,9 +259,7 @@ bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 d
         ret = shared_memory_file::open(&shmem, filename);
         if (ret == true)
         {
-            printf("loading %s from shared memory region (%lu MB)...\n", filename, shmem.size / (1024 * 1024));
             output->unserialize(shmem);
-
             return true;
         }
     }
@@ -269,12 +267,8 @@ bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 d
     sequence_data_host& h = output->host_malloc_container;
     output->data_mask = data_mask;
 
-    printf("loading %s...\n", filename);
-
     for (gamgee::Fastq& record : gamgee::FastqReader(std::string(filename)))
     {
-        printf("... %s (%lu bases)\n", record.name().c_str(), record.sequence().size());
-
         h.num_sequences++;
 
         if (data_mask & SequenceDataMask::BASES)
@@ -313,6 +307,18 @@ bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 d
 
 bool gamgee_load_vcf(variant_database *output, const sequence_data& reference, const char *filename, uint32 data_mask, bool try_mmap)
 {
+    if (try_mmap)
+    {
+        shared_memory_file shmem;
+        bool ret;
+
+        ret = shared_memory_file::open(&shmem, filename);
+        if (ret == true)
+        {
+            output->unserialize(shmem);
+            return true;
+        }
+    }
 
     auto& batch = output->host_malloc_container;
     output->data_mask = data_mask;

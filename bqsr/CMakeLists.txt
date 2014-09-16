@@ -18,6 +18,8 @@ filters.cu
 gamgee_loader.cu
 gamgee_loader.h
 sequence_data.h
+string_database.h
+string_database.cu
 util.cu
 util.h
 variant_data.h

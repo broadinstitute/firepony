@@ -19,7 +19,7 @@
 #pragma once
 
 #include "bqsr_types.h"
-#include "util.h"
+#include "string_database.h"
 
 #include "primitives/cuda.h"
 

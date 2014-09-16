@@ -47,6 +47,8 @@ struct BAM_header
 
     // key is a hash of the read group name, value is a sequential ID for the read group
     std::map<uint32, uint32> rg_name_to_id;
+    // number of read groups in the map
+    uint32 n_read_groups;
 };
 
 // BAM alignment section

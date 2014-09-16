@@ -150,7 +150,7 @@ bool BAMfile::init(void)
     readData(&header.text[0], header.l_text, __LINE__);
 
     // parse header text looking for @RG identifiers and put them in our hash map
-    uint32 read_group_id = 0;
+    header.n_read_groups = 0;
 
     char *start_ptr = strchr(&header.text[0], '@');
     while(start_ptr != NULL && *start_ptr != '\0')
@@ -181,9 +181,9 @@ bool BAMfile::init(void)
                 char tmp = *id_end;
                 *id_end = '\0';
 
-                // store the hash and an ID in the map
-                header.rg_name_to_id[bqsr_string_hash(id)] = read_group_id;
-                read_group_id++;
+                // store the hash and a sequential ID in the map
+                header.rg_name_to_id[bqsr_string_hash(id)] = header.n_read_groups;
+                header.n_read_groups++;
 
                 // restore the nulled-out character
                 *id_end = tmp;
@@ -397,7 +397,14 @@ bool BAMfile::next_batch(BAM_alignment_batch_host *batch, bool skip_headers, con
                 // found a read group tag
                 assert(tag->val_type == 'Z');
                 uint32 h = bqsr_string_hash(aux_ptr);
-                batch->read_groups[read_id] = header.rg_name_to_id[h];
+
+                if (header.rg_name_to_id.find(h) == header.rg_name_to_id.end())
+                {
+                    // invalid read group
+                    batch->read_groups[read_id] = uint32(-1);
+                } else {
+                    batch->read_groups[read_id] = header.rg_name_to_id[h];
+                }
             }
 
             aux_ptr += tag_len;

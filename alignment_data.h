@@ -24,6 +24,7 @@
 #include <gamgee/sam.h>
 
 #include "bqsr_types.h"
+#include "util.h"
 
 // contains information referenced by an alignment data batch
 // xxxnsubtil: a better name might be in order
@@ -34,9 +35,7 @@ struct alignment_header
     H_Vector<uint32> chromosome_lengths;
     D_Vector<uint32> d_chromosome_lengths;
 
-    std::vector<std::string> read_group_names;
-    // key is a hash of the read group name, value is a sequential ID for the read group
-    std::map<uint32, uint32> rg_name_to_id;
+    string_database read_groups_db;
 
     struct const_view
     {

@@ -23,7 +23,9 @@
 
 #include "bqsr_types.h"
 
-using namespace nvbio;
+#include <vector>
+#include <string>
+#include <map>
 
 uint32 bqsr_string_hash(const char* s);
 
@@ -34,3 +36,42 @@ void pack_prepare_storage_1bit(D_VectorU8& storage, uint32 num_elements);
 // packs a vector of uint8 into a bit vector
 void pack_to_2bit(D_PackedVector_2b& dest, D_VectorU8& src);
 void pack_to_1bit(D_PackedVector_1b& dest, D_VectorU8& src);
+
+// utility struct to keep track of string identifiers using integers
+struct string_database
+{
+    std::vector<std::string> string_identifiers;
+    std::map<uint32, uint32> string_hash_to_id;
+
+    uint32 insert(const std::string& string)
+    {
+        uint32 hash = bqsr_string_hash(string.c_str());
+        uint32 id;
+
+        if (string_hash_to_id.find(hash) == string_hash_to_id.end())
+        {
+            // new string identifier, assign an ID and store in the vector
+            id = string_identifiers.size();
+
+            string_hash_to_id[hash] = id;
+            string_identifiers.push_back(std::string(string));
+        } else {
+            // string already in the database, reuse the same ID
+            id = string_hash_to_id[hash];
+        }
+
+        return id;
+    };
+
+    const std::string& lookup(uint32 id)
+    {
+        static const std::string invalid("<invalid>");
+
+        if (id < string_identifiers.size())
+        {
+            return string_identifiers[id];
+        } else {
+            return invalid;
+        }
+    };
+};

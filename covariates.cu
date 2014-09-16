@@ -58,17 +58,10 @@ struct covariates_recaltable1
         for(uint32 i = 0; i < table.size(); i++)
         {
             uint32 rg_id = decode(ReadGroup, table.keys[i]);
-            const char *rg_name;
-
-            if (rg_id < context->bam_header.read_group_names.size())
-            {
-                rg_name = context->bam_header.read_group_names[rg_id].c_str();
-            } else {
-                rg_name = "<invalid>";
-            }
+            const std::string& rg_name = context->bam_header.read_groups_db.lookup(rg_id);
 
             printf("%s\t%d\t\t%c\t\t%d\n",
-                    rg_name,
+                    rg_name.c_str(),
                     decode(QualityScore, table.keys[i]),
                     cigar_event::ascii(decode(EventType, table.keys[i])),
                     table.observations[i]);

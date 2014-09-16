@@ -208,22 +208,7 @@ bool gamgee_file::next_batch(alignment_batch *batch, uint32 data_mask, const uin
                 // invalid read group
                 h_batch->read_group.push_back(uint32(-1));
             } else {
-                uint32 h = bqsr_string_hash(tag.value().c_str());
-                uint32 rg_id;
-
-                // xxxnsubtil: note that we don't validate the read groups against the header
-                if (header.rg_name_to_id.find(h) == header.rg_name_to_id.end())
-                {
-                    // new read group, assign an ID and store in the header
-                    rg_id = header.read_group_names.size();
-
-                    header.rg_name_to_id[h] = rg_id;
-                    header.read_group_names.push_back(tag.value());
-                } else {
-                    // we've seen this read group before, reuse the same ID
-                    rg_id = header.rg_name_to_id[h];
-                }
-
+                uint32 rg_id = header.read_groups_db.insert(tag.value());
                 h_batch->read_group.push_back(rg_id);
             }
         }

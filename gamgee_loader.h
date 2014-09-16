@@ -21,7 +21,7 @@
 #include <gamgee/sam_reader.h>
 #include "alignment_data.h"
 
-struct gamgee_file
+struct gamgee_alignment_file
 {
 private:
     gamgee::SamReader<gamgee::SamIterator> file;
@@ -31,8 +31,8 @@ private:
 public:
     alignment_header header;
 
-    gamgee_file(const char *fname);
-    ~gamgee_file();
+    gamgee_alignment_file(const char *fname);
+    ~gamgee_alignment_file();
 
     bool next_batch(alignment_batch *batch, uint32 data_mask, const uint32 batch_size = 100000);
     const char *get_sequence_name(uint32 id);

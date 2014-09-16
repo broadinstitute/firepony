@@ -106,7 +106,7 @@ int main(int argc, char **argv)
     printf("%lu variants\n", db.genome_start_positions.size());
     printf("reading BAM %s...\n", bam_name);
 
-    gamgee_file bam(bam_name);
+    gamgee_alignment_file bam(bam_name);
     alignment_batch batch;
 
     bqsr_context context(bam.header, dev_db, reference);

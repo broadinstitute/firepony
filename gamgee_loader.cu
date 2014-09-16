@@ -23,7 +23,7 @@
 #include "gamgee_loader.h"
 #include "util.h"
 
-gamgee_file::gamgee_file(const char *fname)
+gamgee_alignment_file::gamgee_alignment_file(const char *fname)
     : file(std::string(fname))
 {
     gamgee_header = file.header();
@@ -37,7 +37,7 @@ gamgee_file::gamgee_file(const char *fname)
     iterator = file.begin();
 }
 
-gamgee_file::~gamgee_file()
+gamgee_alignment_file::~gamgee_alignment_file()
 {
 }
 
@@ -95,7 +95,7 @@ static uint32 extract_gamgee_flags(gamgee::Sam& record)
     return flags;
 }
 
-bool gamgee_file::next_batch(alignment_batch *batch, uint32 data_mask, const uint32 batch_size)
+bool gamgee_alignment_file::next_batch(alignment_batch *batch, uint32 data_mask, const uint32 batch_size)
 {
     alignment_batch_host *h_batch = &batch->host;
     uint32 read_id;
@@ -220,7 +220,7 @@ bool gamgee_file::next_batch(alignment_batch *batch, uint32 data_mask, const uin
     return true;
 }
 
-const char *gamgee_file::get_sequence_name(uint32 id)
+const char *gamgee_alignment_file::get_sequence_name(uint32 id)
 {
     return gamgee_header.sequence_name(id).c_str();
 }

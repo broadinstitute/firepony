@@ -244,3 +244,100 @@ void expand_cigars(bqsr_context *context, const BAM_alignment_batch_device& batc
                      context->active_read_list.end(),
                      cigar_coordinates_expand(*context, batch));
 }
+
+void debug_cigar(bqsr_context *context, const reference_genome& genome, const BAM_alignment_batch_host& batch, int read_index)
+{
+    BAM_CRQ_index idx = batch.crq_index[read_index];
+    cigar_context& ctx = context->cigar;
+    io::SequenceDataView view = plain_view(*genome.h_ref);
+    H_PackedReference reference_stream(view.m_sequence_stream);
+
+    printf("  cigar info:\n");
+
+    printf("    cigar                       = [");
+    for(uint32 i = idx.cigar_start; i < idx.cigar_start + idx.cigar_len; i++)
+    {
+        cigar_op op = batch.cigars[i];
+        printf("%d%c", op.len, op.ascii_op());
+    }
+    printf("]\n");
+
+    uint32 cigar_start = ctx.cigar_offsets[idx.cigar_start];
+    uint32 cigar_end = ctx.cigar_offsets[idx.cigar_start + idx.cigar_len];
+    printf("    offset range                = [% 3d, % 3d]\n", cigar_start, cigar_end);
+
+    printf("                                    ");
+    for(uint32 i = 0; i < cigar_end - cigar_start; i++)
+    {
+        printf("% 3d ", i);
+    }
+    printf("\n");
+
+    printf("    event list                  = [ ");
+    for(uint32 i = cigar_start; i < cigar_end; i++)
+    {
+        printf("  %c ", cigar_event::ascii(ctx.cigar_events[i]));
+    }
+    printf("]\n");
+
+    printf("    event read coordinates      = [ ");
+    for(uint32 i = cigar_start; i < cigar_end; i++)
+    {
+        printf("% 3d ", (int16) ctx.cigar_event_read_coordinates[i]);
+    }
+    printf("]\n");
+
+    printf("    event reference coordinates = [ ");
+    for(uint32 i = cigar_start; i < cigar_end; i++)
+    {
+        printf("% 3d ", (int16) ctx.cigar_event_reference_coordinates[i]);
+    }
+    printf("]\n");
+
+    const uint32 ref_sequence_id = batch.alignment_sequence_IDs[read_index];
+    const uint32 ref_sequence_base = view.m_sequence_index[ref_sequence_id];
+    const uint32 ref_sequence_offset = ref_sequence_base + batch.alignment_positions[read_index];
+
+    printf("    reference sequence data     = [ ");
+    for(uint32 i = cigar_start; i < cigar_end; i++)
+    {
+        const uint16 ref_bp = ctx.cigar_event_reference_coordinates[i];
+        printf("  %c ", ref_bp == uint16(-1) ? '-' : dna_to_char(reference_stream[ref_sequence_offset + ref_bp]));
+    }
+    printf("]\n");
+
+    printf("    read sequence data          = [ ");
+    for(uint32 i = cigar_start; i < cigar_end; i++)
+    {
+        const uint16 read_bp = ctx.cigar_event_read_coordinates[i];
+        char base;
+
+        if (read_bp == uint16(-1))
+        {
+            base = '-';
+        } else {
+            base = iupac16_to_char(batch.reads[idx.read_start + read_bp]);
+            if (ctx.cigar_events[i] == cigar_event::S)
+            {
+                // display soft-clipped bases in lowercase
+                base = tolower(base);
+            }
+        }
+
+        printf("  %c ", base);
+    }
+    printf("]\n");
+
+    ushort2 read_window_clipped = ctx.read_window_clipped[read_index];
+    printf("    clipped read window         = [ % 3d, % 3d ]\n", read_window_clipped.x, read_window_clipped.y);
+
+    ushort2 read_window_clipped_no_insertions = ctx.read_window_clipped_no_insertions[read_index];
+    printf("    ... lead/trail insertions   = [ % 3d, % 3d ]\n",
+                read_window_clipped_no_insertions.x, read_window_clipped_no_insertions.y);
+
+    ushort2 reference_window_clipped = ctx.reference_window_clipped[read_index];
+    printf("    clipped reference window    = [ % 3d, % 3d ]\n",
+                reference_window_clipped.x, reference_window_clipped.y);
+
+    printf("\n");
+}

@@ -20,6 +20,7 @@
 
 #include "bqsr_types.h"
 #include "bam_loader.h"
+#include "reference.h"
 
 using namespace nvbio;
 
@@ -98,3 +99,4 @@ struct cigar_context
 };
 
 void expand_cigars(bqsr_context *context, const BAM_alignment_batch_device& batch);
+void debug_cigar(bqsr_context *context, const reference_genome& genome, const BAM_alignment_batch_host& batch, int read_index);

@@ -49,6 +49,7 @@ void device_sort_batch(BAM_alignment_batch_device *batch)
 }
 */
 
+void debug_read(bqsr_context *context, const reference_genome& reference, const BAM_alignment_batch_host& batch, int read_index);
 
 int main(int argc, char **argv)
 {
@@ -90,7 +91,7 @@ int main(int argc, char **argv)
     BAM_alignment_batch_host h_batch;
     BAM_alignment_batch_device batch;
 
-    bqsr_context ctx(bam.header, dev_db, genome.device);
+    bqsr_context context(bam.header, dev_db, genome.device);
 
     //while(bam.next_batch(&h_batch, true, 20000000))
     //while(bam.next_batch(&h_batch, true, 2000000))
@@ -98,124 +99,52 @@ int main(int argc, char **argv)
     {
         // load the next batch on the device
         batch.load(h_batch);
-        ctx.start_batch(batch);
+        context.start_batch(batch);
 
         // build read offset list
-        build_read_offset_list(&ctx, batch);
+        build_read_offset_list(&context, batch);
         // build read alignment window list
-        build_alignment_windows(&ctx, batch);
+        build_alignment_windows(&context, batch);
 
         // apply read filters
-        filter_reads(&ctx, batch);
+        filter_reads(&context, batch);
 
         // filter known SNPs from active_loc_list
-        filter_snps(&ctx, batch);
+        filter_snps(&context, batch);
 
         // generate cigar events and coordinates
-        expand_cigars(&ctx, batch);
+        expand_cigars(&context, batch);
 
         // build covariate tables
-        gather_covariates(&ctx, batch);
+        gather_covariates(&context, batch);
 
 #if 0
-        H_ReadOffsetList h_read_offset_list = ctx.read_offset_list;
-        H_VectorU32_2 h_alignment_windows = ctx.alignment_windows;
-        H_VectorU32_2 h_vcf_ranges = ctx.snp_filter.active_vcf_ranges;
-        H_VectorU32 h_cigar_offsets = ctx.cigar.cigar_offsets;
-        H_VectorU16 h_cigar_read_coords = ctx.cigar.cigar_op_read_coordinates;
-        H_VectorU16 h_cigar_ref_coords = ctx.cigar.cigar_op_reference_coordinates;
-        H_PackedVector_2b cigar_ops = ctx.cigar.cigar_ops;
-
-        io::SequenceDataView view = plain_view(*genome.h_ref);
-        H_PackedReference reference_stream(view.m_sequence_stream);
-
-        H_VectorU32 h_read_order = ctx.active_read_list;
-        for(uint32 read_id = 0; read_id < 50 && read_id < h_read_order.size(); read_id++)
+        for(uint32 read_id = 0; read_id < context.active_read_list.size(); read_id++)
         {
-            io::SequenceDataView view = plain_view(*genome.h_ref);
-            const uint32 read_index = h_read_order[read_id];
+            const uint32 read_index = context.active_read_list[read_id];
 
-            const BAM_CRQ_index& idx = h_batch.crq_index[read_index];
+            /*
+            const char *name = &h_batch.names[h_batch.index[read_index].name];
 
-            printf("read order %d read %d:\n", read_id, read_index);
-
-            printf("  name = [%s]\n", &h_batch.names[h_batch.index[read_index].name]);
-            printf("  cigar = [");
-            for(uint32 i = idx.cigar_start; i < idx.cigar_start + idx.cigar_len; i++)
+            if (!strcmp(name, "SRR062635.1797528") ||
+                !strcmp(name, "SRR062635.22970839") ||
+                !strcmp(name, "SRR062641.22789430") ||
+                !strcmp(name, "SRR062641.16264831"))
             {
-                printf("%d%c", h_batch.cigars[i].len, h_batch.cigars[i].ascii_op());
-            }
-            printf("]\n");
+                debug_read(&context, genome, h_batch, read_index);
+            }*/
 
-            printf("  offset list = [ ");
-            for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
-            {
-                printf("%d ", h_read_offset_list[i]);
-            }
-            printf("]\n");
-
-            uint32 cigar_start = h_cigar_offsets[idx.cigar_start];
-            uint32 cigar_end = h_cigar_offsets[idx.cigar_start + idx.cigar_len];
-            printf("  cigar offset range = [%d, %d]\n", cigar_start, cigar_end);
-
-            printf("  cigar read offset list      = [ ");
-            for(uint32 i = cigar_start; i < cigar_end; i++)
-            {
-                printf("% 3d ", (int16) h_cigar_read_coords[i]);
-            }
-            printf("]\n");
-
-            printf("  cigar reference offset list = [ ");
-            for(uint32 i = cigar_start; i < cigar_end; i++)
-            {
-                printf("% 3d ", (int16) h_cigar_ref_coords[i]);
-            }
-            printf("]\n");
-
-            printf("  cigar op list               = [ ");
-            for(uint32 i = cigar_start; i < cigar_end; i++)
-            {
-                printf("  %c ", "MID"[cigar_ops[i]]);
-            }
-            printf("]\n");
-
-            printf("  read sequence data          = [ ");
-            for(uint32 i = cigar_start; i < cigar_end; i++)
-            {
-                const uint16 read_bp = h_cigar_read_coords[i];
-                printf("  %c ", read_bp == uint16(-1) ? '-' : iupac16_to_char(h_batch.reads[idx.read_start + read_bp]));
-            }
-            printf("]\n");
-
-            const uint32 ref_sequence_id = h_batch.alignment_sequence_IDs[read_index];
-            const uint32 ref_sequence_base = view.m_sequence_index[ref_sequence_id];
-            const uint32 ref_sequence_offset = ref_sequence_base + h_batch.alignment_positions[read_index];
-
-            printf("  reference sequence data     = [ ");
-            for(uint32 i = cigar_start; i < cigar_end; i++)
-            {
-                const uint16 ref_bp = h_cigar_ref_coords[i];
-                printf("  %c ", ref_bp == uint16(-1) ? '-' : dna_to_char(reference_stream[ref_sequence_offset + ref_bp]));
-            }
-            printf("]\n");
-
-            printf("  sequence name [%s]\n  sequence base [%u]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
-                    &view.m_name_stream[view.m_name_index[h_batch.alignment_sequence_IDs[read_index]]],
-                    genome.ref_sequence_offsets[h_batch.alignment_sequence_IDs[read_index]],
-                    h_batch.alignment_positions[read_index],
-                    h_alignment_windows[read_index].x,
-                    h_alignment_windows[read_index].y);
-            printf("  active VCF range: [%u, %u[\n", h_vcf_ranges[read_index].x, h_vcf_ranges[read_index].y);
+            debug_read(&context, genome, h_batch, read_index);
         }
 #endif
 
 #if 0
         printf("active VCF ranges: %lu out of %lu reads (%f %%)\n",
-                ctx.snp_filter.active_read_ids.size(),
-                ctx.active_read_list.size(),
-                100.0 * float(ctx.snp_filter.active_read_ids.size()) / ctx.active_read_list.size());
+                context.snp_filter.active_read_ids.size(),
+                context.active_read_list.size(),
+                100.0 * float(context.snp_filter.active_read_ids.size()) / context.active_read_list.size());
 
-        H_ActiveLocationList h_bplist = ctx.snp_filter.active_location_list;
+        H_ActiveLocationList h_bplist = context.active_location_list;
         uint32 zeros = 0;
         for(uint32 i = 0; i < h_bplist.size(); i++)
         {
@@ -229,7 +158,44 @@ int main(int argc, char **argv)
         break;
     }
 
-    printf("%d reads filtered out of %d (%f%%)\n", ctx.stats.filtered_reads, ctx.stats.total_reads, float(ctx.stats.filtered_reads) / float(ctx.stats.total_reads) * 100.0);
+    printf("%d reads filtered out of %d (%f%%)\n", context.stats.filtered_reads, context.stats.total_reads, float(context.stats.filtered_reads) / float(context.stats.total_reads) * 100.0);
 
     return 0;
 }
+
+void debug_read(bqsr_context *context, const reference_genome& genome, const BAM_alignment_batch_host& batch, int read_id)
+{
+    uint32 read_index = context->active_read_list[read_id];
+
+    io::SequenceDataView view = plain_view(*genome.h_ref);
+    H_PackedReference reference_stream(view.m_sequence_stream);
+    const BAM_CRQ_index& idx = batch.crq_index[read_index];
+
+    printf("== read order %d read %d\n", read_id, read_index);
+
+    printf("name = [%s]\n", &batch.names[batch.index[read_index].name]);
+
+    printf("  offset list = [ ");
+    for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
+    {
+        uint16 off = context->read_offset_list[i];
+        printf("%d ", off);
+    }
+    printf("]\n");
+
+    debug_cigar(context, genome, batch, read_index);
+
+    const uint2 alignment_window = context->alignment_windows[read_index];
+    printf("  sequence name [%s]\n  sequence base [%u]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
+            &view.m_name_stream[view.m_name_index[batch.alignment_sequence_IDs[read_index]]],
+            genome.ref_sequence_offsets[batch.alignment_sequence_IDs[read_index]],
+            batch.alignment_positions[read_index],
+            alignment_window.x,
+            alignment_window.y);
+
+    const uint2 vcf_range = context->snp_filter.active_vcf_ranges[read_index];
+    printf("  active VCF range: [%u, %u[\n", vcf_range.x, vcf_range.y);
+
+    printf("\n");
+}
+

@@ -19,10 +19,11 @@
 #pragma once
 
 #include "bqsr_types.h"
+#include "alignment_data.h"
 #include "variants.h"
 #include "covariates.h"
 #include "cigar.h"
-#include "bam_loader.h"
+#include "alignment_data.h"
 #include "baq.h"
 #include "reference.h"
 
@@ -43,7 +44,7 @@ struct bqsr_statistics // host-only
 
 struct bqsr_context
 {
-    BAM_header& bam_header;
+    alignment_header& bam_header;
     const DeviceSNPDatabase& db;
     const reference_genome& reference;
 
@@ -77,7 +78,7 @@ struct bqsr_context
     // --- everything below this line is host-only and not available on the device
     bqsr_statistics stats;
 
-    bqsr_context(BAM_header& bam_header,
+    bqsr_context(alignment_header& bam_header,
                  const DeviceSNPDatabase& db,
                  const reference_genome& reference)
         : bam_header(bam_header),
@@ -87,7 +88,7 @@ struct bqsr_context
 
     struct view
     {
-        BAM_header::view                        bam_header;
+        alignment_header::const_view            bam_header;
         DeviceSNPDatabase::const_view           db;
         reference_genome_device::const_view     reference;
         D_VectorU32::plain_view_type            active_read_list;
@@ -131,7 +132,7 @@ struct bqsr_context
         return v;
     }
 
-    void start_batch(BAM_alignment_batch& batch);
+    void start_batch(alignment_batch& batch);
 #if 0
     void compact_active_read_list(void);
 #endif
@@ -141,13 +142,13 @@ struct bqsr_context
 struct bqsr_lambda
 {
     bqsr_context::view ctx;
-    const BAM_alignment_batch_device::const_view batch;
+    const alignment_batch_device::const_view batch;
 
     bqsr_lambda(bqsr_context::view ctx,
-                const BAM_alignment_batch_device::const_view batch)
+                const alignment_batch_device::const_view batch)
         : ctx(ctx),
           batch(batch)
     { }
 };
 
-void debug_read(bqsr_context *context, const BAM_alignment_batch& batch, int read_id);
+void debug_read(bqsr_context *context, const alignment_batch& batch, int read_id);

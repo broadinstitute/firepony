@@ -25,7 +25,7 @@
 #include "cigar.h"
 #include "bqsr_types.h"
 #include "bqsr_context.h"
-#include "bam_loader.h"
+#include "alignment_data.h"
 
 // compute the length of a given cigar operator
 struct cigar_op_len : public thrust::unary_function<const cigar_op&, uint32>
@@ -40,7 +40,7 @@ struct cigar_op_len : public thrust::unary_function<const cigar_op&, uint32>
 struct cigar_op_expand : public bqsr_lambda
 {
     cigar_op_expand(bqsr_context::view ctx,
-                    const BAM_alignment_batch_device::const_view batch)
+                    const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
@@ -84,7 +84,7 @@ struct cigar_op_expand : public bqsr_lambda
 struct cigar_op_compact : public bqsr_lambda
 {
     cigar_op_compact(bqsr_context::view ctx,
-                     const BAM_alignment_batch_device::const_view batch)
+                     const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
@@ -105,7 +105,7 @@ struct cigar_op_compact : public bqsr_lambda
 struct cigar_coordinates_expand : public bqsr_lambda
 {
     cigar_coordinates_expand(bqsr_context::view ctx,
-                             const BAM_alignment_batch_device::const_view batch)
+                             const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
@@ -124,7 +124,7 @@ struct cigar_coordinates_expand : public bqsr_lambda
 
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
         const cigar_op *cigar = &batch.cigars[idx.cigar_start];
 
         uint32 base = ctx.cigar.cigar_offsets[idx.cigar_start];
@@ -230,22 +230,22 @@ struct cigar_coordinates_expand : public bqsr_lambda
 struct compute_is_snp : public bqsr_lambda
 {
     compute_is_snp(bqsr_context::view ctx,
-                   const BAM_alignment_batch_device::const_view batch)
+                   const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
 
         // figure out the cigar event range for this read
         const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
         const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
 
         // fetch the alignment base in reference coordinates
-        const uint32 seq_id = batch.alignment_sequence_IDs[read_index];
+        const uint32 seq_id = batch.chromosome[read_index];
         const uint32 seq_base = ctx.reference.sequence_offsets[seq_id];
-        const uint32 align_offset = batch.alignment_positions[read_index];
+        const uint32 align_offset = batch.alignment_start[read_index];
         const uint32 reference_alignment_start = seq_base + align_offset;
 
         D_PackedReference reference_data(ctx.reference.genome_stream.m_sequence_stream);
@@ -275,13 +275,13 @@ struct compute_is_snp : public bqsr_lambda
 struct count_snps : public bqsr_lambda
 {
     count_snps(bqsr_context::view ctx,
-               const BAM_alignment_batch_device::const_view batch)
+               const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index& idx = batch.crq_index(read_index);
         const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
         const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
 
@@ -298,13 +298,13 @@ struct count_snps : public bqsr_lambda
 struct count_indels : public bqsr_lambda
 {
     count_indels(bqsr_context::view ctx,
-                 const BAM_alignment_batch_device::const_view batch)
+                 const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
         const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
         const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
 
@@ -327,13 +327,13 @@ struct count_indels : public bqsr_lambda
 struct sanity_check_cigar_events : public bqsr_lambda
 {
     sanity_check_cigar_events(bqsr_context::view ctx,
-                              const BAM_alignment_batch_device::const_view batch)
+                              const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
         const cigar_op *cigar = &batch.cigars[idx.cigar_start];
 
         const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
@@ -400,7 +400,7 @@ struct sanity_check_cigar_events : public bqsr_lambda
 };
 #endif
 
-void expand_cigars(bqsr_context *context, const BAM_alignment_batch& batch)
+void expand_cigars(bqsr_context *context, const alignment_batch& batch)
 {
     cigar_context& ctx = context->cigar;
 
@@ -475,11 +475,11 @@ void expand_cigars(bqsr_context *context, const BAM_alignment_batch& batch)
                      count_indels(*context, batch.device));
 }
 
-void debug_cigar(bqsr_context *context, const BAM_alignment_batch& batch, int read_index)
+void debug_cigar(bqsr_context *context, const alignment_batch& batch, int read_index)
 {
-    const BAM_alignment_batch_host& h_batch = batch.host;
+    const alignment_batch_host& h_batch = batch.host;
 
-    BAM_CRQ_index idx = h_batch.crq_index[read_index];
+    CRQ_index idx = h_batch.crq_index(read_index);
     cigar_context& ctx = context->cigar;
     io::SequenceDataView view = plain_view(*(context->reference.h_ref));
     H_PackedReference reference_stream(view.m_sequence_stream);
@@ -546,9 +546,9 @@ void debug_cigar(bqsr_context *context, const BAM_alignment_batch& batch, int re
     }
     printf("]\n");
 
-    const uint32 ref_sequence_id = h_batch.alignment_sequence_IDs[read_index];
+    const uint32 ref_sequence_id = h_batch.chromosome[read_index];
     const uint32 ref_sequence_base = view.m_sequence_index[ref_sequence_id];
-    const uint32 ref_sequence_offset = ref_sequence_base + h_batch.alignment_positions[read_index];
+    const uint32 ref_sequence_offset = ref_sequence_base + h_batch.alignment_start[read_index];
 
     printf("    reference sequence data     = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)

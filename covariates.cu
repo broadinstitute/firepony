@@ -18,6 +18,7 @@
 
 
 #include "bqsr_types.h"
+#include "alignment_data.h"
 #include "bqsr_context.h"
 #include "covariates.h"
 #include "covariates_bit_packing.h"
@@ -84,10 +85,10 @@ struct covariate_gatherer
 
     // state
     bqsr_context::view& ctx;
-    const BAM_alignment_batch_device::const_view& batch;
+    const alignment_batch_device::const_view& batch;
 
     NVBIO_HOST_DEVICE covariate_gatherer(bqsr_context::view& ctx,
-                                         const BAM_alignment_batch_device::const_view& batch)
+                                         const alignment_batch_device::const_view& batch)
         : ctx(ctx), batch(batch)
     {
     }
@@ -104,10 +105,10 @@ private:
     // returns false if we ran out of space
     template<GatherCovariatesMode MODE>
     NVBIO_HOST_DEVICE bool process_read(bqsr_context::view ctx,
-                                        const BAM_alignment_batch_device::const_view batch,
+                                        const alignment_batch_device::const_view batch,
                                         const uint32 read_index)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
         const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
         const uint32 cigar_end = (MODE == Rollback ? last_cigar_event_index : ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len]);
 
@@ -203,7 +204,7 @@ private:
 
 public:
     NVBIO_HOST_DEVICE bool process(bqsr_context::view ctx,
-                                   const BAM_alignment_batch_device::const_view batch,
+                                   const alignment_batch_device::const_view batch,
                                    D_VectorU32::plain_view_type& active_read_list,
                                    const uint32 read_id)
     {
@@ -225,7 +226,7 @@ public:
 template<typename covariate_chain>
 __global__ void covariates_kernel(D_VectorU32::plain_view_type active_read_list,
                                   bqsr_context::view ctx,
-                                  const BAM_alignment_batch_device::const_view batch)
+                                  const alignment_batch_device::const_view batch)
 {
     covariates_context::view& cv = ctx.covariates;
 
@@ -278,7 +279,7 @@ __global__ void covariates_kernel(D_VectorU32::plain_view_type active_read_list,
 template<typename covariate_chain>
 void covariates_cpu(D_CovariateTable::plain_view_type output,
                     bqsr_context::view ctx,
-                    const BAM_alignment_batch_device::const_view batch)
+                    const alignment_batch_device::const_view batch)
 {
     covariate_table table;
 
@@ -331,7 +332,7 @@ struct read_is_valid
     }
 };
 
-void gather_covariates(bqsr_context *context, const BAM_alignment_batch& batch)
+void gather_covariates(bqsr_context *context, const alignment_batch& batch)
 {
     covariates_context& cv = context->covariates;
 

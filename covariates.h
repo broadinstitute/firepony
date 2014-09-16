@@ -44,5 +44,5 @@ struct covariates_context
     }
 };
 
-void gather_covariates(bqsr_context *context, const BAM_alignment_batch& batch);
+void gather_covariates(bqsr_context *context, const alignment_batch& batch);
 void output_covariates(bqsr_context *context);

@@ -24,7 +24,7 @@
 #include <nvbio/io/vcf.h>
 
 #include "bqsr_types.h"
-#include "bam_loader.h"
+#include "alignment_data.h"
 #include "reference.h"
 #include "util.h"
 
@@ -136,10 +136,10 @@ struct DeviceSNPDatabase
 };
 
 void build_read_offset_list(bqsr_context *context,
-                            const BAM_alignment_batch& batch);
+                            const alignment_batch& batch);
 
 void build_alignment_windows(bqsr_context *ctx,
-                             const BAM_alignment_batch& batch);
+                             const alignment_batch& batch);
 
 void filter_known_snps(bqsr_context *context,
-                 const BAM_alignment_batch& batch);
+                       const alignment_batch& batch);

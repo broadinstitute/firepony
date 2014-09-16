@@ -47,7 +47,7 @@ protected:
     template<typename K>
     static NVBIO_HOST_DEVICE uint32 build_key(uint32 input_key, K data,
                                               bqsr_context::view ctx,
-                                              const BAM_alignment_batch_device::const_view batch,
+                                              const alignment_batch_device::const_view batch,
                                               uint32 read_index, uint16 bp_offset, uint32 cigar_event_index)
     {
         // add in our bits
@@ -82,7 +82,7 @@ struct covariate_null
     };
 
     static NVBIO_HOST_DEVICE uint32 encode(bqsr_context::view ctx,
-                                           const BAM_alignment_batch_device::const_view batch,
+                                           const alignment_batch_device::const_view batch,
                                            uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
                                            uint32 input_key = 0)
     {
@@ -106,11 +106,11 @@ template<typename PreviousCovariate = covariate_null>
 struct covariate_ReadGroup : public covariate<PreviousCovariate, 8>
 {
     static NVBIO_HOST_DEVICE uint32 encode(bqsr_context::view ctx,
-                                           const BAM_alignment_batch_device::const_view batch,
+                                           const alignment_batch_device::const_view batch,
                                            uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
                                            uint32 input_key = 0)
     {
-        uint8 key = (uint8) batch.read_groups[read_index];
+        uint8 key = (uint8) batch.read_group[read_index];
         return covariate<PreviousCovariate, 8>::build_key(input_key, key,
                                                           ctx, batch, read_index, bp_offset, cigar_event_index);
     }
@@ -132,7 +132,7 @@ template <typename PreviousCovariate = covariate_null>
 struct covariate_EventType : public covariate<PreviousCovariate, 2>
 {
     static NVBIO_HOST_DEVICE uint32 encode(bqsr_context::view ctx,
-                                           const BAM_alignment_batch_device::const_view batch,
+                                           const alignment_batch_device::const_view batch,
                                            uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
                                            uint32 input_key = 0)
     {
@@ -158,11 +158,11 @@ template <typename PreviousCovariate = covariate_null>
 struct covariate_QualityScore : public covariate<PreviousCovariate, 8>
 {
     static NVBIO_HOST_DEVICE uint32 encode(bqsr_context::view ctx,
-                                           const BAM_alignment_batch_device::const_view batch,
+                                           const alignment_batch_device::const_view batch,
                                            uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
                                            uint32 input_key = 0)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
         uint8 key = batch.qualities[idx.qual_start + bp_offset];
 
         return covariate<PreviousCovariate, 8>::build_key(input_key, key,
@@ -186,11 +186,11 @@ template <typename PreviousCovariate = covariate_null>
 struct covariate_EmpiricalQuality : public covariate<PreviousCovariate, 8>
 {
     static NVBIO_HOST_DEVICE uint32 encode(bqsr_context::view ctx,
-                                           const BAM_alignment_batch_device::const_view batch,
+                                           const alignment_batch_device::const_view batch,
                                            uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
                                            uint32 input_key = 0)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
         uint8 key = ctx.baq.qualities[idx.qual_start + bp_offset];
 
         return covariate<PreviousCovariate, 8>::build_key(input_key, key,

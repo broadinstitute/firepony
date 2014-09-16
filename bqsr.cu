@@ -26,7 +26,9 @@
 
 #include <map>
 
-#include "bam_loader.h"
+#include "bqsr_types.h"
+#include "gamgee_loader.h"
+#include "alignment_data.h"
 #include "reference.h"
 #include "util.h"
 #include "variants.h"
@@ -50,7 +52,7 @@ void device_sort_batch(BAM_alignment_batch_device *batch)
 }
 */
 
-void debug_read(bqsr_context *context, const reference_genome& reference, const BAM_alignment_batch_host& batch, int read_index);
+void debug_read(bqsr_context *context, const alignment_batch& batch, int read_index);
 
 int main(int argc, char **argv)
 {
@@ -61,7 +63,7 @@ int main(int argc, char **argv)
     //const char *vcf_name = "/home/nsubtil/hg96/ALL.chr20.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.vcf";
     //const char *vcf_name = "/home/nsubtil/hg96/one-variant.vcf";
     const char *bam_name = "/home/nsubtil/hg96/HG00096.chrom20.ILLUMINA.bwa.GBR.low_coverage.20120522.bam";
-    //const char *bam_name = "/home/nsubtil/hg96/one-read.bam";
+//    const char *bam_name = "/home/nsubtil/hg96/one-read.bam";
 
     struct reference_genome reference;
 
@@ -87,14 +89,23 @@ int main(int argc, char **argv)
     printf("%lu variants\n", db.genome_start_positions.size());
     printf("reading BAM %s...\n", bam_name);
 
-    BAMfile bam(bam_name);
-
-    BAM_alignment_batch batch;
+    gamgee_file bam(bam_name);
+    alignment_batch batch;
 
     bqsr_context context(bam.header, dev_db, reference);
 
-    while(bam.next_batch(&batch, true, 100000))
-//    while(bam.next_batch(&batch, false, 500))
+    uint32 data_mask = BatchDataMask::NAME |
+                        BatchDataMask::CHROMOSOME |
+                        BatchDataMask::ALIGNMENT_START |
+                        BatchDataMask::CIGAR |
+                        BatchDataMask::READS |
+                        BatchDataMask::QUALITIES |
+                        BatchDataMask::FLAGS |
+                        BatchDataMask::MAPQ |
+                        BatchDataMask::READ_GROUP;
+
+    while(bam.next_batch(&batch, data_mask, 100000))
+//    while(bam.next_batch(&batch, 500))
     {
         // load the next batch on the device
         batch.download();
@@ -139,7 +150,7 @@ int main(int argc, char **argv)
                 debug_read(&context, genome, h_batch, read_index);
             }*/
 
-            debug_read(&context, reference, h_batch, read_index);
+            debug_read(&context, batch, read_index);
         }
 #endif
 
@@ -178,19 +189,19 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void debug_read(bqsr_context *context, const BAM_alignment_batch& batch, int read_id)
+void debug_read(bqsr_context *context, const alignment_batch& batch, int read_id)
 {
-    const BAM_alignment_batch_host& h_batch = batch.host;
+    const alignment_batch_host& h_batch = batch.host;
 
     uint32 read_index = context->active_read_list[read_id];
 
     io::SequenceDataView view = plain_view(*(context->reference.h_ref));
     H_PackedReference reference_stream(view.m_sequence_stream);
-    const BAM_CRQ_index& idx = h_batch.crq_index[read_index];
+    const CRQ_index idx = h_batch.crq_index(read_index);
 
     printf("== read order %d read %d\n", read_id, read_index);
 
-    printf("name = [%s]\n", &h_batch.names[h_batch.index[read_index].name]);
+    printf("name = [%s]\n", h_batch.name[read_index].c_str());
 
     printf("  offset list = [ ");
     for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
@@ -205,9 +216,9 @@ void debug_read(bqsr_context *context, const BAM_alignment_batch& batch, int rea
 
     const uint2 alignment_window = context->alignment_windows[read_index];
     printf("  sequence name [%s]\n  sequence base [%u]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
-            &view.m_name_stream[view.m_name_index[h_batch.alignment_sequence_IDs[read_index]]],
-            context->reference.sequence_offsets[h_batch.alignment_sequence_IDs[read_index]],
-            h_batch.alignment_positions[read_index],
+            &view.m_name_stream[view.m_name_index[h_batch.chromosome[read_index]]],
+            context->reference.sequence_offsets[h_batch.chromosome[read_index]],
+            h_batch.alignment_start[read_index],
             alignment_window.x,
             alignment_window.y);
 

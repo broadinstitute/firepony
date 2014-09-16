@@ -19,7 +19,7 @@
 #pragma once
 
 #include "bqsr_types.h"
-#include "bam_loader.h"
+#include "alignment_data.h"
 #include "reference.h"
 
 using namespace nvbio;
@@ -109,5 +109,5 @@ struct cigar_context
     }
 };
 
-void expand_cigars(bqsr_context *context, const BAM_alignment_batch& batch);
-void debug_cigar(bqsr_context *context, const BAM_alignment_batch& batch, int read_index);
+void expand_cigars(bqsr_context *context, const alignment_batch& batch);
+void debug_cigar(bqsr_context *context, const alignment_batch& batch, int read_index);

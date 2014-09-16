@@ -32,9 +32,9 @@
 #include <math.h>
 
 #include "bqsr_types.h"
+#include "alignment_data.h"
 #include "bqsr_context.h"
 #include "reference.h"
-#include "bam_loader.h"
 
 #if 0
 #include "baq-cpu.h"
@@ -58,7 +58,7 @@ using namespace nvbio;
 struct compute_hmm_windows : public bqsr_lambda
 {
     compute_hmm_windows(bqsr_context::view ctx,
-                        const BAM_alignment_batch_device::const_view batch)
+                        const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
@@ -68,11 +68,11 @@ struct compute_hmm_windows : public bqsr_lambda
         uint2&   out_reference_window = ctx.baq.reference_windows[read_index];
 
         // grab reference sequence window in the genome
-        const uint32 ref_ID = batch.alignment_sequence_IDs[read_index];
+        const uint32 ref_ID = batch.chromosome[read_index];
         const uint32 ref_base = ctx.reference.sequence_offsets[ref_ID];
         const uint32 ref_length = ctx.reference.sequence_offsets[ref_ID + 1] - ref_base;
 
-        const uint32 seq_to_alignment_offset = batch.alignment_positions[read_index];
+        const uint32 seq_to_alignment_offset = batch.alignment_start[read_index];
 
         const ushort2& read_window = ctx.cigar.read_window_clipped[read_index];
         const ushort2& read_window_no_insertions = ctx.cigar.read_window_clipped_no_insertions[read_index];
@@ -111,7 +111,7 @@ struct compute_hmm_windows : public bqsr_lambda
 struct hmm_common : public bqsr_lambda
 {
     hmm_common(bqsr_context::view ctx,
-               const BAM_alignment_batch_device::const_view batch)
+               const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
@@ -142,7 +142,7 @@ struct hmm_common : public bqsr_lambda
         const uint32 matrix_index  = thrust::get<1>(hmm_index);
         const uint32 scaling_index = thrust::get<2>(hmm_index);
 
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
 
         // set up matrix and scaling factor pointers
         forwardMatrix = &ctx.baq.forward[matrix_index];
@@ -252,7 +252,7 @@ struct hmm_common : public bqsr_lambda
 struct hmm_glocal_forward : public hmm_common
 {
     hmm_glocal_forward(bqsr_context::view ctx,
-                       const BAM_alignment_batch_device::const_view batch)
+                       const alignment_batch_device::const_view batch)
         : hmm_common(ctx, batch)
     { }
 
@@ -394,7 +394,7 @@ struct hmm_glocal_forward : public hmm_common
 struct hmm_glocal_backward : public hmm_common
 {
     hmm_glocal_backward(bqsr_context::view ctx,
-                        const BAM_alignment_batch_device::const_view batch)
+                        const alignment_batch_device::const_view batch)
         : hmm_common(ctx, batch)
     { }
 
@@ -496,7 +496,7 @@ struct hmm_glocal_backward : public hmm_common
 struct hmm_glocal_map : public hmm_common
 {
     hmm_glocal_map(bqsr_context::view ctx,
-                   const BAM_alignment_batch_device::const_view batch)
+                   const alignment_batch_device::const_view batch)
         : hmm_common(ctx, batch)
     { }
 
@@ -574,13 +574,13 @@ struct hmm_glocal_map : public hmm_common
 struct compute_hmm_matrix_size : public thrust::unary_function<uint32, uint32>, public bqsr_lambda
 {
     compute_hmm_matrix_size(bqsr_context::view ctx,
-                            const BAM_alignment_batch_device::const_view batch)
+                            const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
     NVBIO_HOST_DEVICE uint32 operator() (const uint32 read_index)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
         return hmm_common::matrix_size(idx.read_len);
     }
 };
@@ -588,13 +588,13 @@ struct compute_hmm_matrix_size : public thrust::unary_function<uint32, uint32>, 
 struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, uint32>, public bqsr_lambda
 {
     compute_hmm_scaling_factor_size(bqsr_context::view ctx,
-                                    const BAM_alignment_batch_device::const_view batch)
+                                    const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
     NVBIO_HOST_DEVICE uint32 operator() (const uint32 read_index)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
         return idx.read_len + 2;
     }
 };
@@ -602,7 +602,7 @@ struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, u
 struct read_needs_baq : public bqsr_lambda
 {
     read_needs_baq(bqsr_context::view ctx,
-                   const BAM_alignment_batch_device::const_view batch)
+                   const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
@@ -618,7 +618,7 @@ struct read_needs_baq : public bqsr_lambda
 struct read_flat_baq : public bqsr_lambda
 {
     read_flat_baq(bqsr_context::view ctx,
-                  const BAM_alignment_batch_device::const_view batch)
+                  const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
@@ -635,7 +635,7 @@ struct read_flat_baq : public bqsr_lambda
             return;
         }
 
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
         const ushort2& read_window = ctx.baq.read_windows[read_index];
         const uint32 queryStart = read_window.x;
         const uint32 queryLen = read_window.y - read_window.x + 1;
@@ -646,7 +646,7 @@ struct read_flat_baq : public bqsr_lambda
     }
 };
 
-void baq_reads(bqsr_context *context, const BAM_alignment_batch& batch)
+void baq_reads(bqsr_context *context, const alignment_batch& batch)
 {
     struct baq_context& baq = context->baq;
     D_VectorU32& active_baq_read_list = context->temp_u32;
@@ -788,13 +788,13 @@ void baq_reads(bqsr_context *context, const BAM_alignment_batch& batch)
 #endif
 }
 
-void debug_baq(bqsr_context *context, const BAM_alignment_batch& batch, int read_index)
+void debug_baq(bqsr_context *context, const alignment_batch& batch, int read_index)
 {
-    const BAM_alignment_batch_host& h_batch = batch.host;
+    const alignment_batch_host& h_batch = batch.host;
 
     printf("  BAQ info:\n");
 
-    const BAM_CRQ_index& idx = h_batch.crq_index[read_index];
+    const CRQ_index idx = h_batch.crq_index(read_index);
 
     ushort2 read_window = context->baq.read_windows[read_index];
     uint2 reference_window = context->baq.reference_windows[read_index];
@@ -803,8 +803,8 @@ void debug_baq(bqsr_context *context, const BAM_alignment_batch& batch, int read
     printf("    absolute reference window   = [ %u %u ]\n", reference_window.x, reference_window.y);
     //printf("    sequence base: %u\n", genome.sequence_offsets[batch.alignment_sequence_IDs[read_index]]);
     printf("    relative reference window   = [ %u %u ]\n",
-            reference_window.x - context->reference.sequence_offsets[h_batch.alignment_sequence_IDs[read_index]],
-            reference_window.y - context->reference.sequence_offsets[h_batch.alignment_sequence_IDs[read_index]]);
+            reference_window.x - context->reference.sequence_offsets[h_batch.chromosome[read_index]],
+            reference_window.y - context->reference.sequence_offsets[h_batch.chromosome[read_index]]);
 
     printf("    BAQ state                   = [ ");
     for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)

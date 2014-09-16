@@ -25,8 +25,8 @@
 
 #include <map>
 
-#include "bam_loader.h"
 #include "util.h"
+#include "alignment_data.h"
 
 using namespace nvbio;
 
@@ -39,7 +39,7 @@ struct reference_genome_device
     ~reference_genome_device();
 
     void load(io::SequenceData *h_ref, const H_VectorU32& ref_sequence_offsets);
-    void transform_alignment_start_positions(BAM_alignment_batch_device *batch);
+    void transform_alignment_start_positions(alignment_batch_device *batch);
 
     struct const_view
     {

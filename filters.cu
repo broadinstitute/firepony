@@ -30,7 +30,7 @@ template<uint32 flags>
 struct filter_if_any_set : public bqsr_lambda
 {
     filter_if_any_set(bqsr_context::view ctx,
-                      const BAM_alignment_batch_device::const_view batch)
+                      const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
@@ -49,7 +49,7 @@ struct filter_if_any_set : public bqsr_lambda
 struct filter_mapq : public bqsr_lambda
 {
     filter_mapq(bqsr_context::view ctx,
-                const BAM_alignment_batch_device::const_view batch)
+                const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
@@ -69,25 +69,25 @@ struct filter_mapq : public bqsr_lambda
 struct filter_malformed_reads : public bqsr_lambda
 {
     filter_malformed_reads(bqsr_context::view ctx,
-                           const BAM_alignment_batch_device::const_view batch)
+                           const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
     NVBIO_HOST_DEVICE bool operator() (const uint32 read_index)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
 
         // read is not flagged as unmapped...
         if (!(batch.flags[read_index] & nvbio::io::SAMFlag_SegmentUnmapped))
         {
             // ... but reference sequence ID is invalid (GATK: checkInvalidAlignmentStart)
-            if (batch.alignment_sequence_IDs[read_index] == uint32(-1))
+            if (batch.chromosome[read_index] == uint32(-1))
             {
                 return false;
             }
 
             // ... but alignment start is -1 (GATK: checkInvalidAlignmentStart)
-            if (batch.alignment_positions[read_index] == uint32(-1))
+            if (batch.alignment_start[read_index] == uint32(-1))
             {
                 return false;
             }
@@ -99,7 +99,7 @@ struct filter_malformed_reads : public bqsr_lambda
             }
 
             // ... but read is aligned to a point after the end of the contig (GATK: checkAlignmentDisagreesWithHeader)
-            if (ctx.sequence_alignment_windows[read_index].y >= ctx.bam_header.sq_lengths[batch.alignment_sequence_IDs[read_index]])
+            if (ctx.sequence_alignment_windows[read_index].y >= ctx.bam_header.chromosome_lengths[batch.chromosome[read_index]])
             {
                 return false;
             }
@@ -114,14 +114,14 @@ struct filter_malformed_reads : public bqsr_lambda
 
         // read is aligned to nonexistent contig but alignment start is valid
         // (GATK: checkAlignmentDisagreesWithHeader)
-        if (batch.alignment_sequence_IDs[read_index] == uint32(-1) && batch.alignment_positions[read_index] != uint32(-1))
+        if (batch.chromosome[read_index] == uint32(-1) && batch.alignment_start[read_index] != uint32(-1))
         {
             return false;
         }
 
         // read has no read group
         // (GATK: checkHasReadGroup)
-        if (batch.read_groups[read_index] == uint32(-1))
+        if (batch.read_group[read_index] == uint32(-1))
         {
             return false;
         }
@@ -149,13 +149,13 @@ struct filter_malformed_reads : public bqsr_lambda
 struct filter_malformed_cigars : public bqsr_lambda
 {
     filter_malformed_cigars(bqsr_context::view ctx,
-                            const BAM_alignment_batch_device::const_view batch)
+                            const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
     NVBIO_HOST_DEVICE bool operator() (const uint32 read_index)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
 
         // state for CIGAR sanity checks
         enum {
@@ -252,7 +252,7 @@ struct filter_malformed_cigars : public bqsr_lambda
 };
 
 // apply read filters to the batch
-void filter_reads(bqsr_context *context, const BAM_alignment_batch& batch)
+void filter_reads(bqsr_context *context, const alignment_batch& batch)
 {
     D_VectorU32& active_read_list = context->active_read_list;
     D_VectorU32& temp_u32 = context->temp_u32;
@@ -318,13 +318,13 @@ void filter_reads(bqsr_context *context, const BAM_alignment_batch& batch)
 struct filter_non_regular_bases : public bqsr_lambda
 {
     filter_non_regular_bases(bqsr_context::view ctx,
-                             const BAM_alignment_batch_device::const_view batch)
+                             const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
 
         for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
         {
@@ -350,13 +350,13 @@ struct filter_non_regular_bases : public bqsr_lambda
 struct filter_low_quality_bases : public bqsr_lambda
 {
     filter_low_quality_bases(bqsr_context::view ctx,
-                             const BAM_alignment_batch_device::const_view batch)
+                             const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
 
         for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
         {
@@ -371,7 +371,7 @@ struct filter_low_quality_bases : public bqsr_lambda
 
 // apply per-BP filters to the batch
 // (known SNPs are filtered elsewhere)
-void filter_bases(bqsr_context *context, const BAM_alignment_batch& batch)
+void filter_bases(bqsr_context *context, const alignment_batch& batch)
 {
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),

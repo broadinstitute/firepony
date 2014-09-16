@@ -60,13 +60,13 @@ void DeviceSNPDatabase::load(const SNPDatabase_refIDs& ref)
 struct compute_read_offset_list : public bqsr_lambda
 {
     compute_read_offset_list(bqsr_context::view ctx,
-                             const BAM_alignment_batch_device::const_view batch)
+                             const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
 
         const cigar_op *cigar = &batch.cigars[idx.cigar_start];
         uint16 *offset_list = &ctx.read_offset_list[idx.read_start];
@@ -120,7 +120,7 @@ struct compute_read_offset_list : public bqsr_lambda
 
 // for each read, compute the offset of each read BP relative to the base alignment position of the read
 void build_read_offset_list(bqsr_context *context,
-                            const BAM_alignment_batch& batch)
+                            const alignment_batch& batch)
 {
     context->read_offset_list.resize(batch.device.reads.size());
     thrust::for_each(context->active_read_list.begin(),
@@ -134,13 +134,13 @@ void build_read_offset_list(bqsr_context *context,
 struct compute_alignment_window : public bqsr_lambda
 {
     compute_alignment_window(bqsr_context::view ctx,
-                             const BAM_alignment_batch_device::const_view batch)
+                             const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index idx = batch.crq_index(read_index);
         const uint16 *offset_list = &ctx.read_offset_list[idx.read_start];
         uint2& output = ctx.alignment_windows[read_index];
         ushort2& output_sequence = ctx.sequence_alignment_windows[read_index];
@@ -159,17 +159,17 @@ struct compute_alignment_window : public bqsr_lambda
             output = make_uint2(uint32(-1), uint32(-1));
         } else {
             // transform the start position
-            output.x = ctx.reference.sequence_offsets[batch.alignment_sequence_IDs[read_index]] + batch.alignment_positions[read_index];
+            output.x = ctx.reference.sequence_offsets[batch.chromosome[read_index]] + batch.alignment_start[read_index];
             output.y = output.x + offset_list[c];
 
-            output_sequence.x = batch.alignment_positions[read_index];
+            output_sequence.x = batch.alignment_start[read_index];
             output_sequence.y = output_sequence.x + offset_list[c];
         }
     }
 };
 
 // for each read, compute the end of the alignment window in the reference
-void build_alignment_windows(bqsr_context *ctx, const BAM_alignment_batch& batch)
+void build_alignment_windows(bqsr_context *ctx, const alignment_batch& batch)
 {
     // set up the alignment window buffer
     ctx->alignment_windows.resize(batch.device.num_reads);
@@ -184,7 +184,7 @@ struct compute_vcf_ranges : public bqsr_lambda
 {
 
     compute_vcf_ranges(bqsr_context::view ctx,
-                       const BAM_alignment_batch_device::const_view batch)
+                       const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
@@ -239,7 +239,7 @@ struct vcf_active_predicate
 struct filter_bps : public bqsr_lambda
 {
     filter_bps(bqsr_context::view ctx,
-               const BAM_alignment_batch_device::const_view batch)
+               const alignment_batch_device::const_view batch)
         : bqsr_lambda(ctx, batch)
     { }
 
@@ -272,7 +272,7 @@ private:
 public:
     NVBIO_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
+        const CRQ_index& idx = batch.crq_index(read_index);
         const uint2& alignment_window = ctx.alignment_windows[read_index];
         const uint16 *offset_list = &ctx.read_offset_list[0];
 
@@ -352,12 +352,12 @@ public:
 
 // filter out known SNPs from the active BP list
 // for each BP in batch, set the corresponding bit in active_loc_list to zero if it matches a known SNP
-void filter_known_snps(bqsr_context *context, const BAM_alignment_batch& batch)
+void filter_known_snps(bqsr_context *context, const alignment_batch& batch)
 {
     snp_filter_context& snp = context->snp_filter;
 
     // compute the VCF ranges for each read
-    snp.active_vcf_ranges.resize(batch.device.crq_index.size());
+    snp.active_vcf_ranges.resize(batch.device.num_reads);
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
                      compute_vcf_ranges(*context, batch.device));

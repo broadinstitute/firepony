@@ -1,14 +1,10 @@
 nvbio_module(bqsr)
 
 addsources(
-bam_loader.cu
-bam_loader.h
 gamgee_loader.cu
 gamgee_loader.h
 baq.cu
 baq.h
-#baq-cpu.cu
-#baq-cpu.h
 bqsr.cu
 bqsr_context.h
 bqsr_context.cu

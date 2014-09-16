@@ -23,6 +23,8 @@
 #include "covariates.h"
 #include "cigar.h"
 #include "bam_loader.h"
+#include "baq.h"
+#include "reference.h"
 
 using namespace nvbio;
 
@@ -86,6 +88,7 @@ struct bqsr_context
     // various pipeline states go here
     snp_filter_context snp_filter;
     cigar_context cigar;
+    baq_context baq;
 
     // --- everything below this line is host-only and not available on the device
     bqsr_statistics stats;
@@ -112,6 +115,7 @@ struct bqsr_context
         D_VectorU32::plain_view_type            temp_u32;
         snp_filter_context::view                snp_filter;
         cigar_context::view                     cigar;
+        baq_context::view                       baq;
     };
 
     operator view()
@@ -129,7 +133,9 @@ struct bqsr_context
             plain_view(temp_u32),
             snp_filter,
             cigar,
+            baq,
         };
+
         return v;
     }
 
@@ -149,5 +155,17 @@ struct bqsr_lambda
                 const BAM_alignment_batch_device::const_view batch)
         : ctx(ctx),
           batch(batch)
+    { }
+};
+
+struct bqsr_lambda_ref : public bqsr_lambda
+{
+    reference_genome_device::const_view reference;
+
+    bqsr_lambda_ref(bqsr_context::view ctx,
+                    const reference_genome_device::const_view reference,
+                    const BAM_alignment_batch_device::const_view batch)
+        : bqsr_lambda(ctx, batch),
+          reference(reference)
     { }
 };

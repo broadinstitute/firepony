@@ -34,6 +34,7 @@
 #include "filters.h"
 #include "cigar.h"
 #include "covariates.h"
+#include "baq.h"
 
 using namespace nvbio;
 
@@ -115,6 +116,8 @@ int main(int argc, char **argv)
         // generate cigar events and coordinates
         expand_cigars(&context, batch);
 
+        // compute the base alignment quality for each read
+        baq_reads(&context, genome, batch);
         // build covariate tables
         gather_covariates(&context, batch);
 
@@ -184,6 +187,7 @@ void debug_read(bqsr_context *context, const reference_genome& genome, const BAM
     printf("]\n");
 
     debug_cigar(context, genome, batch, read_index);
+    debug_baq(context, genome, batch, read_index);
 
     const uint2 alignment_window = context->alignment_windows[read_index];
     printf("  sequence name [%s]\n  sequence base [%u]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",

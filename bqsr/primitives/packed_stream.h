@@ -70,6 +70,9 @@ struct packed_stream
         SYMBOL_MASK             = SYMBOL_COUNT - 1u,
         IS_BIG_ENDIAN           = BIG_ENDIAN_T,
         ALPHABET_SIZE           = SYMBOL_COUNT,
+        // xxxnsubtil: this is wrong, but it's not easy to fix without cleaning this code up
+        WORD_SIZE               = sizeof(uint32) * 8,
+        SYMBOLS_PER_WORD        = WORD_SIZE / SYMBOL_SIZE,
     };
 
     typedef IndexType                                                   index_type;

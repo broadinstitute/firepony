@@ -22,6 +22,7 @@
 #include <gamgee/fastq.h>
 #include <gamgee/fastq_iterator.h>
 #include <gamgee/fastq_reader.h>
+#include <gamgee/variant_reader.h>
 
 #include <string>
 
@@ -29,6 +30,7 @@
 #include "util.h"
 #include "alignment_data.h"
 #include "sequence_data.h"
+#include "variant_data.h"
 
 #include "from_nvbio/dna.h"
 
@@ -285,6 +287,126 @@ bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 d
         {
             uint32 seq_id = h.sequence_names.insert(record.name());
             h.sequence_id.push_back(seq_id);
+        }
+    }
+
+    return true;
+}
+
+bool gamgee_load_vcf(variant_db& output, const char *fname, uint32 data_mask)
+{
+    auto& batch = output.host;
+    auto& header = output.header;
+
+    for(auto& record : gamgee::VariantReader<gamgee::VariantIterator>{std::string(fname)})
+    {
+        // collect all the common variant data
+        struct
+        {
+            uint32 chromosome;
+            uint32 alignment_start;
+            uint32 alignment_stop;
+            uint32 id;
+            float qual;
+            uint32 n_samples;
+            uint32 n_alleles;
+        } variant_data;
+
+        if (data_mask & VariantDataMask::CHROMOSOME)
+        {
+            uint32 gamgee_chromosome_id = record.chromosome();
+            std::string chromosome_name = record.header().chromosomes()[gamgee_chromosome_id];
+
+            variant_data.chromosome = header.chromosome_db.insert(chromosome_name);
+        }
+
+        variant_data.alignment_start = record.alignment_start();
+        variant_data.alignment_stop = record.alignment_stop();
+
+        if (data_mask & VariantDataMask::ID)
+        {
+            variant_data.id = header.id_db.insert(record.id());
+        }
+
+        variant_data.qual = record.qual();
+        variant_data.n_samples = record.n_samples();
+        variant_data.n_alleles = record.n_alleles();
+
+        // for each possible alternate, add one entry to the variant database
+        // xxxnsubtil: this is wrong if alternate data is masked out in data_mask!
+        for(std::string& alt : record.alt())
+        {
+            batch.num_variants++;
+
+            if (data_mask & VariantDataMask::CHROMOSOME)
+            {
+                batch.chromosome.push_back(variant_data.chromosome);
+            }
+
+            if (data_mask & VariantDataMask::ALIGNMENT_START)
+            {
+                batch.alignment_start.push_back(variant_data.alignment_start);
+            }
+
+            if (data_mask & VariantDataMask::ALIGNMENT_STOP)
+            {
+                batch.alignment_stop.push_back(variant_data.alignment_stop);
+            }
+
+            if (data_mask & VariantDataMask::ID)
+            {
+                batch.id.push_back(variant_data.id);
+            }
+
+            if (data_mask & VariantDataMask::REFERENCE)
+            {
+                const std::string& ref = record.ref();
+                uint32 ref_start = batch.reference.size();
+                uint32 ref_len = ref.size();
+
+                batch.reference_start.push_back(ref_start);
+                batch.reference_len.push_back(ref_len);
+
+                // make sure we have enough memory, then read in the sequence
+                // xxxnsubtil: we don't pad reference data to a dword multiple since variants are
+                // meant to be read-only, so RMW hazards should never happen
+                batch.reference.resize(ref_start + ref_len);
+                for(uint32 i = 0; i < ref_len; i++)
+                {
+                    batch.reference[ref_start + i] = from_nvbio::char_to_iupac16(ref[i]);
+                }
+            }
+
+            if (data_mask & VariantDataMask::ALTERNATE)
+            {
+                uint32 alt_start = batch.alternate.size();
+                uint32 alt_len = alt.size();
+
+                batch.alternate_start.push_back(alt_start);
+                batch.alternate_len.push_back(alt_len);
+
+                // xxxnsubtil: same as above, this is not padded to dword size
+                batch.alternate.resize(alt_start + alt_len);
+                for(uint32 i = 0; i < alt_len; i++)
+                {
+                    batch.alternate[alt_start + i] = from_nvbio::char_to_iupac16(alt[i]);
+                }
+            }
+
+            if (data_mask & VariantDataMask::QUAL)
+            {
+                batch.qual.push_back(variant_data.qual);
+            }
+
+            if (data_mask & VariantDataMask::N_SAMPLES)
+            {
+                batch.n_samples.push_back(variant_data.n_samples);
+            }
+
+            if (data_mask & VariantDataMask::N_ALLELES)
+            {
+                batch.n_alleles.push_back(variant_data.n_alleles);
+            }
         }
     }
 

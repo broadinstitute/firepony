@@ -78,6 +78,8 @@ typedef H_Vector<int32> H_VectorI32;
 
 typedef D_Vector<double> D_VectorF64;
 typedef H_Vector<double> H_VectorF64;
+typedef D_Vector<float> D_VectorF32;
+typedef H_Vector<float> H_VectorF32;
 
 typedef H_PackedVector<4> H_VectorDNA16;
 typedef D_PackedVector<4> D_VectorDNA16;

@@ -20,6 +20,7 @@ gamgee_loader.h
 sequence_data.h
 util.cu
 util.h
+variant_data.h
 variants.cu
 variants.h
 

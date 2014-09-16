@@ -21,6 +21,7 @@
 #include <gamgee/sam_reader.h>
 #include "alignment_data.h"
 #include "sequence_data.h"
+#include "variant_data.h"
 
 struct gamgee_alignment_file
 {
@@ -40,3 +41,4 @@ public:
 };
 
 bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 data_mask);
+bool gamgee_load_vcf(variant_db& output, const char *fname, uint32 data_mask);

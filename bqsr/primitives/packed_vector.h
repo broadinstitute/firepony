@@ -22,8 +22,6 @@
 #include "vector.h"
 #include "packed_stream.h"
 
-#include <nvbio/basic/packed_vector.h>
-
 namespace bqsr
 {
 
@@ -149,15 +147,6 @@ struct packed_vector
     operator const_view() const
     {
         return const_view(thrust::raw_pointer_cast(m_storage.data()));
-    }
-
-    // utility assignment operator from nvbio packed vector types, to be removed
-    template <typename OtherSystemTag>
-    type& operator=(const nvbio::PackedVector<OtherSystemTag, SYMBOL_SIZE, IS_BIG_ENDIAN, index_type>& other)
-    {
-        m_storage = other.m_storage;
-        m_size = other.m_size;
-        return *this;
     }
 
     stream_type stream_at_index(const index_type i)

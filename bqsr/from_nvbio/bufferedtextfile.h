@@ -126,7 +126,7 @@ public:
                     {
                         return NULL;
                     } else {
-                        NVBIO_CUDA_ASSERT(valid_size <= buffer.size());
+                        assert(valid_size <= buffer.size());
                         end = &buffer[valid_size];
                     }
                 } else {

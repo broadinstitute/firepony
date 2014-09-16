@@ -32,7 +32,7 @@ struct cigar_event
         S = 3,  // soft clipping (bases exist in read but not in reference)
     } Event;
 
-    static NVBIO_HOST_DEVICE char ascii(Event e)
+    static CUDA_HOST_DEVICE char ascii(Event e)
     {
         return e == M ? 'M' :
                e == I ? 'I' :
@@ -40,7 +40,7 @@ struct cigar_event
                         'S';
     }
 
-    static NVBIO_HOST_DEVICE char ascii(uint32 e)
+    static CUDA_HOST_DEVICE char ascii(uint32 e)
     {
         return e == M ? 'M' :
                e == I ? 'I' :

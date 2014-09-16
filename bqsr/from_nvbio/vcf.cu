@@ -26,6 +26,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 namespace from_nvbio {
 
@@ -146,7 +147,7 @@ bool loadVCF(SNPDatabase& output, const char *file_name)
 
         if (!chrom || !pos || !id || !ref || !alt || !qual || !filter)
         {
-            log_error(stderr, "Error parsing VCF file (line %d): incomplete variant\n", line_counter);
+            printf("Error parsing VCF file (line %d): incomplete variant\n", line_counter);
             return false;
         }
 
@@ -157,7 +158,7 @@ bool loadVCF(SNPDatabase& output, const char *file_name)
         uint32 position = strtoll(pos, &endptr, 10);
         if (!endptr || endptr == pos || *endptr != '\0')
         {
-            log_error(stderr, "VCF file error (line %d): invalid position\n", line_counter);
+            printf("VCF file error (line %d): invalid position\n", line_counter);
             return false;
         }
 
@@ -169,7 +170,7 @@ bool loadVCF(SNPDatabase& output, const char *file_name)
             quality = (uint8) strtol(qual, &endptr, 10);
             if (!endptr || endptr == qual || *endptr != '\0')
             {
-                log_warning(stderr, "VCF file error (line %d): invalid quality\n", line_counter);
+                printf("VCF file error (line %d): invalid quality\n", line_counter);
                 quality = 0xff;
             }
         }
@@ -182,7 +183,7 @@ bool loadVCF(SNPDatabase& output, const char *file_name)
             ret = get_end_position(&stop, info);
             if (ret == false)
             {
-                log_warning(stderr, "VCF file error (line %d): error parsing INFO line\n", line_counter);
+                printf("VCF file error (line %d): error parsing INFO line\n", line_counter);
                 return false;
             }
         }

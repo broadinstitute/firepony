@@ -190,7 +190,7 @@ template <> struct AlphabetTraits<RNA_N>
 
 /// return the number of bits per symbol for a given alphabet
 ///
-NVBIO_FORCEINLINE NVBIO_HOST_DEVICE
+inline CUDA_HOST_DEVICE
 uint32 bits_per_symbol(const Alphabet alphabet)
 {
     return alphabet == DNA       ? 2 :
@@ -205,17 +205,17 @@ uint32 bits_per_symbol(const Alphabet alphabet)
 /// convert a given symbol to its ASCII character
 ///
 template <Alphabet ALPHABET>
-NVBIO_FORCEINLINE NVBIO_HOST_DEVICE char to_char(const uint8 c);
+inline CUDA_HOST_DEVICE char to_char(const uint8 c);
 
 /// convert a given symbol to its ASCII character
 ///
 template <Alphabet ALPHABET>
-NVBIO_FORCEINLINE NVBIO_HOST_DEVICE uint8 from_char(const char c);
+inline CUDA_HOST_DEVICE uint8 from_char(const char c);
 
 /// convert from the given alphabet to an ASCII string
 ///
 template <Alphabet ALPHABET, typename SymbolIterator>
-NVBIO_FORCEINLINE NVBIO_HOST_DEVICE void to_string(
+inline CUDA_HOST_DEVICE void to_string(
     const SymbolIterator begin,
     const uint32         n,
     char*                string);
@@ -223,7 +223,7 @@ NVBIO_FORCEINLINE NVBIO_HOST_DEVICE void to_string(
 /// convert from the given alphabet to an ASCII string
 ///
 template <Alphabet ALPHABET, typename SymbolIterator>
-NVBIO_FORCEINLINE NVBIO_HOST_DEVICE void to_string(
+inline CUDA_HOST_DEVICE void to_string(
     const SymbolIterator begin,
     const SymbolIterator end,
     char*                string);
@@ -231,7 +231,7 @@ NVBIO_FORCEINLINE NVBIO_HOST_DEVICE void to_string(
 /// convert from an ASCII string to the given alphabet
 ///
 template <Alphabet ALPHABET, typename SymbolIterator>
-NVBIO_FORCEINLINE NVBIO_HOST_DEVICE void from_string(
+inline CUDA_HOST_DEVICE void from_string(
     const char*             begin,
     const char*             end,
     SymbolIterator          symbols);
@@ -239,7 +239,7 @@ NVBIO_FORCEINLINE NVBIO_HOST_DEVICE void from_string(
 /// convert from an ASCII string to the given alphabet
 ///
 template <Alphabet ALPHABET, typename SymbolIterator>
-NVBIO_FORCEINLINE NVBIO_HOST_DEVICE void from_string(
+inline CUDA_HOST_DEVICE void from_string(
     const char*             begin,
     SymbolIterator          symbols);
 
@@ -253,7 +253,7 @@ struct to_char_functor
 
     /// functor operator
     ///
-    NVBIO_FORCEINLINE NVBIO_HOST_DEVICE char operator() (const uint8 c) const { return to_char<ALPHABET>( c ); }
+    inline CUDA_HOST_DEVICE char operator() (const uint8 c) const { return to_char<ALPHABET>( c ); }
 };
 
 /// conversion functor from a given alphabet to ASCII char
@@ -266,7 +266,7 @@ struct from_char_functor
 
     /// functor operator
     ///
-    NVBIO_FORCEINLINE NVBIO_HOST_DEVICE uint8 operator() (const char c) const { return from_char<ALPHABET>( c ); }
+    inline CUDA_HOST_DEVICE uint8 operator() (const char c) const { return from_char<ALPHABET>( c ); }
 };
 
 ///@} AlphabetsModule

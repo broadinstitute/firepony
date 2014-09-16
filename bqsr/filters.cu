@@ -16,7 +16,7 @@
  *
  */
 
-#include <nvbio/strings/alphabet.h>
+#include "from_nvbio/alphabet.h"
 
 #include "primitives/parallel.h"
 
@@ -325,10 +325,10 @@ struct filter_non_regular_bases : public bqsr_lambda
         for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
         {
             uint8 bp = batch.reads[i];
-            if (bp != nvbio::AlphabetTraits<nvbio::Alphabet::DNA_IUPAC>::A &&
-                bp != nvbio::AlphabetTraits<nvbio::Alphabet::DNA_IUPAC>::C &&
-                bp != nvbio::AlphabetTraits<nvbio::Alphabet::DNA_IUPAC>::G &&
-                bp != nvbio::AlphabetTraits<nvbio::Alphabet::DNA_IUPAC>::T)
+            if (bp != from_nvbio::AlphabetTraits<from_nvbio::Alphabet::DNA_IUPAC>::A &&
+                bp != from_nvbio::AlphabetTraits<from_nvbio::Alphabet::DNA_IUPAC>::C &&
+                bp != from_nvbio::AlphabetTraits<from_nvbio::Alphabet::DNA_IUPAC>::G &&
+                bp != from_nvbio::AlphabetTraits<from_nvbio::Alphabet::DNA_IUPAC>::T)
             {
                 ctx.active_location_list[i] = 0;
             }

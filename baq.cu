@@ -18,8 +18,6 @@
 
 // base alignment quality calculations (gatk: BAQ.java)
 
-#include <nvbio/basic/dna.h>
-
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/tuple.h>
@@ -30,11 +28,12 @@
 
 #include "bqsr_types.h"
 #include "alignment_data.h"
+#include "sequence_data.h"
 #include "bqsr_context.h"
-#include "reference.h"
 
 #include "primitives/util.h"
 #include "primitives/parallel.h"
+#include "from_nvbio/dna.h"
 
 #if 0
 #include "baq-cpu.h"
@@ -67,8 +66,8 @@ struct compute_hmm_windows : public bqsr_lambda
 
         // grab reference sequence window in the genome
         const uint32 ref_ID = batch.chromosome[read_index];
-        const uint32 ref_base = ctx.reference.sequence_offsets[ref_ID];
-        const uint32 ref_length = ctx.reference.sequence_offsets[ref_ID + 1] - ref_base;
+        const uint32 ref_base = ctx.reference.sequence_bp_start[ref_ID];
+        const uint32 ref_length = ctx.reference.sequence_bp_len[ref_ID];
 
         const uint32 seq_to_alignment_offset = batch.alignment_start[read_index];
 
@@ -126,7 +125,7 @@ struct hmm_common : public bqsr_lambda
 
     double m[9];
 
-    D_PackedReference referenceBases;
+    D_StreamDNA16 referenceBases;
     D_StreamDNA16 queryBases;
     const uint8 *inputQualities;
 
@@ -199,7 +198,7 @@ struct hmm_common : public bqsr_lambda
 //        printf("queryStart = %u queryLen = %u\n", queryStart, queryLen);
 
         queryBases = D_StreamDNA16(batch.reads.stream(), idx.read_start + queryStart);
-        referenceBases = D_PackedReference(ctx.reference.genome_stream.m_sequence_stream, referenceStart);
+        referenceBases = D_StreamDNA16(ctx.reference.bases.stream(), referenceStart);
         inputQualities = &batch.qualities[idx.qual_start] + queryStart;
 
         if (ctx.baq.qualities.size() > 0)
@@ -298,7 +297,7 @@ struct hmm_glocal_forward : public hmm_common
             for (k = beg; k <= end; ++k)
             {
                 int u;
-                double e = calcEpsilon(dna_to_iupac16(referenceBases[k-1]), queryBases[queryStart], inputQualities[queryStart]);
+                double e = calcEpsilon(referenceBases[k-1], queryBases[queryStart], inputQualities[queryStart]);
 //                printf("referenceBases[%d-1] = %c inputQualities[%d] = %d queryBases[%d] = %c -> e = %.4f\n", k, dna_to_char(referenceBases[k-1]), queryStart, inputQualities[queryStart], queryStart, iupac16_to_char(queryBases[queryStart]), e);
 
                 u = set_u(bandWidth, 1, k);
@@ -342,7 +341,7 @@ struct hmm_glocal_forward : public hmm_common
             for (k = beg; k <= end; ++k)
             {
                 int u, v11, v01, v10;
-                double e = calcEpsilon(dna_to_iupac16(referenceBases[k-1]), qyi, inputQualities[queryStart+i-1]);
+                double e = calcEpsilon(referenceBases[k-1], qyi, inputQualities[queryStart+i-1]);
 //                printf("referenceBases[%d-1] = %c inputQualities[%d+%d-1] = %d qyi = %c -> e = %.4f\n", k, dna_to_char(referenceBases[k-1]), queryStart, i, inputQualities[queryStart+i-1], iupac16_to_char(qyi), e);
 
                 u = set_u(bandWidth, i, k);
@@ -451,7 +450,7 @@ struct hmm_glocal_backward : public hmm_common
                 if (k >= referenceLength)
                     e = 0;
                 else
-                    e = calcEpsilon(dna_to_iupac16(referenceBases[k]), qyi1, inputQualities[queryStart+i]) * bi1[v11];
+                    e = calcEpsilon(referenceBases[k], qyi1, inputQualities[queryStart+i]) * bi1[v11];
 
                 bi[u+0] = e * m[0] + EI * m[1] * bi1[v10+1] + m[2] * bi[v01+2]; // bi1[v11] has been folded into e.
                 bi[u+1] = e * m[3] + EI * m[4] * bi1[v10+1];
@@ -477,7 +476,7 @@ struct hmm_glocal_backward : public hmm_common
             for (k = end; k >= beg; --k)
             {
                 int u = set_u(bandWidth, 1, k);
-                double e = calcEpsilon(dna_to_iupac16(referenceBases[k-1]), queryBases[queryStart], inputQualities[queryStart]);
+                double e = calcEpsilon(referenceBases[k-1], queryBases[queryStart], inputQualities[queryStart]);
 
                 if (u < 3 || u >= bandWidth2*3+3)
                     continue;
@@ -798,8 +797,8 @@ void debug_baq(bqsr_context *context, const alignment_batch& batch, int read_ind
     printf("    absolute reference window   = [ %u %u ]\n", reference_window.x, reference_window.y);
     //printf("    sequence base: %u\n", genome.sequence_offsets[batch.alignment_sequence_IDs[read_index]]);
     printf("    relative reference window   = [ %u %u ]\n",
-            reference_window.x - context->reference.sequence_offsets[h_batch.chromosome[read_index]],
-            reference_window.y - context->reference.sequence_offsets[h_batch.chromosome[read_index]]);
+            reference_window.x - context->reference.host.sequence_bp_start[h_batch.chromosome[read_index]],
+            reference_window.y - context->reference.host.sequence_bp_start[h_batch.chromosome[read_index]]);
 
     printf("    BAQ state                   = [ ");
     for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)

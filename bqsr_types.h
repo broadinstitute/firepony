@@ -52,10 +52,8 @@ typedef bqsr::host_tag host_tag;
 #if THRUST_DEVICE_SYSTEM != THRUST_DEVICE_SYSTEM_OMP
 #error must build with -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP
 #endif
-typedef nvbio::host_tag nvbio_target_system_tag;
 typedef host_tag target_system_tag;
 #else
-typedef nvbio::device_tag nvbio_target_system_tag;
 typedef bqsr::device_tag target_system_tag;
 #endif
 
@@ -91,10 +89,6 @@ typedef D_PackedVector<1> D_PackedVector_1b;
 
 typedef H_PackedVector<2> H_PackedVector_2b;
 typedef D_PackedVector<2> D_PackedVector_2b;
-
-// this is evil: endianess between reference data and sequence data doesn't seem to match...
-typedef nvbio::PackedVector<nvbio::host_tag, 2, true>::const_stream_type H_PackedReference;
-typedef nvbio::PackedVector<nvbio_target_system_tag, 2, true>::const_stream_type D_PackedReference;
 
 typedef D_Vector<uint2> D_VectorU32_2;
 typedef H_Vector<uint2> H_VectorU32_2;

@@ -19,8 +19,6 @@ filters.h
 filters.cu
 gamgee_loader.cu
 gamgee_loader.h
-reference.cu
-reference.h
 sequence_data.h
 util.cu
 util.h

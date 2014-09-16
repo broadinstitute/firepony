@@ -19,16 +19,12 @@
 #include "from_nvbio/dna.h"
 #include "from_nvbio/vcf.h"
 
-#include <nvbio/io/sequence/sequence.h>
-#include <nvbio/io/sequence/sequence_access.h>
-#include <nvbio/io/sequence/sequence_pac.h>
-
 #include <map>
 
 #include "bqsr_types.h"
 #include "gamgee_loader.h"
 #include "alignment_data.h"
-#include "reference.h"
+#include "sequence_data.h"
 #include "util.h"
 #include "variants.h"
 #include "bqsr_context.h"
@@ -72,7 +68,7 @@ void init_cuda(void)
 int main(int argc, char **argv)
 {
     // load the reference genome
-    const char *ref_name = "hs37d5";
+    const char *ref_name = "/home/nsubtil/hg96/hs37d5.fa";
     //const char *ref_name = "/home/nsubtil/hg96/test";
     const char *vcf_name = "/home/nsubtil/hg96/ALL.chr20.integrated_phase1_v3.20101123.snps_indels_svs.genotypes-stripped.vcf";
     //const char *vcf_name = "/home/nsubtil/hg96/ALL.chr20.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.vcf";
@@ -82,11 +78,9 @@ int main(int argc, char **argv)
 
     init_cuda();
 
-    struct reference_genome reference;
+    sequence_data reference;
 
-    printf("loading reference %s...\n", ref_name);
-
-    if (reference.load(ref_name) == false)
+    if (gamgee_load_sequences(&reference, ref_name, SequenceDataMask::BASES | SequenceDataMask::NAMES) == false)
     {
         printf("failed to load reference %s\n", ref_name);
         exit(1);
@@ -210,10 +204,7 @@ void debug_read(bqsr_context *context, const alignment_batch& batch, int read_id
 {
     const alignment_batch_host& h_batch = batch.host;
 
-    uint32 read_index = context->active_read_list[read_id];
-
-    nvbio::io::SequenceDataView view = nvbio::plain_view(*(context->reference.h_ref));
-    H_PackedReference reference_stream(view.m_sequence_stream);
+    const uint32 read_index = context->active_read_list[read_id];
     const CRQ_index idx = h_batch.crq_index(read_index);
 
     printf("== read order %d read %d\n", read_id, read_index);
@@ -233,8 +224,8 @@ void debug_read(bqsr_context *context, const alignment_batch& batch, int read_id
 
     const uint2 alignment_window = context->alignment_windows[read_index];
     printf("  sequence name [%s]\n  sequence base [%u]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
-            &view.m_name_stream[view.m_name_index[h_batch.chromosome[read_index]]],
-            context->reference.sequence_offsets[h_batch.chromosome[read_index]],
+            context->reference.host.sequence_names.lookup(h_batch.chromosome[read_index]).c_str(),
+            context->reference.host.sequence_bp_start[h_batch.chromosome[read_index]],
             h_batch.alignment_start[read_index],
             alignment_window.x,
             alignment_window.y);

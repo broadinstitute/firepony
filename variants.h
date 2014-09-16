@@ -18,14 +18,10 @@
 
 #pragma once
 
-#include <nvbio/basic/types.h>
-#include <nvbio/basic/vector.h>
-#include <nvbio/basic/dna.h>
-#include <nvbio/io/vcf.h>
-
 #include "bqsr_types.h"
 #include "alignment_data.h"
-#include "reference.h"
+#include "sequence_data.h"
+#include "from_nvbio/vcf.h"
 #include "util.h"
 
 struct snp_filter_context
@@ -51,7 +47,7 @@ struct snp_filter_context
     }
 };
 
-struct SNPDatabase_refIDs : public nvbio::io::SNPDatabase
+struct SNPDatabase_refIDs : public SNPDatabase
 {
     // maps a variant ID to a reference sequence ID
     H_VectorU32 variant_sequence_ref_ids;
@@ -59,7 +55,7 @@ struct SNPDatabase_refIDs : public nvbio::io::SNPDatabase
     H_VectorU32 genome_start_positions;
     H_VectorU32 genome_stop_positions;
 
-    void compute_sequence_offsets(const reference_genome& genome);
+    void compute_sequence_offsets(const sequence_data& genome);
 };
 
 
@@ -78,7 +74,7 @@ struct DeviceSNPDatabase
     // packed variant sequences
     D_VectorDNA16 variants;
     // an index for both references and variants
-    D_Vector<nvbio::io::SNP_sequence_index> ref_variant_index;
+    D_Vector<SNP_sequence_index> ref_variant_index;
 
     void load(const SNPDatabase_refIDs& ref);
 
@@ -90,7 +86,7 @@ struct DeviceSNPDatabase
         D_VectorU32_2::view sequence_positions;
         D_VectorDNA16::view reference_sequences;
         D_VectorDNA16::view variants;
-        D_Vector<nvbio::io::SNP_sequence_index>::view ref_variant_index;
+        D_Vector<SNP_sequence_index>::view ref_variant_index;
     };
 
     struct const_view
@@ -101,7 +97,7 @@ struct DeviceSNPDatabase
         D_VectorU32_2::const_view sequence_positions;
         D_VectorDNA16::const_view reference_sequences;
         D_VectorDNA16::const_view variants;
-        D_Vector<nvbio::io::SNP_sequence_index>::const_view ref_variant_index;
+        D_Vector<SNP_sequence_index>::const_view ref_variant_index;
     };
 
     operator view()

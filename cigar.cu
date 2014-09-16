@@ -247,11 +247,9 @@ struct compute_is_snp : public bqsr_lambda
 
         // fetch the alignment base in reference coordinates
         const uint32 seq_id = batch.chromosome[read_index];
-        const uint32 seq_base = ctx.reference.sequence_offsets[seq_id];
+        const uint32 seq_base = ctx.reference.sequence_bp_start[seq_id];
         const uint32 align_offset = batch.alignment_start[read_index];
         const uint32 reference_alignment_start = seq_base + align_offset;
-
-        D_PackedReference reference_data(ctx.reference.genome_stream.m_sequence_stream);
 
         // go through the cigar events looking for M
         for(uint32 i = cigar_start; i < cigar_end; i++)
@@ -264,7 +262,7 @@ struct compute_is_snp : public bqsr_lambda
 
                 // load the corresponding sequence bp
                 const uint32 reference_bp_idx = reference_alignment_start + ctx.cigar.cigar_event_reference_coordinates[i];
-                const uint8 reference_bp = dna_to_iupac16(reference_data[reference_bp_idx]);
+                const uint8 reference_bp = ctx.reference.bases[reference_bp_idx];
 
                 if (reference_bp != read_bp)
                 {
@@ -481,10 +479,8 @@ void debug_cigar(bqsr_context *context, const alignment_batch& batch, int read_i
 {
     const alignment_batch_host& h_batch = batch.host;
 
-    CRQ_index idx = h_batch.crq_index(read_index);
-    cigar_context& ctx = context->cigar;
-    nvbio::io::SequenceDataView view = nvbio::plain_view(*(context->reference.h_ref));
-    H_PackedReference reference_stream(view.m_sequence_stream);
+    const CRQ_index idx = h_batch.crq_index(read_index);
+    const cigar_context& ctx = context->cigar;
 
     printf("  cigar info:\n");
 
@@ -549,14 +545,14 @@ void debug_cigar(bqsr_context *context, const alignment_batch& batch, int read_i
     printf("]\n");
 
     const uint32 ref_sequence_id = h_batch.chromosome[read_index];
-    const uint32 ref_sequence_base = view.m_sequence_index[ref_sequence_id];
+    const uint32 ref_sequence_base = context->reference.host.sequence_bp_start[ref_sequence_id];
     const uint32 ref_sequence_offset = ref_sequence_base + h_batch.alignment_start[read_index];
 
     printf("    reference sequence data     = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
         const uint16 ref_bp = ctx.cigar_event_reference_coordinates[i];
-        printf("  %c ", ref_bp == uint16(-1) ? '-' : nvbio::dna_to_char(reference_stream[ref_sequence_offset + ref_bp]));
+        printf("  %c ", ref_bp == uint16(-1) ? '-' : bqsr::iupac16_to_char(context->reference.host.bases[ref_sequence_offset + ref_bp]));
     }
     printf("]\n");
 
@@ -570,7 +566,7 @@ void debug_cigar(bqsr_context *context, const alignment_batch& batch, int read_i
         {
             base = '-';
         } else {
-            base = nvbio::iupac16_to_char(h_batch.reads[idx.read_start + read_bp]);
+            base = bqsr::iupac16_to_char(h_batch.reads[idx.read_start + read_bp]);
             if (ctx.cigar_events[i] == cigar_event::S)
             {
                 // display soft-clipped bases in lowercase

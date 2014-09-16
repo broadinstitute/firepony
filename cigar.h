@@ -20,7 +20,7 @@
 
 #include "bqsr_types.h"
 #include "alignment_data.h"
-#include "reference.h"
+#include "sequence_data.h"
 
 struct cigar_event
 {

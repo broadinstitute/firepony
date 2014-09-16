@@ -88,7 +88,7 @@ void reference_genome::generate_reference_sequence_map(void)
     for(unsigned int i = 0; i < view.m_n_seqs; i++)
     {
         char *name = &view.m_name_stream[view.m_name_index[i]];
-        uint32 h = bqsr_string_hash(name);
+        uint32 h = string_database::hash(name);
 
         NVBIO_CUDA_ASSERT(sequence_id_map.find(h) == sequence_id_map.end() ||
                           !"duplicate reference sequence name!");

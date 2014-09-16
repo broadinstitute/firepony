@@ -23,14 +23,6 @@
 
 #include "util.h"
 
-uint32 bqsr_string_hash(const char* s)
-{
-    uint32 h = 0;
-    while (*s)
-        h = h * 101 + (uint32) *s++;
-    return h;
-}
-
 // the following two structures are the result of a couple of hours trying to do this with templates...
 struct pack_uint8_to_2bit_vector
 {

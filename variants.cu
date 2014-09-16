@@ -32,7 +32,7 @@ void SNPDatabase_refIDs::compute_sequence_offsets(const reference_genome& genome
 
     for(unsigned int c = 0; c < reference_sequence_names.size(); c++)
     {
-        uint32 h = bqsr_string_hash(reference_sequence_names[c].c_str());
+        uint32 h = string_database::hash(reference_sequence_names[c].c_str());
 
         assert(genome.sequence_id_map.find(h) != genome.sequence_id_map.end());
 

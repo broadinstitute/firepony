@@ -22,7 +22,6 @@
 #include <nvbio/io/sequence/sequence.h>
 #include <nvbio/io/vcf.h>
 #include <nvbio/io/sequence/sequence_pac.h>
-#include <nvbio/io/sequence/sequence_sam.h>
 
 #include <map>
 
@@ -31,6 +30,7 @@
 #include "util.h"
 #include "variants.h"
 #include "bqsr_context.h"
+#include "filters.h"
 
 using namespace nvbio;
 
@@ -46,30 +46,13 @@ void device_sort_batch(BAM_alignment_batch_device *batch)
 }
 */
 
-struct remove_unaligned_reads_functor : public bqsr_lambda
-{
-    remove_unaligned_reads_functor(bqsr_context::view ctx,
-                                   const BAM_alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
-    { }
-
-    NVBIO_HOST_DEVICE void operator() (const uint32 read_id)
-    {
-        uint32& read_index = ctx.active_read_list[read_id];
-
-        if (batch.flags[read_index] & nvbio::io::SAMFlag_SegmentUnmapped ||
-            batch.alignment_positions[read_index] == uint32(-1))
-        {
-            read_index = uint32(-1);
-        }
-    }
-};
 
 int main(int argc, char **argv)
 {
     // load the reference genome
     const char *ref_name = "hs37d5";
     const char *vcf_name = "/home/nsubtil/hg96/ALL.chr20.integrated_phase1_v3.20101123.snps_indels_svs.genotypes-stripped.vcf";
+    //const char *vcf_name = "/home/nsubtil/hg96/ALL.chr20.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.vcf";
     //const char *vcf_name = "/home/nsubtil/hg96/one-variant.vcf";
     const char *bam_name = "/home/nsubtil/hg96/HG00096.chrom20.ILLUMINA.bwa.GBR.low_coverage.20120522.bam";
     //const char *bam_name = "/home/nsubtil/hg96/one-read.bam";
@@ -103,7 +86,6 @@ int main(int argc, char **argv)
     BAM_alignment_batch_host h_batch;
     BAM_alignment_batch_device batch;
 
-    uint64 alignments = 0;
     bqsr_context ctx(bam.header, dev_db, genome.device);
 
     while(bam.next_batch(&h_batch, true, 2000000))
@@ -112,16 +94,13 @@ int main(int argc, char **argv)
         batch.load(h_batch);
         ctx.start_batch(batch);
 
-        // mark and remove unmapped reads
-        thrust::for_each(thrust::make_counting_iterator(0),
-                         thrust::make_counting_iterator(0) + ctx.active_read_list.size(),
-                         remove_unaligned_reads_functor(ctx, batch));
-        ctx.compact_active_read_list();
-
         // build read offset list
         build_read_offset_list(&ctx, batch);
         // build read alignment window list
         build_alignment_windows(&ctx, batch);
+
+        // apply read filters
+        filter_reads(&ctx, batch);
 
         // filter known SNPs from active_loc_list
         filter_snps(&ctx, batch);
@@ -176,10 +155,9 @@ int main(int argc, char **argv)
 
         printf("active BPs: %u out of %u (%f %%)\n", h_bplist.size() - zeros, h_bplist.size(), 100.0 * float(h_bplist.size() - zeros) / float(h_bplist.size()));
 #endif
-        alignments += h_batch.crq_index.size();
     }
 
-    printf("%llu alignments\n", alignments);
+    printf("%d reads filtered out of %d (%f%%)\n", ctx.stats.filtered_reads, ctx.stats.total_reads, float(ctx.stats.filtered_reads) / float(ctx.stats.total_reads) * 100.0);
 
     return 0;
 }

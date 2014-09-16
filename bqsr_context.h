@@ -53,6 +53,17 @@ struct covariate_context
 
 };
 
+struct bqsr_statistics // host-only
+{
+    uint32 total_reads;        // total number of reads processed
+    uint32 filtered_reads;     // number of reads filtered out in pre-processing
+
+    bqsr_statistics()
+        : total_reads(0),
+          filtered_reads(0)
+    { }
+};
+
 struct bqsr_context
 {
     BAM_header& bam_header;
@@ -79,6 +90,8 @@ struct bqsr_context
     // various pipeline states go here
     snp_filter_context snp_filter;
 
+    // --- everything below this line is host-only and not available on the device
+    bqsr_statistics stats;
 
     bqsr_context(BAM_header& bam_header,
                  const DeviceSNPDatabase& db,

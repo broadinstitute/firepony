@@ -34,6 +34,8 @@ void bqsr_context::start_batch(BAM_alignment_batch_device& batch)
     thrust::fill(active_location_list.m_storage.begin(),
                  active_location_list.m_storage.end(),
                  0xffffffff);
+
+    stats.total_reads += batch.num_reads;
 }
 
 struct read_active_predicate

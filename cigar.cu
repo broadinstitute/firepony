@@ -328,6 +328,20 @@ void debug_cigar(bqsr_context *context, const reference_genome& genome, const BA
     }
     printf("]\n");
 
+    printf("    read quality data           = [ ");
+    for(uint32 i = cigar_start; i < cigar_end; i++)
+    {
+        const uint16 read_bp = ctx.cigar_event_read_coordinates[i];
+
+        if (read_bp == uint16(-1))
+        {
+            printf("    ");
+        } else {
+            printf("% 3d ", batch.qualities[idx.read_start + read_bp]);
+        }
+    }
+    printf("]\n");
+
     ushort2 read_window_clipped = ctx.read_window_clipped[read_index];
     printf("    clipped read window         = [ % 3d, % 3d ]\n", read_window_clipped.x, read_window_clipped.y);
 

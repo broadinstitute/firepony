@@ -87,13 +87,14 @@ struct packed_stream
     typedef typename signed_type<index_type>::type                              distance_type;
 
     CUDA_HOST_DEVICE packed_stream() = default;
-    CUDA_HOST_DEVICE packed_stream(const stream_type stream, const index_type index = 0)
-        : m_stream(stream), m_index(index)
+
+    CUDA_HOST_DEVICE packed_stream(const stream_type stream, const size_t size, const index_type index = 0)
+        : m_stream(stream), m_size(size), m_index(index)
     { }
 
     template <typename UInputStream>
-    CUDA_HOST_DEVICE explicit packed_stream(const UInputStream stream, const index_type index = 0)
-        : m_stream( static_cast<InputStream>(stream) ), m_index( index )
+    CUDA_HOST_DEVICE explicit packed_stream(const UInputStream stream, const size_t size, const index_type index = 0)
+        : m_stream(static_cast<InputStream>(stream)), m_size(size), m_index(index)
     { }
 
     CUDA_HOST_DEVICE reference operator*() const
@@ -184,12 +185,12 @@ struct packed_stream
 
     CUDA_HOST_DEVICE packed_stream operator+ (const sindex_type distance) const
     {
-        return type(m_stream, m_index + distance);
+        return type(m_stream, m_size, m_index + distance);
     }
 
     CUDA_HOST_DEVICE packed_stream operator- (const sindex_type distance) const
     {
-        return type(m_stream, m_index - distance);
+        return type(m_stream, m_size, m_index - distance);
     }
 
     CUDA_HOST_DEVICE sindex_type operator- (const packed_stream it) const
@@ -197,8 +198,14 @@ struct packed_stream
         return sindex_type(m_index - it.m_index);
     }
 
+    CUDA_HOST_DEVICE size_t size() const
+    {
+        return m_size;
+    }
+
 private:
     stream_type m_stream;
+    size_t m_size;
     index_type m_index;
 };
 

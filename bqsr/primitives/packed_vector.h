@@ -34,7 +34,8 @@ struct packed_vector
     enum {
         SYMBOL_SIZE         = SYMBOL_SIZE_T,
         IS_BIG_ENDIAN       = BIG_ENDIAN_T,
-        SYMBOLS_PER_WORD    = 32 / SYMBOL_SIZE,
+        WORD_SIZE           = sizeof(uint32) * 8,
+        SYMBOLS_PER_WORD    = WORD_SIZE / SYMBOL_SIZE,
     };
 
     typedef packed_vector<SystemTag, SYMBOL_SIZE_T, BIG_ENDIAN_T, IndexType>                type;
@@ -95,22 +96,22 @@ struct packed_vector
 
     iterator begin()
     {
-        return stream_type(m_storage.data()).begin();
+        return stream_type(m_storage.data(), m_size).begin();
     }
 
     const_iterator begin() const
     {
-        return const_stream_type(m_storage.data()).begin();
+        return const_stream_type(m_storage.data(), m_size).begin();
     }
 
     iterator end()
     {
-        return stream_type(m_storage.data()).begin() + m_size;
+        return stream_type(m_storage.data(), m_size).begin() + m_size;
     }
 
     const_iterator end() const
     {
-        return const_stream_type(m_storage.data()).begin() + m_size;
+        return const_stream_type(m_storage.data(), m_size).begin() + m_size;
     }
 
     void push_back(const value_type s)
@@ -129,29 +130,37 @@ struct packed_vector
     /// (only their plain view, which is a packed_stream)
     CUDA_HOST const typename stream_type::symbol_type operator[] (const index_type i) const
     {
-        const_stream_type stream(thrust::raw_pointer_cast(&m_storage.front()));
+        const_stream_type stream(thrust::raw_pointer_cast(&m_storage.front()), m_size);
         return stream[i];
     }
 
     CUDA_HOST typename stream_type::reference operator[] (const index_type i)
     {
-        stream_type stream(thrust::raw_pointer_cast(&m_storage.front()));
+        stream_type stream(thrust::raw_pointer_cast(&m_storage.front()), m_size);
         return stream[i];
     }
 
     operator view()
     {
-        return view(thrust::raw_pointer_cast(m_storage.data()));
+        return view(thrust::raw_pointer_cast(m_storage.data()), m_size);
     }
 
     operator const_view() const
     {
-        return const_view(thrust::raw_pointer_cast(m_storage.data()));
+        return const_view(thrust::raw_pointer_cast(m_storage.data()), m_size);
     }
 
     stream_type stream_at_index(const index_type i)
     {
-        return stream_type(thrust::raw_pointer_cast(&m_storage.front()), i);
+        return stream_type(thrust::raw_pointer_cast(&m_storage.front()), m_size, i);
+    }
+
+    // assignment from a host view
+    void copy_from_view(const typename packed_vector<host_tag, SYMBOL_SIZE>::const_view& other)
+    {
+        m_storage.resize(divide_ri(other.size(), SYMBOLS_PER_WORD));
+        m_storage.assign((uint32 *)other.stream(), ((uint32 *)other.stream()) + divide_ri(other.size(), SYMBOLS_PER_WORD));
+        m_size = other.size();
     }
 
     bqsr::vector<system_tag, uint32> m_storage;

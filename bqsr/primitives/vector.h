@@ -254,6 +254,12 @@ struct vector<device_tag, T> : public thrust::device_vector<T>
         return const_view(base::size() ? thrust::raw_pointer_cast(base::data()) : nullptr,
                           base::size());
     }
+
+    // assignment from a host vector view
+    void copy_from_view(const typename vector<host_tag, T>::const_view& other)
+    {
+        base::assign(other.begin(), other.end());
+    }
 };
 
 // xxxnsubtil: document this

@@ -27,6 +27,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+namespace from_nvbio {
+
 // parse the INFO field looking for an END tag
 // INFO is a set of ID=val entries separated by semicolons
 // returns false if a parse error occurs
@@ -210,10 +212,10 @@ bool loadVCF(SNPDatabase& output, const char *file_name)
             output.sequence_positions.push_back(make_uint2(position, stop));
 
             output.reference_sequences.resize(index.reference_start + ref_len);
-            bqsr::string_to_iupac16(ref, output.reference_sequences.begin() + index.reference_start);
+            from_nvbio::string_to_iupac16(ref, output.reference_sequences.begin() + index.reference_start);
 
             output.variants.resize(index.variant_start + var_len);
-            bqsr::string_to_iupac16(var, output.variants.begin() + index.variant_start);
+            from_nvbio::string_to_iupac16(var, output.variants.begin() + index.variant_start);
 
             output.variant_qualities.push_back(quality);
 
@@ -226,3 +228,5 @@ bool loadVCF(SNPDatabase& output, const char *file_name)
 
     return true;
 }
+
+} // namespace from_nvbio

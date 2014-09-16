@@ -240,7 +240,7 @@ struct iupac16 : public thrust::unary_function<char, uint8>
 {
     uint8 operator() (char in)
     {
-        return bqsr::char_to_iupac16(in);
+        return from_nvbio::char_to_iupac16(in);
     }
 };
 

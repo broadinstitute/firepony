@@ -47,7 +47,7 @@ struct snp_filter_context
     }
 };
 
-struct SNPDatabase_refIDs : public SNPDatabase
+struct SNPDatabase_refIDs : public from_nvbio::SNPDatabase
 {
     // maps a variant ID to a reference sequence ID
     H_VectorU32 variant_sequence_ref_ids;
@@ -74,7 +74,7 @@ struct DeviceSNPDatabase
     // packed variant sequences
     D_VectorDNA16 variants;
     // an index for both references and variants
-    D_Vector<SNP_sequence_index> ref_variant_index;
+    D_Vector<from_nvbio::SNP_sequence_index> ref_variant_index;
 
     void load(const SNPDatabase_refIDs& ref);
 
@@ -86,7 +86,7 @@ struct DeviceSNPDatabase
         D_VectorU32_2::view sequence_positions;
         D_VectorDNA16::view reference_sequences;
         D_VectorDNA16::view variants;
-        D_Vector<SNP_sequence_index>::view ref_variant_index;
+        D_Vector<from_nvbio::SNP_sequence_index>::view ref_variant_index;
     };
 
     struct const_view
@@ -97,7 +97,7 @@ struct DeviceSNPDatabase
         D_VectorU32_2::const_view sequence_positions;
         D_VectorDNA16::const_view reference_sequences;
         D_VectorDNA16::const_view variants;
-        D_Vector<SNP_sequence_index>::const_view ref_variant_index;
+        D_Vector<from_nvbio::SNP_sequence_index>::const_view ref_variant_index;
     };
 
     operator view()

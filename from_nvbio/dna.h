@@ -20,8 +20,7 @@
 
 #include "../bqsr_types.h"
 
-namespace bqsr
-{
+namespace from_nvbio {
 
 /// convert a 2-bit DNA symbol to its ASCII character
 ///
@@ -200,5 +199,4 @@ inline CUDA_HOST_DEVICE void string_to_iupac16(
         symbols[ it - begin ] = char_to_iupac16( *it );
 }
 
-} // namespace bqsr
-
+} // namespace from_nvbio

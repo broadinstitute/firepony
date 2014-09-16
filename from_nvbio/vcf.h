@@ -23,6 +23,8 @@
 
 #pragma once
 
+namespace from_nvbio {
+
 struct SNP_sequence_index
 {
     // these indices are stored in base-pairs since variants are extremely short
@@ -74,3 +76,5 @@ struct SNPDatabase
 
 // loads variant data from file_name and appends to output
 bool loadVCF(SNPDatabase& output, const char *file_name);
+
+} // namespace from_nvbio

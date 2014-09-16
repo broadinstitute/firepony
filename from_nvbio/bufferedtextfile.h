@@ -27,6 +27,8 @@
 
 #include <stdexcept>
 
+namespace from_nvbio {
+
 // Generic I/O class for consuming data from a text file delimited by a single record separator
 // handles gzip-compressed files transparently
 class BufferedTextFile
@@ -149,3 +151,5 @@ public:
         return start;
     }
 };
+
+} // namespace from_nvbio

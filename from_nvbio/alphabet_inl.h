@@ -22,7 +22,7 @@
 #include "dna.h"
 #include "../primitives/cuda.h"
 
-namespace bqsr {
+namespace from_nvbio {
 
 /// convert a 2-bit RNA symbol to its ASCII character
 ///
@@ -201,5 +201,4 @@ inline CUDA_HOST_DEVICE void from_string(
         symbols[ it - begin ] = from_char<ALPHABET>( *it );
 }
 
-} // namespace bqsr
-
+} // namespace from_nvbio

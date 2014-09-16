@@ -20,7 +20,7 @@
 
 #include "../bqsr_types.h"
 
-namespace bqsr {
+namespace from_nvbio {
 
 ///@addtogroup Strings
 ///@{
@@ -272,6 +272,6 @@ struct from_char_functor
 ///@} AlphabetsModule
 ///@} Strings
 
-} // namespace bqsr
+} // namespace from_nvbio
 
 #include "alphabet_inl.h"

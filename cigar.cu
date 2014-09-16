@@ -203,7 +203,7 @@ struct cigar_coordinates_expand : public bqsr_lambda
     }
 };
 
-void expand_cigars(bqsr_context *context, const BAM_alignment_batch_device& batch)
+void expand_cigars(bqsr_context *context, const reference_genome& reference, const BAM_alignment_batch_device& batch)
 {
     cigar_context& ctx = context->cigar;
 
@@ -245,11 +245,11 @@ void expand_cigars(bqsr_context *context, const BAM_alignment_batch_device& batc
                      cigar_coordinates_expand(*context, batch));
 }
 
-void debug_cigar(bqsr_context *context, const reference_genome& genome, const BAM_alignment_batch_host& batch, int read_index)
+void debug_cigar(bqsr_context *context, const reference_genome& reference, const BAM_alignment_batch_host& batch, int read_index)
 {
     BAM_CRQ_index idx = batch.crq_index[read_index];
     cigar_context& ctx = context->cigar;
-    io::SequenceDataView view = plain_view(*genome.h_ref);
+    io::SequenceDataView view = plain_view(*reference.h_ref);
     H_PackedReference reference_stream(view.m_sequence_stream);
 
     printf("  cigar info:\n");

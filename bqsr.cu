@@ -63,22 +63,22 @@ int main(int argc, char **argv)
     const char *bam_name = "/home/nsubtil/hg96/HG00096.chrom20.ILLUMINA.bwa.GBR.low_coverage.20120522.bam";
     //const char *bam_name = "/home/nsubtil/hg96/one-read.bam";
 
-    struct reference_genome genome;
+    struct reference_genome reference;
 
     printf("loading reference %s...\n", ref_name);
 
-    if (genome.load(ref_name) == false)
+    if (reference.load(ref_name) == false)
     {
         printf("failed to load reference %s\n", ref_name);
         exit(1);
     }
 
-    genome.download();
+    reference.download();
 
     SNPDatabase_refIDs db;
     printf("loading variant database %s...\n", vcf_name);
     io::loadVCF(db, vcf_name);
-    db.compute_sequence_offsets(genome);
+    db.compute_sequence_offsets(reference);
 
     DeviceSNPDatabase dev_db;
     dev_db.load(db);
@@ -92,7 +92,7 @@ int main(int argc, char **argv)
     BAM_alignment_batch_host h_batch;
     BAM_alignment_batch_device batch;
 
-    bqsr_context context(bam.header, dev_db, genome.device);
+    bqsr_context context(bam.header, dev_db, reference.device);
 
     //while(bam.next_batch(&h_batch, true, 20000000))
     //while(bam.next_batch(&h_batch, true, 2000000))
@@ -117,7 +117,7 @@ int main(int argc, char **argv)
         expand_cigars(&context, batch);
 
         // compute the base alignment quality for each read
-        baq_reads(&context, genome, batch);
+        baq_reads(&context, reference, batch);
         // build covariate tables
         gather_covariates(&context, batch);
 
@@ -137,7 +137,7 @@ int main(int argc, char **argv)
                 debug_read(&context, genome, h_batch, read_index);
             }*/
 
-            debug_read(&context, genome, h_batch, read_index);
+            debug_read(&context, reference, h_batch, read_index);
         }
 #endif
 

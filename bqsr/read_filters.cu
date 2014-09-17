@@ -23,7 +23,7 @@
 #include "bqsr_types.h"
 #include "bqsr_context.h"
 #include "alignment_data.h"
-#include "filters.h"
+#include "read_filters.h"
 
 // filter if any of the flags are set
 template<uint32 flags>

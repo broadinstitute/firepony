@@ -18,7 +18,7 @@
 
 #include "bqsr_types.h"
 #include "bqsr_context.h"
-#include "variants.h"
+#include "snp_filter.h"
 
 #include "primitives/algorithms.h"
 #include "primitives/cuda.h"

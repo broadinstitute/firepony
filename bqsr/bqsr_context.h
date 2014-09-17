@@ -22,7 +22,7 @@
 #include "alignment_data.h"
 #include "sequence_data.h"
 #include "variant_data.h"
-#include "variants.h"
+#include "snp_filter.h"
 #include "covariates.h"
 #include "cigar.h"
 #include "alignment_data.h"

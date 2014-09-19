@@ -34,6 +34,7 @@
 #include "primitives/util.h"
 #include "primitives/parallel.h"
 #include "from_nvbio/dna.h"
+#include "from_nvbio/alphabet.h"
 
 #if 0
 #include "baq-cpu.h"
@@ -197,8 +198,8 @@ struct hmm_common : public bqsr_lambda
 //        printf("referenceStart = %u\n", referenceStart);
 //        printf("queryStart = %u queryLen = %u\n", queryStart, queryLen);
 
-        queryBases = D_StreamDNA16(batch.reads.stream(), idx.read_start + queryStart);
-        referenceBases = D_StreamDNA16(ctx.reference.bases.stream(), referenceStart);
+        queryBases = batch.reads + idx.read_start + queryStart;
+        referenceBases = ctx.reference.bases + referenceStart;
         inputQualities = &batch.qualities[idx.qual_start] + queryStart;
 
         if (ctx.baq.qualities.size() > 0)
@@ -240,6 +241,12 @@ struct hmm_common : public bqsr_lambda
 
     CUDA_HOST_DEVICE static double calcEpsilon(uint8 ref, uint8 read, uint8 qualB)
     {
+        if (ref == from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::N ||
+            read == from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::N)
+        {
+            return 1.0;
+        }
+
         double qual = qual2prob(qualB < MIN_BASE_QUAL ? MIN_BASE_QUAL : qualB);
         double e = (ref == read ? 1 - qual : qual * EM);
         return e;
@@ -264,21 +271,21 @@ struct hmm_glocal_forward : public hmm_common
 //        printf("ref = { ");
 //        for(int c = 0; c < referenceLength; c++)
 //        {
-//            printf("%c ", dna_to_char(referenceBases[c]));
+//            printf("%c ", from_nvbio::iupac16_to_char(referenceBases[c]));
 //        }
 //        printf("\n");
 //
 //        printf("que = { ");
 //        for(int c = 0; c < queryLen; c++)
 //        {
-//            printf("%c ", iupac16_to_char(queryBases[c]));
+//            printf("%c ", from_nvbio::iupac16_to_char(queryBases[c]));
 //        }
 //        printf("\n");
 //
 //        printf("_iqual = { % 3d % 3d % 3d % 3d % 3d ... % 3d % 3d % 3d % 3d % 3d }\n",
 //                inputQualities[0], inputQualities[1], inputQualities[2], inputQualities[3], inputQualities[4],
 //                inputQualities[queryLen - 5], inputQualities[queryLen - 4], inputQualities[queryLen - 3], inputQualities[queryLen - 2], inputQualities[queryLen - 1]);
-//        printf("c->bw = %d, bw = %d, l_ref = %d, l_query = %d\n", maxBandWidth, bandWidth, referenceLength, queryLen);
+//        printf("c->bw = %d, bw = %d, l_ref = %d, l_query = %d\n", MAX_BAND_WIDTH, bandWidth, referenceLength, queryLen);
 
         /*** forward ***/
         // f[0]
@@ -296,7 +303,13 @@ struct hmm_glocal_forward : public hmm_common
             {
                 int u;
                 double e = calcEpsilon(referenceBases[k-1], queryBases[queryStart], inputQualities[queryStart]);
-//                printf("referenceBases[%d-1] = %c inputQualities[%d] = %d queryBases[%d] = %c -> e = %.4f\n", k, dna_to_char(referenceBases[k-1]), queryStart, inputQualities[queryStart], queryStart, iupac16_to_char(queryBases[queryStart]), e);
+//                printf("referenceBases[%d-1] = %c inputQualities[%d] = %d queryBases[%d] = %c -> e = %.4f\n",
+//                        k,
+//                        from_nvbio::iupac16_to_char(referenceBases[k-1]),
+//                        queryStart,
+//                        inputQualities[queryStart],
+//                        queryStart,
+//                        from_nvbio::iupac16_to_char(queryBases[queryStart]), e);
 
                 u = set_u(bandWidth, 1, k);
 
@@ -340,7 +353,13 @@ struct hmm_glocal_forward : public hmm_common
             {
                 int u, v11, v01, v10;
                 double e = calcEpsilon(referenceBases[k-1], qyi, inputQualities[queryStart+i-1]);
-//                printf("referenceBases[%d-1] = %c inputQualities[%d+%d-1] = %d qyi = %c -> e = %.4f\n", k, dna_to_char(referenceBases[k-1]), queryStart, i, inputQualities[queryStart+i-1], iupac16_to_char(qyi), e);
+//                printf("referenceBases[%d-1] = %c inputQualities[%d+%d-1] = %d qyi = %c -> e = %.4f\n",
+//                        k,
+//                        from_nvbio::iupac16_to_char(referenceBases[k-1]),
+//                        queryStart,
+//                        i,
+//                        inputQualities[queryStart+i-1],
+//                        from_nvbio::iupac16_to_char(qyi), e);
 
                 u = set_u(bandWidth, i, k);
                 v11 = set_u(bandWidth, i-1, k-1);
@@ -632,8 +651,7 @@ struct read_flat_baq : public bqsr_lambda
         const uint32 queryLen = read_window.y - read_window.x + 1;
         uint8 *outputQualities = &ctx.baq.qualities[idx.qual_start] + queryStart;
 
-        // xxxnsubtil: GATK uses 64 instead of 0, not sure why
-        memset(outputQualities, 0, queryLen);
+        memset(outputQualities, NO_BAQ_UNCERTAINTY, queryLen);
     }
 };
 

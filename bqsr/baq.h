@@ -20,6 +20,8 @@
 
 #include "bqsr_types.h"
 
+#define NO_BAQ_UNCERTAINTY 64
+
 struct baq_context
 {
     // read and reference windows for HMM

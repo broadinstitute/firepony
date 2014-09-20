@@ -36,10 +36,6 @@
 #include "from_nvbio/dna.h"
 #include "from_nvbio/alphabet.h"
 
-#if 0
-#include "baq-cpu.h"
-#endif
-
 #define MAX_PHRED_SCORE 93
 #define EM 0.33333333333
 #define EI 0.25
@@ -55,14 +51,10 @@
 
 struct compute_hmm_windows : public bqsr_lambda
 {
-    compute_hmm_windows(bqsr_context::view ctx,
-                        const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
-    { }
+    using bqsr_lambda::bqsr_lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        ushort2& out_read_window = ctx.baq.read_windows[read_index];
         uint2&   out_reference_window = ctx.baq.reference_windows[read_index];
 
         // grab reference sequence window in the genome
@@ -88,7 +80,6 @@ struct compute_hmm_windows : public bqsr_lambda
 
         if (stop > ref_length)
         {
-            out_read_window = make_ushort2(uint16(-1), uint16(-1));
             out_reference_window = make_uint2(uint32(-1), uint32(-1));
             return;
         }
@@ -96,11 +87,6 @@ struct compute_hmm_windows : public bqsr_lambda
         start += ref_base;
         stop += ref_base;
 
-        // calcBAQFromHMM line 602 starts here
-        int queryStart = read_window.x;
-        int queryEnd = read_window.y;
-
-        out_read_window = make_ushort2(queryStart, queryEnd);
         out_reference_window = make_uint2(start, stop);
     }
 };
@@ -108,9 +94,12 @@ struct compute_hmm_windows : public bqsr_lambda
 // encapsulates common state for the HMM algorithm
 struct hmm_common : public bqsr_lambda
 {
+    D_VectorU32::view baq_state;
+
     hmm_common(bqsr_context::view ctx,
-               const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
+               const alignment_batch_device::const_view batch,
+               D_VectorU32::view baq_state)
+        : bqsr_lambda(ctx, batch), baq_state(baq_state)
     { }
 
     int bandWidth, bandWidth2;
@@ -149,7 +138,7 @@ struct hmm_common : public bqsr_lambda
 
         // get the windows for the current read
         const uint2& reference_window = ctx.baq.reference_windows[read_index];
-        const ushort2& read_window = ctx.baq.read_windows[read_index];
+        const ushort2& read_window = ctx.cigar.read_window_clipped[read_index];
 
         referenceStart = reference_window.x;
         referenceLength = reference_window.y - reference_window.x + 1;
@@ -207,8 +196,8 @@ struct hmm_common : public bqsr_lambda
         else
             outputQualities = NULL;
 
-        if (ctx.baq.state.size() > 0)
-            outputState = &ctx.baq.state[idx.qual_start] + queryStart;
+        if (baq_state.size() > 0)
+            outputState = &baq_state[idx.qual_start] + queryStart;
         else
             outputState = NULL;
 
@@ -255,10 +244,7 @@ struct hmm_common : public bqsr_lambda
 
 struct hmm_glocal_forward : public hmm_common
 {
-    hmm_glocal_forward(bqsr_context::view ctx,
-                       const alignment_batch_device::const_view batch)
-        : hmm_common(ctx, batch)
-    { }
+    using hmm_common::hmm_common;
 
     template<typename Tuple>
     CUDA_HOST_DEVICE void operator() (const Tuple& hmm_index)
@@ -407,10 +393,7 @@ struct hmm_glocal_forward : public hmm_common
 
 struct hmm_glocal_backward : public hmm_common
 {
-    hmm_glocal_backward(bqsr_context::view ctx,
-                        const alignment_batch_device::const_view batch)
-        : hmm_common(ctx, batch)
-    { }
+    using hmm_common::hmm_common;
 
     template<typename Tuple>
     CUDA_HOST_DEVICE void operator() (const Tuple& hmm_index)
@@ -507,10 +490,7 @@ struct hmm_glocal_backward : public hmm_common
 
 struct hmm_glocal_map : public hmm_common
 {
-    hmm_glocal_map(bqsr_context::view ctx,
-                   const alignment_batch_device::const_view batch)
-        : hmm_common(ctx, batch)
-    { }
+    using hmm_common::hmm_common;
 
     template<typename Tuple>
     CUDA_HOST_DEVICE void operator() (const Tuple& hmm_index)
@@ -583,10 +563,7 @@ struct hmm_glocal_map : public hmm_common
 // note that this computes the size required for *one* matrix only; we allocate the matrices on two separate vectors and use the same index for both
 struct compute_hmm_matrix_size : public thrust::unary_function<uint32, uint32>, public bqsr_lambda
 {
-    compute_hmm_matrix_size(bqsr_context::view ctx,
-                            const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
-    { }
+    using bqsr_lambda::bqsr_lambda;
 
     CUDA_HOST_DEVICE uint32 operator() (const uint32 read_index)
     {
@@ -597,10 +574,7 @@ struct compute_hmm_matrix_size : public thrust::unary_function<uint32, uint32>, 
 
 struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, uint32>, public bqsr_lambda
 {
-    compute_hmm_scaling_factor_size(bqsr_context::view ctx,
-                                    const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
-    { }
+    using bqsr_lambda::bqsr_lambda;
 
     CUDA_HOST_DEVICE uint32 operator() (const uint32 read_index)
     {
@@ -611,10 +585,7 @@ struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, u
 
 struct read_needs_baq : public bqsr_lambda
 {
-    read_needs_baq(bqsr_context::view ctx,
-                   const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
-    { }
+    using bqsr_lambda::bqsr_lambda;
 
     CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
@@ -627,10 +598,7 @@ struct read_needs_baq : public bqsr_lambda
 
 struct read_flat_baq : public bqsr_lambda
 {
-    read_flat_baq(bqsr_context::view ctx,
-                  const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
-    { }
+    using bqsr_lambda::bqsr_lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -646,7 +614,7 @@ struct read_flat_baq : public bqsr_lambda
         }
 
         const CRQ_index idx = batch.crq_index(read_index);
-        const ushort2& read_window = ctx.baq.read_windows[read_index];
+        const ushort2& read_window = ctx.cigar.read_window_clipped[read_index];
         const uint32 queryStart = read_window.x;
         const uint32 queryLen = read_window.y - read_window.x + 1;
         uint8 *outputQualities = &ctx.baq.qualities[idx.qual_start] + queryStart;
@@ -658,7 +626,13 @@ struct read_flat_baq : public bqsr_lambda
 // bottom half of BAQ.calcBAQFromHMM in GATK
 struct cap_baq_qualities : public bqsr_lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    D_VectorU32::view baq_state;
+
+    cap_baq_qualities(bqsr_context::view ctx,
+                      const alignment_batch_device::const_view batch,
+                      D_VectorU32::view baq_state)
+        : bqsr_lambda(ctx, batch), baq_state(baq_state)
+    { }
 
     CUDA_HOST_DEVICE bool stateIsIndel(uint32 state)
     {
@@ -686,6 +660,7 @@ struct cap_baq_qualities : public bqsr_lambda
         return b;
     }
 
+    // xxxnsubtil: this could use some cleanup
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
@@ -747,7 +722,7 @@ struct cap_baq_qualities : public bqsr_lambda
                 const uint32 expectedPos = refI - refOffset + (current_op_offset - readI);
                 ctx.baq.qualities[qual_idx] = capBaseByBAQ(batch.qualities[idx.qual_start + read_bp_idx],
                                                            ctx.baq.qualities[idx.qual_start + read_bp_idx],
-                                                           ctx.baq.state[idx.qual_start + read_bp_idx],
+                                                           baq_state[idx.qual_start + read_bp_idx],
                                                            expectedPos);
                 readI++;
                 refI++;
@@ -787,6 +762,8 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
 {
     struct baq_context& baq = context->baq;
     D_VectorU32& active_baq_read_list = context->temp_u32;
+    D_VectorU32& baq_state = context->temp_u32_2;
+
     uint32 num_active;
 
     // collect the reads that we need to compute BAQ for
@@ -848,13 +825,12 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
 //    printf("]\n");
 //    fflush(stdout);
 
-    baq.read_windows.resize(batch.device.num_reads);
     baq.reference_windows.resize(batch.device.num_reads);
 
-    baq.state.resize(batch.device.qualities.size());
+    baq_state.resize(batch.device.qualities.size());
     baq.qualities.resize(batch.device.qualities.size());
 
-    thrust::fill(baq.state.begin(), baq.state.end(), uint32(-1));
+    thrust::fill(baq_state.begin(), baq_state.end(), uint32(-1));
     thrust::fill(baq.qualities.begin(), baq.qualities.end(), uint8(-1));
 
     // compute the alignment frames
@@ -875,7 +851,7 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
                      thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
                                                                   baq.matrix_index.end(),
                                                                   baq.scaling_index.end())),
-                     hmm_glocal_forward(*context, batch.device));
+                     hmm_glocal_forward(*context, batch.device, baq_state));
 
     // run the backward portion
     thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
@@ -884,7 +860,7 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
                      thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
                                                                   baq.matrix_index.end(),
                                                                   baq.scaling_index.end())),
-                     hmm_glocal_backward(*context, batch.device));
+                     hmm_glocal_backward(*context, batch.device, baq_state));
 
     // use the computed state to map qualities
     thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
@@ -893,7 +869,7 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
                      thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
                                                                   baq.matrix_index.end(),
                                                                   baq.scaling_index.end())),
-                     hmm_glocal_map(*context, batch.device));
+                     hmm_glocal_map(*context, batch.device, baq_state));
 
     // for any reads that we did *not* compute a BAQ, mark the base pairs as having no BAQ uncertainty
     thrust::for_each(context->active_read_list.begin(),
@@ -903,32 +879,13 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     // transform quality scores
     thrust::for_each(active_baq_read_list.begin(),
                      active_baq_read_list.end(),
-                     cap_baq_qualities(*context, batch.device));
+                     cap_baq_qualities(*context, batch.device, baq_state));
 
     thrust::for_each(active_baq_read_list.begin(),
                      active_baq_read_list.end(),
                      recode_baq_qualities(*context, batch.device));
 
     context->stats.baq_reads += num_active;
-
-#if 0
-    for(uint32 i = 0; i < context->active_read_list.size(); i++)
-    {
-        uint32 read_index = context->active_read_list[i];
-
-        ushort2 read_window;
-        uint2 reference_window;
-
-        cpu::frame_alignment(read_window, reference_window,
-                             context, reference, batch, h_batch, read_index);
-        //hengli::calcBAQFromHMM(NULL, NULL, NULL, context, reference, h_batch, read_index);
-        printf("cpu frame_alignment: read = [ %u %u ] ref = [ %u %u ]\n", read_window.x, read_window.y, reference_window.x, reference_window.y);
-
-        read_window = baq.read_windows[read_index];
-        reference_window = baq.reference_windows[read_index];
-        printf("gpu frame_alignment: read = [ %u %u ] ref = [ %u %u ]\n", read_window.x, read_window.y, reference_window.x, reference_window.y);
-    }
-#endif
 }
 
 void debug_baq(bqsr_context *context, const alignment_batch& batch, int read_index)
@@ -939,7 +896,7 @@ void debug_baq(bqsr_context *context, const alignment_batch& batch, int read_ind
 
     const CRQ_index idx = h_batch.crq_index(read_index);
 
-    ushort2 read_window = context->baq.read_windows[read_index];
+    ushort2 read_window = context->cigar.read_window_clipped[read_index];
     uint2 reference_window = context->baq.reference_windows[read_index];
 
     printf("    read window                 = [ %u %u ]\n", read_window.x, read_window.y);
@@ -948,20 +905,6 @@ void debug_baq(bqsr_context *context, const alignment_batch& batch, int read_ind
     printf("    relative reference window   = [ %lu %lu ]\n",
             reference_window.x - context->reference.host.sequence_bp_start[h_batch.chromosome[read_index]],
             reference_window.y - context->reference.host.sequence_bp_start[h_batch.chromosome[read_index]]);
-
-    printf("    BAQ state                   = [ ");
-    for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
-    {
-        uint32 s = context->baq.state[i];
-
-        if (s == uint32(-1))
-        {
-            printf("  - ");
-        } else {
-            printf("% 3d ", s);
-        }
-    }
-    printf(" ]\n");
 
     printf("    BAQ quals                   = [ ");
     for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)

@@ -24,14 +24,11 @@
 
 struct baq_context
 {
-    // read and reference windows for HMM
-    D_VectorU16_2 read_windows;
+    // reference windows for HMM
     D_VectorU32_2 reference_windows;
 
     // BAQ'ed qualities for each read, same size as each read
     D_VectorU8 qualities;
-    // BAQ state vector, same size as each read
-    D_VectorU32 state;
 
     // forward and backward HMM matrices
     // each read requires read_len * 6 * (bandWidth + 1)
@@ -47,10 +44,8 @@ struct baq_context
 
     struct view
     {
-        D_VectorU16_2::view read_windows;
         D_VectorU32_2::view reference_windows;
         D_VectorU8::view qualities;
-        D_VectorU32::view state;
         D_VectorF64::view forward;
         D_VectorF64::view backward;
         D_VectorU32::view matrix_index;
@@ -61,10 +56,8 @@ struct baq_context
     operator view()
     {
         view v = {
-                read_windows,
                 reference_windows,
                 qualities,
-                state,
                 forward,
                 backward,
                 matrix_index,

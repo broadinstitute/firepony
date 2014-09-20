@@ -655,6 +655,134 @@ struct read_flat_baq : public bqsr_lambda
     }
 };
 
+// bottom half of BAQ.calcBAQFromHMM in GATK
+struct cap_baq_qualities : public bqsr_lambda
+{
+    using bqsr_lambda::bqsr_lambda;
+
+    CUDA_HOST_DEVICE bool stateIsIndel(uint32 state)
+    {
+        return (state & 3) != 0;
+    }
+
+    CUDA_HOST_DEVICE uint32 stateAlignedPosition(uint32 state)
+    {
+        return state >> 2;
+    }
+
+    CUDA_HOST_DEVICE uint8 capBaseByBAQ(uint8 oq, uint8 bq, uint32 state, uint32 expectedPos)
+    {
+        uint8 b;
+        bool isIndel = stateIsIndel(state);
+        uint32 pos = stateAlignedPosition(state);
+
+        if (isIndel || pos != expectedPos) // we are an indel or we don't algin to our best current position
+        {
+            b = MIN_BASE_QUAL; // just take b = minBaseQuality
+        } else {
+            b = bqsr::min(bq, oq);
+        }
+
+        return b;
+    }
+
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
+    {
+        const CRQ_index idx = batch.crq_index(read_index);
+
+        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
+        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
+
+        const ushort2& read_window = ctx.cigar.read_window_clipped[read_index];
+        const ushort2& read_window_no_insertions = ctx.cigar.read_window_clipped_no_insertions[read_index];
+        const ushort2& reference_window = ctx.cigar.reference_window_clipped[read_index];
+
+        const uint32 seq_to_alignment_offset = batch.alignment_start[read_index];
+        const uint32 first_insertion_offset = read_window_no_insertions.x - read_window.x;
+
+        const int offset = MAX_BAND_WIDTH / 2;
+
+        const uint32 readStart = reference_window.x + seq_to_alignment_offset;
+        const uint32 start = bqsr::max(readStart - offset - first_insertion_offset, 0u);
+
+        const int refOffset = (int)(start - readStart);
+
+        uint32 readI = 0;
+        uint32 refI = 0;
+        uint32 current_op_offset = 0;
+
+        // scan for the start of the baq region
+        uint32 i;
+        for(i = 0; i < cigar_end - cigar_start; i++)
+        {
+            const uint16 read_bp_idx = ctx.cigar.cigar_event_read_coordinates[cigar_start + i];
+            if (read_bp_idx >= read_window.x)
+                break;
+        }
+
+        for(; i < cigar_end - cigar_start; i++)
+        {
+            const uint16 read_bp_idx = ctx.cigar.cigar_event_read_coordinates[cigar_start + i];
+            const uint32 qual_idx = idx.qual_start + read_bp_idx;
+
+            switch(ctx.cigar.cigar_events[i + cigar_start])
+            {
+            case cigar_event::S:
+                refI++;
+                current_op_offset = 0;
+                break;
+
+            case cigar_event::I:
+                ctx.baq.qualities[qual_idx] = batch.qualities[qual_idx];
+                readI++;
+                current_op_offset = 0;
+                break;
+
+            case cigar_event::D:
+                refI++;
+                current_op_offset = 0;
+                break;
+
+            case cigar_event::M:
+                const uint32 expectedPos = refI - refOffset + (current_op_offset - readI);
+                ctx.baq.qualities[qual_idx] = capBaseByBAQ(batch.qualities[idx.qual_start + read_bp_idx],
+                                                           ctx.baq.qualities[idx.qual_start + read_bp_idx],
+                                                           ctx.baq.state[idx.qual_start + read_bp_idx],
+                                                           expectedPos);
+                readI++;
+                refI++;
+                current_op_offset++;
+
+                break;
+            }
+        }
+    }
+};
+
+// transforms BAQ scores the same way as GATK's encodeBQTag
+struct recode_baq_qualities : public bqsr_lambda
+{
+    using bqsr_lambda::bqsr_lambda;
+
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
+    {
+        const CRQ_index idx = batch.crq_index(read_index);
+
+        for(uint32 i = idx.qual_start; i < idx.qual_len; i++)
+        {
+            const uint8 baq_i = ctx.baq.qualities[i];
+            if (baq_i == uint8(-1))
+            {
+                continue;
+            }
+
+            const uint8 bq = batch.qualities[i] + 64;
+            const uint8 tag = bq - baq_i;
+            ctx.baq.qualities[i] = tag;
+        }
+    }
+};
+
 void baq_reads(bqsr_context *context, const alignment_batch& batch)
 {
     struct baq_context& baq = context->baq;
@@ -771,6 +899,15 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
                      read_flat_baq(*context, batch.device));
+
+    // transform quality scores
+    thrust::for_each(active_baq_read_list.begin(),
+                     active_baq_read_list.end(),
+                     cap_baq_qualities(*context, batch.device));
+
+    thrust::for_each(active_baq_read_list.begin(),
+                     active_baq_read_list.end(),
+                     recode_baq_qualities(*context, batch.device));
 
     context->stats.baq_reads += num_active;
 

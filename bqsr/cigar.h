@@ -72,6 +72,8 @@ struct cigar_context
     // bit vector representing SNPs, one per cigar event
     // (1 means reference mismatch, 0 means match or non-M cigar event)
     D_PackedVector_1b is_snp;
+    D_PackedVector_1b is_insertion;
+    D_PackedVector_1b is_deletion;
 
     // number of errors for each read
     D_VectorU16 num_errors;
@@ -86,6 +88,8 @@ struct cigar_context
         D_VectorU16_2::view read_window_clipped_no_insertions;
         D_VectorU16_2::view reference_window_clipped;
         D_PackedVector_1b::view is_snp;
+        D_PackedVector_1b::view is_insertion;
+        D_PackedVector_1b::view is_deletion;
         D_VectorU16::view num_errors;
     };
 
@@ -100,6 +104,8 @@ struct cigar_context
                 read_window_clipped_no_insertions,
                 reference_window_clipped,
                 is_snp,
+                is_insertion,
+                is_deletion,
                 num_errors,
         };
 

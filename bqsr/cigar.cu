@@ -230,11 +230,15 @@ struct cigar_coordinates_expand : public bqsr_lambda
     }
 };
 
-struct compute_is_snp : public bqsr_lambda
+template <cigar_event::Event E>
+struct compute_error_vector : public bqsr_lambda
 {
-    compute_is_snp(bqsr_context::view ctx,
-                   const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
+    D_PackedVector_1b::view error_vector;
+
+    compute_error_vector(bqsr_context::view ctx,
+                               const alignment_batch_device::const_view batch,
+                               D_PackedVector_1b::view error_vector)
+        : bqsr_lambda(ctx, batch), error_vector(error_vector)
     { }
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
@@ -254,7 +258,7 @@ struct compute_is_snp : public bqsr_lambda
         // go through the cigar events looking for M
         for(uint32 i = cigar_start; i < cigar_end; i++)
         {
-            if(ctx.cigar.cigar_events[i] == cigar_event::M)
+            if(ctx.cigar.cigar_events[i] == E)
             {
                 // load the read bp at this offset
                 const uint16 read_bp_idx = ctx.cigar.cigar_event_read_coordinates[i];
@@ -264,13 +268,42 @@ struct compute_is_snp : public bqsr_lambda
                 const uint32 reference_bp_idx = reference_alignment_start + ctx.cigar.cigar_event_reference_coordinates[i];
                 const uint8 reference_bp = ctx.reference.bases[reference_bp_idx];
 
-                if (reference_bp != read_bp)
+                if (E == cigar_event::M)
                 {
-                    ctx.cigar.is_snp[i] = 1;
+                    if (reference_bp != read_bp)
+                    {
+                        error_vector[i] = 1;
+                    }
+                } else {
+                    error_vector[i] = 1;
                 }
             }
         }
     }
+};
+
+struct compute_is_snp : public compute_error_vector<cigar_event::M>
+{
+    compute_is_snp(bqsr_context::view ctx,
+                   const alignment_batch_device::const_view batch)
+        : compute_error_vector<cigar_event::M>(ctx, batch, ctx.cigar.is_snp)
+    { }
+};
+
+struct compute_is_insertion : public compute_error_vector<cigar_event::I>
+{
+    compute_is_insertion(bqsr_context::view ctx,
+                         const alignment_batch_device::const_view batch)
+        : compute_error_vector<cigar_event::I>(ctx, batch, ctx.cigar.is_insertion)
+    { }
+};
+
+struct compute_is_deletion : public compute_error_vector<cigar_event::D>
+{
+    compute_is_deletion(bqsr_context::view ctx,
+                        const alignment_batch_device::const_view batch)
+        : compute_error_vector<cigar_event::D>(ctx, batch, ctx.cigar.is_deletion)
+    { }
 };
 
 struct count_snps : public bqsr_lambda
@@ -434,10 +467,14 @@ void expand_cigars(bqsr_context *context, const alignment_batch& batch)
     ctx.reference_window_clipped.resize(batch.device.num_reads);
 
     ctx.is_snp.resize(expanded_cigar_len);
+    ctx.is_insertion.resize(expanded_cigar_len);
+    ctx.is_deletion.resize(expanded_cigar_len);
     ctx.num_errors.resize(batch.device.num_reads);
 
-    // is_snp and num_errors require zero initialization
+    // the following require zero initialization
     thrust::fill(ctx.is_snp.m_storage.begin(), ctx.is_snp.m_storage.end(), 0);
+    thrust::fill(ctx.is_insertion.m_storage.begin(), ctx.is_insertion.m_storage.end(), 0);
+    thrust::fill(ctx.is_deletion.m_storage.begin(), ctx.is_deletion.m_storage.end(), 0);
     thrust::fill(ctx.num_errors.begin(), ctx.num_errors.end(), 0);
 
     // expand the cigar ops into temp storage (xxxnsubtil: same as above, active read list is ignored)
@@ -455,15 +492,23 @@ void expand_cigars(bqsr_context *context, const alignment_batch& batch)
 #endif
 
     // now expand the coordinates per read
-    // this avoids having to deal with boundary condtions within reads
+    // this avoids having to deal with boundary conditions within reads
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
                      cigar_coordinates_expand(*context, batch.device));
 
-    // compute the SNP bit vector
+    // compute the error bit vectors
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
                      compute_is_snp(*context, batch.device));
+
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     compute_is_insertion(*context, batch.device));
+
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     compute_is_deletion(*context, batch.device));
 
     // compute the number of errors
     thrust::for_each(context->active_read_list.begin(),
@@ -528,6 +573,20 @@ void debug_cigar(bqsr_context *context, const alignment_batch& batch, int read_i
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
         printf("% 3d ", (uint8) ctx.is_snp[i]);
+    }
+    printf("]\n");
+
+    printf("    is insertion                = [ ");
+    for(uint32 i = cigar_start; i < cigar_end; i++)
+    {
+        printf("% 3d ", (uint8) ctx.is_insertion[i]);
+    }
+    printf("]\n");
+
+    printf("    is deletion                 = [ ");
+    for(uint32 i = cigar_start; i < cigar_end; i++)
+    {
+        printf("% 3d ", (uint8) ctx.is_deletion[i]);
     }
     printf("]\n");
 

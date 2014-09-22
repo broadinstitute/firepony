@@ -12,6 +12,8 @@ covariates_bit_packing.h
 covariates_table.cu
 covariates_table.h
 covariates.cu
+fractional_errors.cu
+fractional_errors.h
 gamgee_loader.cu
 gamgee_loader.h
 mmap.cu

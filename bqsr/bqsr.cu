@@ -32,6 +32,7 @@
 #include "cigar.h"
 #include "covariates.h"
 #include "baq.h"
+#include "fractional_errors.h"
 
 /*
 // sort batch by increasing alignment position
@@ -151,6 +152,8 @@ int main(int argc, char **argv)
         // compute the base alignment quality for each read
         baq_reads(&context, batch);
 
+        build_fractional_error_arrays(&context, batch);
+
         // build covariate tables
         gather_covariates(&context, batch);
 
@@ -230,6 +233,7 @@ void debug_read(bqsr_context *context, const alignment_batch& batch, int read_id
 
     debug_cigar(context, batch, read_index);
     debug_baq(context, batch, read_index);
+    debug_fractional_error_arrays(context, batch, read_index);
 
     const uint2 alignment_window = context->alignment_windows[read_index];
     printf("  sequence name [%s]\n  sequence base [%lu]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",

@@ -27,6 +27,7 @@
 #include "cigar.h"
 #include "alignment_data.h"
 #include "baq.h"
+#include "fractional_errors.h"
 
 struct bqsr_statistics // host-only
 {
@@ -73,6 +74,7 @@ struct bqsr_context
     cigar_context cigar;
     baq_context baq;
     covariates_context covariates;
+    fractional_error_context fractional_error;
 
     // --- everything below this line is host-only and not available on the device
     bqsr_statistics stats;
@@ -104,6 +106,7 @@ struct bqsr_context
         cigar_context::view                     cigar;
         baq_context::view                       baq;
         covariates_context::view                covariates;
+        fractional_error_context::view          fractional_error;
     };
 
     operator view()
@@ -126,6 +129,7 @@ struct bqsr_context
             cigar,
             baq,
             covariates,
+            fractional_error,
         };
 
         return v;

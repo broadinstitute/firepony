@@ -68,6 +68,7 @@ struct bqsr_context
     D_VectorU32 temp_u32_2;
     D_VectorU32 temp_u32_3;
     D_VectorU32 temp_u32_4;
+    D_VectorF32 temp_f32;
 
     // various pipeline states go here
     snp_filter_context snp_filter;

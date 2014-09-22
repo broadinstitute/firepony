@@ -20,71 +20,70 @@
 
 #include "bqsr_types.h"
 
-struct D_CovariateTable
-{
-    D_VectorU32 keys;
-    D_VectorU32 observations;
+typedef uint32 covariate_key;
 
-    D_CovariateTable()
+struct covariate_value
+{
+    uint32 observations;
+    float mismatches;
+};
+
+template <typename system_tag>
+struct covariate_table_storage
+{
+    bqsr::vector<system_tag, covariate_key> keys;
+    bqsr::vector<system_tag, covariate_value> values;
+
+    covariate_table_storage()
     {
         keys.resize(0);
-        observations.resize(0);
+        values.resize(0);
     }
 
-    void resize(uint32 size)
+    void resize(size_t size)
     {
         keys.resize(size);
-        observations.resize(size);
+        values.resize(size);
     }
 
-    uint32 size(void)
+    size_t size(void) const
     {
-        assert(keys.size() == observations.size());
+        assert(keys.size() == values.size());
         return keys.size();
     }
 
-    void copyfrom(D_CovariateTable& other)
+    template <typename other_system_tag>
+    void copyfrom(covariate_table_storage<other_system_tag>& other)
     {
         keys = other.keys;
-        observations = other.observations;
+        values = other.values;
     }
+};
 
-    void concatenate(D_CovariateTable& other, uint32 other_size);
-    void sort(D_VectorU32& indices, D_VectorU32& temp);
-    void pack(D_VectorU32& temp_keys, D_VectorU32& temp_observations);
+// host-side covariate tables are just simple storage
+typedef covariate_table_storage<host_tag> H_CovariateTable;
+
+// device covariate tables implement merging primitives and views
+struct D_CovariateTable : public covariate_table_storage<target_system_tag>
+{
+    void concatenate(D_CovariateTable& other, size_t other_size);
+    void sort(D_Vector<covariate_key>& indices, D_Vector<covariate_value>& temp);
+    void pack(D_Vector<covariate_key>& temp_keys, D_Vector<covariate_value>& temp_values);
 
     struct view
     {
         D_VectorU32::view keys;
-        D_VectorU32::view observations;
+        bqsr::vector<target_system_tag, covariate_value>::view values;
 
+        // note: we don't use implicit cast operators here
+        // we want to derive from this view to implement D_CovariatePool::view
         view(D_CovariateTable& table)
             : keys(table.keys),
-              observations(table.observations)
+              values(table.values)
         { }
     };
 };
 
-struct H_CovariateTable
-{
-    H_VectorU32 keys;
-    H_VectorU32 observations;
-
-    H_CovariateTable()
-    { };
-
-    void copyfrom(D_CovariateTable& other)
-    {
-        keys = other.keys;
-        observations = other.observations;
-    }
-
-    uint32 size(void)
-    {
-        assert(keys.size() == observations.size());
-        return keys.size();
-    }
-};
 
 struct D_CovariatePool : public D_CovariateTable
 {
@@ -139,8 +138,8 @@ struct D_LocalCovariateTable
         max_size = LOCAL_TABLE_SIZE
     };
 
-    uint32 keys[LOCAL_TABLE_SIZE];
-    uint32 observations[LOCAL_TABLE_SIZE];
+    covariate_key keys[LOCAL_TABLE_SIZE];
+    covariate_value values[LOCAL_TABLE_SIZE];
 
     uint32 num_items;
 
@@ -161,7 +160,7 @@ struct D_LocalCovariateTable
         return false;
     }
 
-    CUDA_HOST_DEVICE bool insert(uint32 key, uint32 target_index)
+    CUDA_HOST_DEVICE bool insert(uint32 key, uint32 target_index, float mismatch)
     {
         if (num_items == LOCAL_TABLE_SIZE - 1)
         {
@@ -174,7 +173,7 @@ struct D_LocalCovariateTable
             // simple case
             assert(target_index == 0);
             keys[0] = key;
-            observations[0] = 1;
+            values[0] = { 1, mismatch }; // observations, mismatches
             num_items = 1;
             return true;
         }
@@ -186,14 +185,14 @@ struct D_LocalCovariateTable
             for(int i = int(num_items) - 1; i >= int(target_index); i--)
             {
                 keys[i + 1] = keys[i];
-                observations[i + 1] = observations[i];
+                values[i + 1] = values[i];
             }
         } else {
             assert(target_index == num_items);
         }
 
         keys[target_index] = key;
-        observations[target_index] = 1;
+        values[target_index] = { 1, mismatch };
         num_items++;
 
         return true;
@@ -215,7 +214,7 @@ struct D_LocalCovariateTable
 
         return i;
 #else
-        covariate_table_entry *loc = nvbio::find_pivot(data, num_entries, covariate_key_gequal(key));
+        covariate_value *loc = nvbio::find_pivot(data, num_entries, covariate_key_gequal(key));
         return (int)(loc - data);
 #endif
     }

@@ -25,17 +25,17 @@
 #include <thrust/sort.h>
 #include <thrust/reduce.h>
 
-void D_CovariateTable::concatenate(D_CovariateTable& other, uint32 other_size)
+void D_CovariateTable::concatenate(D_CovariateTable& other, size_t other_size)
 {
-    uint32 concat_index = size();
+    size_t concat_index = size();
 
     resize(size() + other_size);
 
     thrust::copy(other.keys.begin(), other.keys.begin() + other_size, keys.begin() + concat_index);
-    thrust::copy(other.observations.begin(), other.observations.begin() + other_size, observations.begin() + concat_index);
+    thrust::copy(other.values.begin(), other.values.begin() + other_size, values.begin() + concat_index);
 }
 
-void D_CovariateTable::sort(D_VectorU32& indices, D_VectorU32& temp)
+void D_CovariateTable::sort(D_VectorU32& indices, D_Vector<covariate_value>& temp)
 {
     indices.resize(size());
     temp.resize(size());
@@ -43,22 +43,38 @@ void D_CovariateTable::sort(D_VectorU32& indices, D_VectorU32& temp)
     thrust::sequence(indices.begin(), indices.end());
     thrust::sort_by_key(keys.begin(), keys.end(), indices.begin());
 
-    thrust::gather(indices.begin(), indices.end(), observations.begin(), temp.begin());
-    observations = temp;
+    thrust::gather(indices.begin(), indices.end(), values.begin(), temp.begin());
+    values = temp;
 }
 
-void D_CovariateTable::pack(D_VectorU32& temp_keys, D_VectorU32& temp_observations)
+struct covariate_value_sum
+{
+    CUDA_HOST_DEVICE covariate_value operator() (const covariate_value& a, const covariate_value& b)
+    {
+        return covariate_value { a.observations + b.observations,
+                                 a.mismatches + b.mismatches };
+    }
+};
+
+
+void D_CovariateTable::pack(D_Vector<covariate_key>& temp_keys, D_Vector<covariate_value>& temp_values)
 {
     temp_keys.resize(size());
-    temp_observations.resize(size());
+    temp_values.resize(size());
 
-    thrust::pair<D_VectorU32::iterator, D_VectorU32::iterator> out;
-    out = thrust::reduce_by_key(keys.begin(), keys.end(), observations.begin(), temp_keys.begin(), temp_observations.begin());
+    thrust::pair<D_Vector<covariate_key>::iterator, D_Vector<covariate_value>::iterator> out;
+    out = thrust::reduce_by_key(keys.begin(),
+                                keys.end(),
+                                values.begin(),
+                                temp_keys.begin(),
+                                temp_values.begin(),
+                                thrust::equal_to<covariate_key>(),
+                                covariate_value_sum());
 
     uint32 new_size = out.first - temp_keys.begin();
 
     keys = temp_keys;
-    observations = temp_observations;
+    values = temp_values;
 
     resize(new_size);
 }

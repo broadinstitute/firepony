@@ -17,7 +17,6 @@
  */
 
 #include "from_nvbio/dna.h"
-#include "from_nvbio/vcf.h"
 
 #include <map>
 

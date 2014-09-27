@@ -27,7 +27,7 @@ endif()
 
 # set cuda debug flags
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
-    set(CUDA_NVCC_DEBUG_FLAGS "-g -lineinfo -G")
+    set(CUDA_NVCC_DEBUG_FLAGS "-g -lineinfo -G -DTHRUST_DEBUG")
 else()
     set(CUDA_NVCC_DEBUG_FLAGS "-lineinfo")
 endif()

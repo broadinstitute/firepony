@@ -646,7 +646,21 @@ void debug_cigar(bqsr_context *context, const alignment_batch& batch, int read_i
         {
             printf("    ");
         } else {
-            printf("% 3d ", h_batch.qualities[idx.read_start + read_bp]);
+            printf("% 3d ", h_batch.qualities[idx.qual_start + read_bp]);
+        }
+    }
+    printf("]\n");
+
+    printf("    ... in ascii                = [ ");
+    for(uint32 i = cigar_start; i < cigar_end; i++)
+    {
+        const uint16 read_bp = ctx.cigar_event_read_coordinates[i];
+
+        if (read_bp == uint16(-1))
+        {
+            printf(" -  ");
+        } else {
+            printf("  %c ", h_batch.qualities[idx.qual_start + read_bp] + '!');
         }
     }
     printf("]\n");

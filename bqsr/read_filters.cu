@@ -29,10 +29,7 @@
 template<uint32 flags>
 struct filter_if_any_set : public bqsr_lambda
 {
-    filter_if_any_set(bqsr_context::view ctx,
-                      const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
-    { }
+    using bqsr_lambda::bqsr_lambda;
 
     CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
@@ -48,10 +45,7 @@ struct filter_if_any_set : public bqsr_lambda
 // implements the GATK filters MappingQualityUnavailable and MappingQualityZero
 struct filter_mapq : public bqsr_lambda
 {
-    filter_mapq(bqsr_context::view ctx,
-                const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
-    { }
+    using bqsr_lambda::bqsr_lambda;
 
     CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
@@ -68,10 +62,7 @@ struct filter_mapq : public bqsr_lambda
 // partially implements the GATK MalformedReadFilter
 struct filter_malformed_reads : public bqsr_lambda
 {
-    filter_malformed_reads(bqsr_context::view ctx,
-                           const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
-    { }
+    using bqsr_lambda::bqsr_lambda;
 
     CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
@@ -148,10 +139,7 @@ struct filter_malformed_reads : public bqsr_lambda
 // implements another part of the GATK MalformedReadFilter
 struct filter_malformed_cigars : public bqsr_lambda
 {
-    filter_malformed_cigars(bqsr_context::view ctx,
-                            const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
-    { }
+    using bqsr_lambda::bqsr_lambda;
 
     CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
@@ -354,12 +342,12 @@ struct filter_low_quality_bases : public bqsr_lambda
     {
         const CRQ_index idx = batch.crq_index(read_index);
 
-        for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
+        for(uint32 i = 0; i < idx.read_len; i++)
         {
-            uint8 qual = batch.qualities[i];
+            uint8 qual = batch.qualities[idx.qual_start + i];
             if (qual < MIN_USABLE_Q_SCORE)
             {
-                ctx.active_location_list[i] = 0;
+                ctx.active_location_list[idx.read_start + i] = 0;
             }
         }
     }

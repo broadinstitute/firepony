@@ -104,6 +104,8 @@ private:
     // returns false if the table is full
     CUDA_HOST_DEVICE bool update(uint32 insert_idx, covariate_key key, float fractional_error)
     {
+        assert(insert_idx < LOCAL_TABLE_SIZE);
+
         if (!table.exists(insert_idx) || table.keys[insert_idx] != key)
         {
             //            printf("adding key %x (RG = %d)\n", key, covariate_chain::decode(key, 1));
@@ -171,9 +173,6 @@ private:
             covariate_key_set keys = covariate_chain::encode(ctx, batch, read_index, read_bp_offset, cigar_event_index);
 
             //        printf("locating key %x...\n", key);
-            uint32 insert_idx_M = table.find_insertion_point(keys.M);
-            uint32 insert_idx_I = table.find_insertion_point(keys.I);
-            uint32 insert_idx_D = table.find_insertion_point(keys.D);
 
             //        if (table->exists(insert_idx) && table->table[insert_idx].key == key)
             //            printf("... found at index %d (%x)\n", insert_idx, table->table[insert_idx].key);
@@ -208,21 +207,28 @@ private:
 
                 bool ret;
 
+                uint32 insert_idx_M = table.find_insertion_point(keys.M);
+                assert(insert_idx_M < LOCAL_TABLE_SIZE);
+
                 ret = update(insert_idx_M, keys.M, fractional_error_M);
                 if (ret == false)
                 {
-                    //printf("overflow! rollback at read index %u event index %u\n", read_index, cigar_event_index);
+//                    printf("[B %d T %d] overflow! rollback at read index %u event index %u event M insert index %d\n", blockIdx.x, threadIdx.x, read_index, cigar_event_index, insert_idx_M);
 
                     // mark for rollback from here
                     last_cigar_event_index = cigar_event_index;
                     return false;
                 }
 
+                uint32 insert_idx_I = table.find_insertion_point(keys.I);
+                assert(insert_idx_I < LOCAL_TABLE_SIZE);
+
                 ret = update(insert_idx_I, keys.I, fractional_error_I);
                 if (ret == false)
                 {
-                    //printf("overflow! rollback at read index %u event index %u\n", read_index, cigar_event_index);
+//                    printf("[B %d T %d] overflow! rollback at read index %u event index %u event I insert index %d\n", blockIdx.x, threadIdx.x, read_index, cigar_event_index, insert_idx_I);
 
+//                    printf("[B %d T %d] rolling back M (index %d)\n", blockIdx.x, threadIdx.x, insert_idx_M);
                     rollback(insert_idx_M, keys.M, fractional_error_M);
 
                     // mark for rollback from here
@@ -230,12 +236,17 @@ private:
                     return false;
                 }
 
+                uint32 insert_idx_D = table.find_insertion_point(keys.D);
+                assert(insert_idx_D < LOCAL_TABLE_SIZE);
+
                 ret = update(insert_idx_D, keys.D, fractional_error_D);
                 if (ret == false)
                 {
-                    //printf("overflow! rollback at read index %u event index %u\n", read_index, cigar_event_index);
+//                    printf("[B %d T %d] overflow! rollback at read index %u event index %u event D insert index %d\n", blockIdx.x, threadIdx.x, read_index, cigar_event_index, insert_idx_D);
 
+//                    printf("[B %d T %d] rolling back I (index %d)\n", blockIdx.x, threadIdx.x, insert_idx_I);
                     rollback(insert_idx_I, keys.I, fractional_error_I);
+//                    printf("[B %d T %d] rolling back M (index %d)\n", blockIdx.x, threadIdx.x, insert_idx_M);
                     rollback(insert_idx_M, keys.M, fractional_error_M);
 
                     // mark for rollback from here
@@ -244,8 +255,16 @@ private:
                 }
             } else {
                 // MODE == Rollback
+                uint32 insert_idx_M = table.find_insertion_point(keys.M);
+                assert(insert_idx_M < LOCAL_TABLE_SIZE);
                 rollback(insert_idx_M, keys.M, fractional_error_M);
+
+                uint32 insert_idx_I = table.find_insertion_point(keys.I);
+                assert(insert_idx_I < LOCAL_TABLE_SIZE);
                 rollback(insert_idx_I, keys.I, fractional_error_I);
+
+                uint32 insert_idx_D = table.find_insertion_point(keys.D);
+                assert(insert_idx_D < LOCAL_TABLE_SIZE);
                 rollback(insert_idx_D, keys.D, fractional_error_D);
             }
         }

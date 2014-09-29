@@ -253,25 +253,26 @@ struct hmm_glocal_forward : public hmm_common
 
         hmm_common::setup(hmm_index);
 
-//        printf("hmm_glocal(l_ref=%d qstart=%d, l_query=%d)\n", referenceLength, queryStart, queryLen);
-//        printf("ref = { ");
+//        const uint32 read_index    = thrust::get<0>(hmm_index);
+//        printf("read %d: hmm_glocal(l_ref=%d qstart=%d, l_query=%d)\n", read_index, referenceLength, queryStart, queryLen);
+//        printf("read %d: ref = { ", read_index);
 //        for(int c = 0; c < referenceLength; c++)
 //        {
 //            printf("%c ", from_nvbio::iupac16_to_char(referenceBases[c]));
 //        }
 //        printf("\n");
 //
-//        printf("que = { ");
+//        printf("read %d: que = { ", read_index);
 //        for(int c = 0; c < queryLen; c++)
 //        {
 //            printf("%c ", from_nvbio::iupac16_to_char(queryBases[c]));
 //        }
 //        printf("\n");
-//
-//        printf("_iqual = { % 3d % 3d % 3d % 3d % 3d ... % 3d % 3d % 3d % 3d % 3d }\n",
+
+//        printf("read %d: _iqual = { % 3d % 3d % 3d % 3d % 3d ... % 3d % 3d % 3d % 3d % 3d }\n", read_index,
 //                inputQualities[0], inputQualities[1], inputQualities[2], inputQualities[3], inputQualities[4],
 //                inputQualities[queryLen - 5], inputQualities[queryLen - 4], inputQualities[queryLen - 3], inputQualities[queryLen - 2], inputQualities[queryLen - 1]);
-//        printf("c->bw = %d, bw = %d, l_ref = %d, l_query = %d\n", MAX_BAND_WIDTH, bandWidth, referenceLength, queryLen);
+//        printf("read %d: c->bw = %d, bw = %d, l_ref = %d, l_query = %d\n", read_index, MAX_BAND_WIDTH, bandWidth, referenceLength, queryLen);
 
         /*** forward ***/
         // f[0]
@@ -289,7 +290,8 @@ struct hmm_glocal_forward : public hmm_common
             {
                 int u;
                 double e = calcEpsilon(referenceBases[k-1], queryBases[queryStart], inputQualities[queryStart]);
-//                printf("referenceBases[%d-1] = %c inputQualities[%d] = %d queryBases[%d] = %c -> e = %.4f\n",
+//                printf("read %d: referenceBases[%d-1] = %c inputQualities[%d] = %d queryBases[%d] = %c -> e = %.4f\n",
+//                        read_index,
 //                        k,
 //                        from_nvbio::iupac16_to_char(referenceBases[k-1]),
 //                        queryStart,
@@ -339,7 +341,8 @@ struct hmm_glocal_forward : public hmm_common
             {
                 int u, v11, v01, v10;
                 double e = calcEpsilon(referenceBases[k-1], qyi, inputQualities[queryStart+i-1]);
-//                printf("referenceBases[%d-1] = %c inputQualities[%d+%d-1] = %d qyi = %c -> e = %.4f\n",
+//                printf("read %d: referenceBases[%d-1] = %c inputQualities[%d+%d-1] = %d qyi = %c -> e = %.4f\n",
+//                        read_index,
 //                        k,
 //                        from_nvbio::iupac16_to_char(referenceBases[k-1]),
 //                        queryStart,
@@ -551,7 +554,7 @@ struct hmm_glocal_map : public hmm_common
                 k = (int)(double(-4.343) * log(double(1.0) - double(max)) + double(.499)); // = 10*log10(1-max)
                 outputQualities[queryStart+i-1] = (char)(k > 100? 99 : (k < MIN_BASE_QUAL ? MIN_BASE_QUAL : k));
 
-    //            printf("outputQualities[%d]: max = %.16f l = %.4f dk = %.4f k = %d -> %d\n", i, max, l, dk, k, outputQualities[queryStart+i-1]);
+//                printf("read %d: outputQualities[%d]: max = %.16f k = %d -> %d\n", read_index, queryStart+i-1, max, k, outputQualities[queryStart+i-1]);
             }
 
     //        printf("(%.4f,%.4f) (%d,%d,%d,%.4f)\n", pb, sum, (i-1), (max_k>>2), (max_k&3), max);
@@ -743,7 +746,7 @@ struct recode_baq_qualities : public bqsr_lambda
     {
         const CRQ_index idx = batch.crq_index(read_index);
 
-        for(uint32 i = idx.qual_start; i < idx.qual_len; i++)
+        for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
         {
             const uint8 baq_i = ctx.baq.qualities[i];
             if (baq_i == uint8(-1))

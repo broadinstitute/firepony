@@ -69,10 +69,14 @@ struct cigar_context
     // alignment window in the reference, not including clipped bases (relative to base alignment position)
     D_VectorU16_2 reference_window_clipped;
 
-    // bit vector representing SNPs, one per cigar event
+    // bit vector representing SNPs, one per read bp
     // (1 means reference mismatch, 0 means match or non-M cigar event)
     D_PackedVector_1b is_snp;
+    // bit vector representing insertions, one per read bp (similar to is_snp)
     D_PackedVector_1b is_insertion;
+    // bit vector representing deletions, one per read bp
+    // note that this only flags the starting base for a deletion and is independent of the other bit vectors
+    // in other words, the same bp can have is_deletion and one of is_insertion or is_snp set
     D_PackedVector_1b is_deletion;
 
     // number of errors for each read

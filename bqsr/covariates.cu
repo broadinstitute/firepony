@@ -196,9 +196,9 @@ private:
             //            }
             //        }
 
-            float fractional_error_M = ctx.fractional_error.snp_errors[idx.read_start + read_bp_offset];
-            float fractional_error_I = ctx.fractional_error.insertion_errors[idx.read_start + read_bp_offset];
-            float fractional_error_D = ctx.fractional_error.deletion_errors[idx.read_start + read_bp_offset];
+            float fractional_error_M = ctx.fractional_error.snp_errors[idx.qual_start + read_bp_offset];
+            float fractional_error_I = ctx.fractional_error.insertion_errors[idx.qual_start + read_bp_offset];
+            float fractional_error_D = ctx.fractional_error.deletion_errors[idx.qual_start + read_bp_offset];
 
             if (MODE == Gather)
             {

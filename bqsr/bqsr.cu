@@ -227,7 +227,12 @@ void debug_read(bqsr_context *context, const alignment_batch& batch, int read_id
     for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
     {
         uint16 off = context->read_offset_list[i];
-        printf("%d ", off);
+        if (off == uint16(-1))
+        {
+            printf("  - ");
+        } else {
+            printf("% 3d ", off);
+        }
     }
     printf("]\n");
 

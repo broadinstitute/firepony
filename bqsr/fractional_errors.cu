@@ -23,18 +23,19 @@
 // implements GATK's BaseRecalibrator.calculateFractionalErrorArray
 struct compute_fractional_errors : public bqsr_lambda
 {
-    D_PackedVector_1b::const_view errorArray;
+    D_PackedVector_1b::const_view error_vector;
     D_VectorF64::view output_vector;
 
     compute_fractional_errors(bqsr_context::view ctx,
                               const alignment_batch_device::const_view batch,
-                              const D_PackedVector_1b::const_view errorArray,
+                              const D_PackedVector_1b::const_view error_vector,
                               D_VectorF64::view output_vector)
-        : bqsr_lambda(ctx, batch), errorArray(errorArray), output_vector(output_vector)
+        : bqsr_lambda(ctx, batch), error_vector(error_vector), output_vector(output_vector)
     { }
 
     CUDA_HOST_DEVICE void calculateAndStoreErrorsInBlock(const int iii,
                                                          const int blockStartIndex,
+                                                         const D_PackedVector_1b::const_view errorArray,
                                                          double *fractionalErrors)
     {
         int totalErrors = 0;
@@ -55,8 +56,8 @@ struct compute_fractional_errors : public bqsr_lambda
         const ushort2& read_window = ctx.cigar.read_window_clipped[read_index];
         const uint8 *baqArray = &ctx.baq.qualities[idx.qual_start] + read_window.x;
 
-        // adjust the error array to simulate hard clipping of soft clipped bases
-        errorArray += read_window.x;
+        // offset the error array by read_window.x to simulate hard clipping of soft clipped bases
+        auto errorArray = error_vector + (idx.read_start + read_window.x);
 
         constexpr int BLOCK_START_UNSET = -1;
 
@@ -76,7 +77,7 @@ struct compute_fractional_errors : public bqsr_lambda
                 {
                     fractionalErrors[iii] = (double) errorArray[iii];
                 } else {
-                    calculateAndStoreErrorsInBlock(iii, blockStartIndex, fractionalErrors);
+                    calculateAndStoreErrorsInBlock(iii, blockStartIndex, errorArray, fractionalErrors);
                     inBlock = false; // reset state variables
                     blockStartIndex = BLOCK_START_UNSET;
                 }
@@ -91,7 +92,7 @@ struct compute_fractional_errors : public bqsr_lambda
 
         if (inBlock)
         {
-            calculateAndStoreErrorsInBlock(iii-1, blockStartIndex, fractionalErrors);
+            calculateAndStoreErrorsInBlock(iii-1, blockStartIndex, errorArray, fractionalErrors);
         }
     }
 };

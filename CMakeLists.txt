@@ -17,7 +17,7 @@ find_package(CUDA 7.0 REQUIRED)
 # enable C++11 support
 set(CUDA_NVCC_FLAGS "-std=c++11")
 # build for Kepler
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} ${CUDA_NVCC_DEBUG_FLAGS} --gpu-architecture=sm_35 -use_fast_math)
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} --gpu-architecture=sm_35 -use_fast_math)
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -27,9 +27,9 @@ endif()
 
 # set cuda debug flags
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
-    set(CUDA_NVCC_DEBUG_FLAGS "-g -lineinfo -G -DTHRUST_DEBUG")
+    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -g -lineinfo -G -DTHRUST_DEBUG")
 else()
-    set(CUDA_NVCC_DEBUG_FLAGS "-lineinfo")
+    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -lineinfo")
 endif()
 
 include_directories(${CMAKE_SOURCE_DIR})

@@ -33,16 +33,40 @@ inline void inclusive_scan(InputIterator first,
     thrust::inclusive_scan(first, first + len, result, op);
 }
 
-// simplified version of thrust::copy_if
+#include <cub/device/device_select.cuh>
+
+// implementation of copy_if based on CUB
 template <typename InputIterator, typename OutputIterator, typename Predicate>
 inline size_t copy_if(InputIterator first,
                       size_t len,
                       OutputIterator result,
-                      Predicate op)
+                      Predicate op,
+                      D_VectorU8& temp_storage)
 {
-    InputIterator last;
-    last = thrust::copy_if(first, first + len, result, op);
-    return last - result;
+    D_Vector<int> num_selected(1);
+
+    // determine amount of temp storage required
+    size_t temp_bytes = 0;
+    cub::DeviceSelect::If(nullptr,
+                          temp_bytes,
+                          first,
+                          result,
+                          num_selected.begin(),
+                          len,
+                          op);
+
+    // make sure we have enough temp storage
+    temp_storage.resize(temp_bytes);
+
+    cub::DeviceSelect::If(thrust::raw_pointer_cast(temp_storage.data()),
+                          temp_bytes,
+                          first,
+                          result,
+                          num_selected.begin(),
+                          len,
+                          op);
+
+    return size_t(num_selected[0]);
 }
 
 } // namespace bqsr

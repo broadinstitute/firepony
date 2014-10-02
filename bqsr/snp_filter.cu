@@ -342,7 +342,8 @@ void filter_known_snps(bqsr_context *context, const alignment_batch& batch)
     num_active = bqsr::copy_if(context->temp_u32.begin(),
                                context->temp_u32.size(),
                                snp.active_read_ids.begin(),
-                               vcf_active_predicate(snp.active_vcf_ranges));
+                               vcf_active_predicate(snp.active_vcf_ranges),
+                               context->temp_storage);
 
     snp.active_read_ids.resize(num_active);
 

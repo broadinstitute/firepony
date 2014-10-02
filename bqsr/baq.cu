@@ -775,7 +775,8 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     num_active = bqsr::copy_if(context->active_read_list.begin(),
                                context->active_read_list.size(),
                                active_baq_read_list.begin(),
-                               read_needs_baq(*context, batch.device));
+                               read_needs_baq(*context, batch.device),
+                               context->temp_storage);
 
     active_baq_read_list.resize(num_active);
 

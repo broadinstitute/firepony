@@ -39,5 +39,6 @@ include("contrib/boost.cmake")
 include("contrib/htslib.cmake")
 include("contrib/gamgee.cmake")
 include("contrib/zlib.cmake")
+include("contrib/cub.cmake")
 
 add_subdirectory(bqsr)

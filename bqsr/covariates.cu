@@ -460,7 +460,8 @@ void gather_covariates(bqsr_context *context, const alignment_batch& batch)
         active_reads = bqsr::copy_if(read_lists.source().begin(),
                                      read_lists.source().size(),
                                      read_lists.destination().begin(),
-                                     read_is_valid());
+                                     read_is_valid(),
+                                     context->temp_storage);
 
         read_lists.destination().resize(active_reads);
         read_lists.swap();

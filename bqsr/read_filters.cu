@@ -272,25 +272,29 @@ void filter_reads(bqsr_context *context, const alignment_batch& batch)
     num_active = bqsr::copy_if(active_read_list.begin(),
                                active_read_list.size(),
                                temp_u32.begin(),
-                               flags_filter);
+                               flags_filter,
+                               context->temp_storage);
 
     // apply the mapq filters, copying from temp_u32 into active_read_list
     num_active = bqsr::copy_if(temp_u32.begin(),
                                temp_u32.size(),
                                active_read_list.begin(),
-                               mapq_filter);
+                               mapq_filter,
+                               context->temp_storage);
 
     // apply the malformed read filters, copying from active_read_list into temp_u32
     num_active = bqsr::copy_if(active_read_list.begin(),
                                num_active,
                                temp_u32.begin(),
-                               malformed_read_filter);
+                               malformed_read_filter,
+                               context->temp_storage);
 
     // apply the malformed cigar filters, copying from temp_u32 into active_read_list
     num_active = bqsr::copy_if(temp_u32.begin(),
                                num_active,
                                active_read_list.begin(),
-                               malformed_cigar_filter);
+                               malformed_cigar_filter,
+                               context->temp_storage);
 
     // resize active_read_list
     active_read_list.resize(num_active);

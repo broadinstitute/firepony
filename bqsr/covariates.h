@@ -26,6 +26,8 @@ struct covariates_context
     D_CovariatePool mempool;
 
     D_CovariateTable recal_table_1;
+    D_CovariateTable cycle;
+    D_CovariateTable context;
 
     struct view
     {

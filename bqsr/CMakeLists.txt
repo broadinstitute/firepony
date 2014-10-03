@@ -57,4 +57,4 @@ add_dependencies(bqsr gamgee zlib)
 
 cuda_add_executable(bqsr-loader bqsr-loader.cu)
 target_link_libraries(bqsr-loader bqsr-common rt ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
-add_dependencies(bqsr-loader gamgee zlib)
+add_dependencies(bqsr-loader gamgee zlib cub)

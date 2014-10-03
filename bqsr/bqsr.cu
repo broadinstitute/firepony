@@ -69,10 +69,13 @@ void init_cuda(void)
 int main(int argc, char **argv)
 {
     // load the reference genome
-    const char *ref_name = "/home/nsubtil/hg96/hs37d5.fa";
-    const char *bam_name = "/home/nsubtil/hg96/HG00096.chrom20.ILLUMINA.bwa.GBR.low_coverage.20120522.bam";
-//    const char *bam_name = "/home/nsubtil/hg96/one-read.bam";
-    const char *vcf_name = "/home/nsubtil/hg96/ALL.chr20.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.vcf";
+    const char *default_ref_name = "/home/nsubtil/hg96/hs37d5.fa";
+    const char *default_bam_name = "/home/nsubtil/hg96/HG00096.chrom20.ILLUMINA.bwa.GBR.low_coverage.20120522.fixed.bam";
+    const char *default_vcf_name = "/home/nsubtil/hg96/ALL.chr20.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.vcf";
+
+    const char *bam_name = (argc < 2 ? default_bam_name : argv[1]);
+    const char *vcf_name = (argc < 3 ? default_vcf_name : argv[2]);
+    const char *ref_name = (argc < 4 ? default_ref_name : argv[3]);
 
     sequence_data reference;
     variant_database vcf;
@@ -194,7 +197,6 @@ int main(int argc, char **argv)
         printf("active BPs: %u out of %u (%f %%)\n", h_bplist.size() - zeros, h_bplist.size(), 100.0 * float(h_bplist.size() - zeros) / float(h_bplist.size()));
 #endif
 
-        break;
     }
 
     output_covariates(&context);

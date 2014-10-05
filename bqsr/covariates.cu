@@ -325,7 +325,7 @@ private:
 
             const bool valid_M = !is_sparse || covariate_packer::decode(keys.M, covariate_packer::TargetCovariate) != invalid_key;
             const bool valid_I = !is_sparse || covariate_packer::decode(keys.I, covariate_packer::TargetCovariate) != invalid_key;
-            const bool valid_D = !is_sparse || covariate_packer::decode(keys.I, covariate_packer::TargetCovariate) != invalid_key;
+            const bool valid_D = !is_sparse || covariate_packer::decode(keys.D, covariate_packer::TargetCovariate) != invalid_key;
 
 
             //        printf("locating key %x...\n", key);

@@ -32,14 +32,14 @@ struct covariates_context
     struct view
     {
         D_CovariatePool::view mempool;
-        D_CovariateTable::view recal_table_1;
+//        D_CovariateTable::view recal_table_1;
     };
 
     operator view()
     {
         view v = {
             mempool,
-            recal_table_1,
+//            recal_table_1,
         };
 
         return v;

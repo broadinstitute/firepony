@@ -42,6 +42,17 @@ inline CUDA_HOST_DEVICE uint8 dna_to_iupac16(const uint8 c)
     return 1 << c;
 }
 
+/// convert a IUPAC16 symbol to a 2-bit DNA symbol
+///
+inline CUDA_HOST_DEVICE uint8 iupac16_to_dna(const uint8 c)
+{
+#ifdef CUDA_DEVICE_COMPILATION
+    return 31 - __clz(uint32(c));
+#else
+    return 31 - __builtin_clz(uint32(c));
+#endif
+}
+
 /// convert a 4-bit DNA symbol to its ASCII character
 ///
 inline CUDA_HOST_DEVICE char iupac16_to_char(const uint8 c)

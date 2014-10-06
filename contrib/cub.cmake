@@ -3,7 +3,7 @@ ExternalProject_Add(cub
     PREFIX ${cub_PREFIX}
 #    GIT_REPOSITORY "https://github.com/nvlabs/cub.git"
     GIT_REPOSITORY "git://wilkins/nvlabs/cub.git"
-    GIT_TAG "a615c0f3b4a7dc78e9626e0a7c29d6e452da5230"
+    GIT_TAG "70de43938d9bed686531a5bf01bd6cbba8959884"
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ""
     INSTALL_COMMAND ""

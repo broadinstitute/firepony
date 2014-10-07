@@ -329,7 +329,7 @@ struct covariate_Context : public covariate<PreviousCovariate, 4 + constexpr_max
                                                      covariate_key_set input_key = {0, 0, 0})
     {
         const auto idx = batch.crq_index(read_index);
-        const auto& window = ctx.cigar.read_window_clipped[read_index];
+        const auto& window = ctx.covariates.high_quality_window[read_index];
 
         covariate_key context = 0;
         covariate_key context_mismatch = base::invalid_key_pattern;

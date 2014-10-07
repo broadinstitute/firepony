@@ -349,11 +349,51 @@ void build_covariates_table(D_CovariateTable& table, bqsr_context *context, cons
     table.pack(temp_keys, temp_values);
 }
 
+struct compute_high_quality_windows : public bqsr_lambda
+{
+    using bqsr_lambda::bqsr_lambda;
+
+    enum {
+        // any bases with q <= LOW_QUAL_TAIL are considered low quality
+        LOW_QUAL_TAIL = 2
+    };
+
+    CUDA_DEVICE void operator() (const uint32 read_index)
+    {
+        const CRQ_index idx = batch.crq_index(read_index);
+
+        const auto& window = ctx.cigar.read_window_clipped[read_index];
+        auto& low_qual_window = ctx.covariates.high_quality_window[read_index];
+
+        low_qual_window = window;
+
+        while(batch.qualities[idx.qual_start + low_qual_window.x] <= LOW_QUAL_TAIL &&
+                low_qual_window.x < low_qual_window.y)
+        {
+            low_qual_window.x++;
+        }
+
+        while(batch.qualities[idx.qual_start + low_qual_window.y] <= LOW_QUAL_TAIL &&
+                low_qual_window.y >= window.x)
+        {
+            low_qual_window.y--;
+        }
+    }
+};
+
 void gather_covariates(bqsr_context *context, const alignment_batch& batch)
 {
-    build_covariates_table<covariates_quality_table>(context->covariates.quality, context, batch);
-    build_covariates_table<covariate_table_cycle_illumina>(context->covariates.cycle, context, batch);
-    build_covariates_table<covariate_table_context>(context->covariates.context, context, batch);
+    auto& cv = context->covariates;
+
+    // compute the "high quality" windows (i.e., clip off low quality ends from each read)
+    cv.high_quality_window.resize(batch.device.num_reads);
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     compute_high_quality_windows(*context, batch.device));
+
+    build_covariates_table<covariates_quality_table>(cv.quality, context, batch);
+    build_covariates_table<covariate_table_cycle_illumina>(cv.cycle, context, batch);
+    build_covariates_table<covariate_table_context>(cv.context, context, batch);
 }
 
 void output_covariates(bqsr_context *context)

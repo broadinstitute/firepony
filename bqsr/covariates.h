@@ -23,6 +23,9 @@
 
 struct covariates_context
 {
+    // read window after clipping low quality ends
+    D_VectorU16_2 high_quality_window;
+
     D_CovariateTable scratch_table_space;
 
     D_CovariateTable quality;
@@ -31,12 +34,14 @@ struct covariates_context
 
     struct view
     {
+        D_VectorU16_2::view high_quality_window;
         D_CovariateTable::view scratch_table_space;
     };
 
     operator view()
     {
         view v = {
+            high_quality_window,
             scratch_table_space,
         };
 

@@ -29,7 +29,7 @@
 #include <thrust/functional.h>
 
 // defines a covariate chain equivalent to GATK's RecalTable1
-struct covariates_recaltable1
+struct covariates_quality_table
 {
     // the type that represents the chain of covariates
     typedef covariate_ReadGroup<
@@ -222,383 +222,75 @@ struct covariate_table_context
 };
 
 template <typename covariate_packer>
-struct covariate_gatherer
+struct covariate_gatherer : public bqsr_lambda
 {
-    // covariate table in local memory
-    D_LocalCovariateTable table;
+    using bqsr_lambda::bqsr_lambda;
 
-    // state
-    bqsr_context::view& ctx;
-    const alignment_batch_device::const_view& batch;
-
-    CUDA_HOST_DEVICE covariate_gatherer(bqsr_context::view& ctx,
-                                        const alignment_batch_device::const_view& batch)
-        : ctx(ctx), batch(batch)
-    {
-    }
-
-private:
-    // gather_covariates_for_read can run in two modes: gather (where table data is updated normally) and rollback (reverts all updates up to a given cigar event index)
-    typedef enum {
-        Gather,
-        Rollback,
-    } GatherCovariatesMode;
-
-    uint32 last_cigar_event_index;
-
-    // update a key at a given insertion point in the local table
-    // observations is incremented by 1, fractional_error is added to the current mismatch rate
-    // returns false if the table is full
-    CUDA_HOST_DEVICE bool update(uint32 insert_idx, covariate_key key, float fractional_error)
-    {
-        assert(insert_idx < LOCAL_TABLE_SIZE);
-
-        if (!table.exists(insert_idx) || table.keys[insert_idx] != key)
-        {
-//            printf("[B %d T %d] inserting key %x at index %d\n", blockIdx.x, threadIdx.x, key, insert_idx);
-            bool r = table.insert(key, insert_idx, fractional_error);
-            if (!r)
-            {
-                return false;
-            }
-        } else {
-//            printf("[B %d T %d] reusing key %x at index %d\n", blockIdx.x, threadIdx.x, key, insert_idx);
-            table.values[insert_idx].observations++;
-            table.values[insert_idx].mismatches += fractional_error;
-        }
-
-        return true;
-    }
-
-    CUDA_HOST_DEVICE void rollback(uint32 insert_idx, covariate_key key, float fractional_error)
-    {
-        // note: rollback can leave entries with 0 observations; there's probably no need to cull them, however, as they will show up later
-        assert(insert_idx < LOCAL_TABLE_SIZE);
-        assert(table.exists(insert_idx));
-        assert(table.keys[insert_idx] == key);
-        table.values[insert_idx].observations--;
-        table.values[insert_idx].mismatches -= fractional_error;
-    }
-
-    // returns false if we ran out of space
-    template <GatherCovariatesMode MODE>
-    CUDA_HOST_DEVICE bool process_read(bqsr_context::view ctx,
-                                        const alignment_batch_device::const_view batch,
-                                        const uint32 read_index)
+    CUDA_DEVICE void operator()(const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
         const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
-        const uint32 cigar_end = (MODE == Rollback ? last_cigar_event_index : ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len]);
+        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
 
-        uint32 counter_pass = 0;
-        uint32 counter_bp_offset = 0;
-        uint32 counter_inactive = 0;
-        uint32 counter_clip = 0;
-
-        for(uint32 cigar_event_index = cigar_start; cigar_event_index < cigar_end; cigar_event_index++)
+        for(uint32 i = cigar_start; i < cigar_end; i++)
         {
-            uint16 read_bp_offset = ctx.cigar.cigar_event_read_coordinates[cigar_event_index];
+            uint16 read_bp_offset = ctx.cigar.cigar_event_read_coordinates[i];
             if (read_bp_offset == uint16(-1))
             {
-                counter_bp_offset++;
                 continue;
             }
 
             if (ctx.active_location_list[idx.read_start + read_bp_offset] == 0)
             {
-                counter_inactive++;
                 continue;
             }
 
-            if (ctx.cigar.cigar_events[cigar_event_index] == cigar_event::S)
+            if (ctx.cigar.cigar_events[i] == cigar_event::S)
             {
-                counter_clip++;
                 continue;
             }
 
-            counter_pass++;
+            covariate_key_set keys = covariate_packer::chain::encode(ctx, batch, read_index, read_bp_offset, i, covariate_key_set{0, 0, 0});
 
-            covariate_key_set keys = covariate_packer::chain::encode(ctx, batch, read_index, read_bp_offset, cigar_event_index, covariate_key_set{0, 0, 0});
+            ctx.covariates.scratch_table_space.keys  [i * 3 + 0] = keys.M;
+            ctx.covariates.scratch_table_space.values[i * 3 + 0].observations = 1;
+            ctx.covariates.scratch_table_space.values[i * 3 + 0].mismatches = ctx.fractional_error.snp_errors[idx.qual_start + read_bp_offset];
 
-            constexpr bool is_sparse = covariate_packer::chain::is_sparse(covariate_packer::TargetCovariate);
-            constexpr uint32 invalid_key = covariate_packer::chain::invalid_key(covariate_packer::TargetCovariate);
+            ctx.covariates.scratch_table_space.keys  [i * 3 + 1] = keys.I;
+            ctx.covariates.scratch_table_space.values[i * 3 + 1].observations = 1;
+            ctx.covariates.scratch_table_space.values[i * 3 + 1].mismatches = ctx.fractional_error.insertion_errors[idx.qual_start + read_bp_offset];
 
-            const bool valid_M = !is_sparse || covariate_packer::decode(keys.M, covariate_packer::TargetCovariate) != invalid_key;
-            const bool valid_I = !is_sparse || covariate_packer::decode(keys.I, covariate_packer::TargetCovariate) != invalid_key;
-            const bool valid_D = !is_sparse || covariate_packer::decode(keys.D, covariate_packer::TargetCovariate) != invalid_key;
-
-
-            //        printf("locating key %x...\n", key);
-
-            //        if (table->exists(insert_idx) && table->table[insert_idx].key == key)
-            //            printf("... found at index %d (%x)\n", insert_idx, table->table[insert_idx].key);
-            //        else
-            //            printf("... not found\n");
-
-            //        {
-            //            struct covariate_table_entry *loc2 = NULL;
-            //            for(uint32 i = 0; i < table->num_entries; i++)
-            //            {
-            //                if (table->table[i].key == key)
-            //                {
-            //                    loc2 = &table->table[i];
-            //                    break;
-            //                }
-            //            }
-            //
-            //            if (loc2 && &table->table[insert_idx] != loc2)
-            //            {
-            //                printf("bug!\n");
-            //            }
-            //        }
-
-            float fractional_error_M;
-            float fractional_error_I;
-            float fractional_error_D;
-
-            if (valid_M)
-                fractional_error_M = ctx.fractional_error.snp_errors[idx.qual_start + read_bp_offset];
-
-            if (valid_I)
-                fractional_error_I = ctx.fractional_error.insertion_errors[idx.qual_start + read_bp_offset];
-
-            if (valid_D)
-                fractional_error_D = ctx.fractional_error.deletion_errors[idx.qual_start + read_bp_offset];
-
-            if (MODE == Gather)
-            {
-                // try to insert each of the keys in the key set, one at a time
-                // if any of them fails, roll back all previous keys and mark for continuation in the next pass
-
-                uint32 insert_idx_M, insert_idx_I, insert_idx_D;
-                bool ret;
-
-                if (valid_M)
-                {
-                    insert_idx_M = table.find_insertion_point(keys.M);
-                    assert(insert_idx_M < LOCAL_TABLE_SIZE);
-
-//                    printf("[B %d T %d] inserting M index = %d key = %x\n", blockIdx.x, threadIdx.x, insert_idx_M, keys.M);
-                    ret = update(insert_idx_M, keys.M, fractional_error_M);
-                    if (ret == false)
-                    {
-//                        printf("[B %d T %d] overflow! rollback at read index %u event index %u event M insert index %d\n", blockIdx.x, threadIdx.x, read_index, cigar_event_index, insert_idx_M);
-
-                        // mark for rollback from here
-                        last_cigar_event_index = cigar_event_index;
-                        return false;
-                    }
-                }
-
-                if (valid_I)
-                {
-                    insert_idx_I = table.find_insertion_point(keys.I);
-                    assert(insert_idx_I < LOCAL_TABLE_SIZE);
-
-//                    printf("[B %d T %d] inserting I index = %d key = %x\n", blockIdx.x, threadIdx.x, insert_idx_I, keys.I);
-                    ret = update(insert_idx_I, keys.I, fractional_error_I);
-                    if (ret == false)
-                    {
-//                        printf("[B %d T %d] overflow! rollback at read index %u event index %u event I insert index %d\n", blockIdx.x, threadIdx.x, read_index, cigar_event_index, insert_idx_I);
-
-//                        printf("[B %d T %d] rolling back M (index %d sentinel %d)\n", blockIdx.x, threadIdx.x, insert_idx_M, sentinel_M);
-                        if (valid_M)
-                        {
-                            rollback(insert_idx_M, keys.M, fractional_error_M);
-                        }
-
-                        // mark for rollback from here
-                        last_cigar_event_index = cigar_event_index;
-                        return false;
-                    }
-                }
-
-                if (valid_D)
-                {
-                    insert_idx_D = table.find_insertion_point(keys.D);
-                    assert(insert_idx_D < LOCAL_TABLE_SIZE);
-
-//                    printf("[B %d T %d] inserting D index = %d key = %x\n", blockIdx.x, threadIdx.x, insert_idx_D, keys.D);
-                    ret = update(insert_idx_D, keys.D, fractional_error_D);
-                    if (ret == false)
-                    {
-//                        printf("[B %d T %d] overflow! rollback at read index %u event index %u event D insert index %d\n", blockIdx.x, threadIdx.x, read_index, cigar_event_index, insert_idx_D);
-
-//                        printf("[B %d T %d] rolling back I (index %d sentinel %d)\n", blockIdx.x, threadIdx.x, insert_idx_I, sentinel_I);
-                        if (valid_I)
-                        {
-                            rollback(insert_idx_I, keys.I, fractional_error_I);
-                        }
-
-//                        printf("[B %d T %d] rolling back M (index %d sentinel %d)\n", blockIdx.x, threadIdx.x, insert_idx_M, sentinel_M);
-                        if (valid_M)
-                        {
-                            rollback(insert_idx_M, keys.M, fractional_error_M);
-                        }
-
-                        // mark for rollback from here
-                        last_cigar_event_index = cigar_event_index;
-                        return false;
-                    }
-                }
-            } else {
-                // MODE == Rollback
-                if (valid_M)
-                {
-                    uint32 insert_idx_M = table.find_insertion_point(keys.M);
-                    assert(insert_idx_M < LOCAL_TABLE_SIZE);
-//                    printf("[B %d T %d] rollback mode: rolling back M at index %d key %x\n", blockIdx.x, threadIdx.x, insert_idx_M, keys.M);
-                    rollback(insert_idx_M, keys.M, fractional_error_M);
-                }
-
-                if (valid_I)
-                {
-                    uint32 insert_idx_I = table.find_insertion_point(keys.I);
-                    assert(insert_idx_I < LOCAL_TABLE_SIZE);
-//                    printf("[B %d T %d] rollback mode: rolling back I at index %d key %x\n", blockIdx.x, threadIdx.x, insert_idx_I, keys.I);
-                    rollback(insert_idx_I, keys.I, fractional_error_I);
-                }
-
-                if (valid_D)
-                {
-                    uint32 insert_idx_D = table.find_insertion_point(keys.D);
-                    assert(insert_idx_D < LOCAL_TABLE_SIZE);
-//                    printf("[B %d T %d] rollback mode: rolling back D at index %d key %x\n", blockIdx.x, threadIdx.x, insert_idx_D, keys.D);
-                    rollback(insert_idx_D, keys.D, fractional_error_D);
-                }
-            }
-        }
-
-        return true;
-    }
-
-public:
-    CUDA_HOST_DEVICE bool process(bqsr_context::view ctx,
-                                   const alignment_batch_device::const_view batch,
-                                   D_VectorU32::view& active_read_list,
-                                   const uint32 read_id)
-    {
-        const uint32 read_index = active_read_list[read_id];
-        bool ret;
-
-        ret = process_read<Gather>(ctx, batch, read_index);
-        if (ret == false)
-        {
-            // rollback this read in the table
-            process_read<Rollback>(ctx, batch, read_index);
-            return false;
-        } else {
-            return true;
+            ctx.covariates.scratch_table_space.keys  [i * 3 + 2] = keys.D;
+            ctx.covariates.scratch_table_space.values[i * 3 + 2].observations = 1;
+            ctx.covariates.scratch_table_space.values[i * 3 + 2].mismatches = ctx.fractional_error.deletion_errors[idx.qual_start + read_bp_offset];
         }
     }
 };
 
-template<typename covariate_packer>
-__global__ void covariates_kernel(D_VectorU32::view active_read_list,
-                                  bqsr_context::view ctx,
-                                  const alignment_batch_device::const_view batch)
+template <typename covariate_packer>
+struct flag_valid_keys : public bqsr_lambda
 {
-    covariates_context::view& cv = ctx.covariates;
+    D_VectorU8::view flags;
 
-    covariate_gatherer<covariate_packer> gatherer(ctx, batch);
-    int tid = threadIdx.x + blockIdx.x * blockDim.x;
-
-    // process reads until we overflow the local memory buffer
-    while(tid < active_read_list.size())
-    {
-        uint32 read_index = ctx.active_read_list[tid];
-        bool ret;
-
-        ret = gatherer.process(ctx, batch, active_read_list, tid);
-        if (ret == false)
-        {
-            break;
-        }
-
-        tid += blockDim.x * gridDim.x;
-    }
-
-    if (gatherer.table.size())
-    {
-        // allocate a chunk of memory to dump our local table into
-        uint32 alloc;
-        alloc = ctx.covariates.mempool.allocate(gatherer.table.size());
-        if (alloc == uint32(-1))
-        {
-            // out of memory
-            // do not flush and do not retire processed reads (they will be processed in the next pass)
-            return;
-        }
-
-        memcpy(cv.mempool.keys.begin() + alloc, gatherer.table.keys, sizeof(gatherer.table.keys[0]) * gatherer.table.size());
-        memcpy(cv.mempool.values.begin() + alloc, gatherer.table.values, sizeof(gatherer.table.values[0]) * gatherer.table.size());
-    }
-
-    // retire all reads we processed
-    uint32 tid_last = tid;
-
-    tid = threadIdx.x + blockIdx.x * blockDim.x;
-    while(tid < active_read_list.size() && tid < tid_last)
-    {
-        active_read_list[tid] = uint32(-1);
-        tid += blockDim.x * gridDim.x;
-    }
-}
-
-#if 0
-template<typename covariate_packer>
-void covariates_cpu(D_CovariateTable::view output,
-                    bqsr_context::view ctx,
-                    const alignment_batch_device::const_view batch)
-{
-    covariate_table table;
-
-    for(uint32 i = 0; i < ctx.active_read_list.size(); i++)
-    {
-        uint32 read_index = ctx.active_read_list[i];
-        gather_covariates_for_read<typename covariate_packer>(ctx, batch, read_index, table);
-    }
-
-    for(int i = 0; i < LOCAL_TABLE_SIZE; i++)
-    {
-        output[i] = table[i];
-    }
-
-    ctx.covariates.table_size[0] = table.size();
-}
-#endif
-
-struct pingpong_read_lists
-{
-    D_VectorU32& a;
-    D_VectorU32& b;
-    uint8 i;
-
-    pingpong_read_lists(D_VectorU32& a, D_VectorU32& b)
-        : a(a), b(b), i(0)
+    flag_valid_keys(bqsr_context::view ctx,
+                    const alignment_batch_device::const_view batch,
+                    D_VectorU8::view flags)
+        : bqsr_lambda(ctx, batch), flags(flags)
     { }
 
-    D_VectorU32& source(void)
+    CUDA_HOST_DEVICE void operator() (const uint32 key_index)
     {
-        return (i ? a : b);
-    }
+        constexpr bool sparse = covariate_packer::chain::is_sparse(covariate_packer::TargetCovariate);
 
-    D_VectorU32& destination(void)
-    {
-        return (i ? b : a);
-    }
+        const covariate_key& key = ctx.covariates.scratch_table_space.keys[key_index];
 
-    void swap(void)
-    {
-        i ^= 1;
-    }
-};
-
-struct read_is_valid
-{
-    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
-    {
-        return (read_index != uint32(-1));
+        if (key == covariate_key(-1) ||
+            (sparse && covariate_packer::decode(key, covariate_packer::TargetCovariate) == covariate_packer::chain::invalid_key(covariate_packer::TargetCovariate)))
+        {
+            flags[key_index] = 0;
+        } else {
+            flags[key_index] = 1;
+        }
     }
 };
 
@@ -606,75 +298,67 @@ template <typename covariate_packer>
 void build_covariates_table(D_CovariateTable& table, bqsr_context *context, const alignment_batch& batch)
 {
     covariates_context& cv = context->covariates;
+    auto& scratch_table = cv.scratch_table_space;
 
-    // set up our ping-pong read lists
-    pingpong_read_lists read_lists(context->temp_u32, context->temp_u32_2);
+    D_VectorU8& flags = context->temp_u8;
 
-    // copy the current read list into the source list
-    read_lists.source() = context->active_read_list;
-    // resize the destination list to make sure we have enough space
-    read_lists.destination().resize(context->active_read_list.size());
+    D_Vector<covariate_value> temp_values;
+    D_Vector<covariate_key> temp_keys;
 
-    cv.mempool.resize(LOCAL_TABLE_SIZE * 256);
+    // set up a scratch table space with enough room for 3 keys per cigar event
+    scratch_table.resize(context->cigar.cigar_events.size() * 3);
+    table.resize(context->cigar.cigar_events.size() * 3);
+    flags.resize(context->cigar.cigar_events.size() * 3);
 
-    // set up our list of indices and temporary arrays for sorting
-    D_Vector<covariate_key>& indices = context->temp_u32_3;
-    indices.resize(LOCAL_TABLE_SIZE * 256);
+    // mark all keys as invalid
+    thrust::fill(scratch_table.keys.begin(),
+                 scratch_table.keys.end(),
+                 covariate_key(-1));
 
-    // xxxnsubtil: fix this to not go through cudaMalloc/cudaFree every time
-    D_Vector<covariate_value> temp_sorted;
-    temp_sorted.resize(indices.size());
+    // generate keys into the scratch table
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     covariate_gatherer<covariate_packer>(*context, batch.device));
 
-    uint32 active_reads = read_lists.source().size();
+    // flag valid keys
+    thrust::for_each(thrust::make_counting_iterator(0u),
+                     thrust::make_counting_iterator(0u) + cv.scratch_table_space.keys.size(),
+                     flag_valid_keys<covariate_packer>(*context, batch.device, flags));
 
-    // figure out our launch parameters and mempool size
-    const uint32 threads_per_block = 128;
-    // the number of reads per thread will affect how often we move local memory into the mempool
-    // running with reads_per_thread = 1 means the mempool will fill up very quickly
-    // on the other hand, a large reads_per_thread value will cause divergence due to occasional flushes of the local storage into the mempool
-    // the ideal value would cause each thread to run for as long as possible without flushing until the very end
-    const uint32 reads_per_thread = 32;
-    const uint32 num_blocks = bqsr::divide_ri(read_lists.source().size(), threads_per_block * reads_per_thread);
+    // copy valid keys into the output table
+    bqsr::copy_flagged(scratch_table.keys.begin(),
+                       flags.size(),
+                       table.keys.begin(),
+                       flags.begin(),
+                       context->temp_storage);
 
-    do {
-        cv.mempool.clear();
+    bqsr::copy_flagged(scratch_table.values.begin(),
+                       flags.size(),
+                       table.values.begin(),
+                       flags.begin(),
+                       context->temp_storage);
 
-        covariates_kernel<covariate_packer> <<<num_blocks, threads_per_block>>>(read_lists.source(), *context, batch.device);
-        cudaDeviceSynchronize();
+    // count valid keys
+    uint32 valid_keys = thrust::reduce(flags.begin(), flags.end(), uint32(0));
 
-        // read back the number of items in the mempool
-        const uint32 mempool_size = cv.mempool.items_allocated[0];
+    // resize the table
+    table.resize(valid_keys);
 
-        // concat the mempool to the end of the current table
-        table.concatenate(cv.mempool, mempool_size);
-        // sort the concatenated table
-        table.sort(indices, temp_sorted);
-        // pack the table
-        // (indices is reused as a temporary vector here)
-        table.pack(indices, temp_sorted);
-
-        // compact the active read list
-        active_reads = bqsr::copy_if(read_lists.source().begin(),
-                                     read_lists.source().size(),
-                                     read_lists.destination().begin(),
-                                     read_is_valid(),
-                                     context->temp_storage);
-
-        read_lists.destination().resize(active_reads);
-        read_lists.swap();
-    } while(active_reads);
+    // sort and reduce the table by key
+    table.sort(temp_keys, temp_values, context->temp_storage, covariate_packer::chain::next_offset);
+    table.pack(temp_keys, temp_values);
 }
 
 void gather_covariates(bqsr_context *context, const alignment_batch& batch)
 {
-    build_covariates_table<covariates_recaltable1>(context->covariates.recal_table_1, context, batch);
+    build_covariates_table<covariates_quality_table>(context->covariates.quality, context, batch);
     build_covariates_table<covariate_table_cycle_illumina>(context->covariates.cycle, context, batch);
     build_covariates_table<covariate_table_context>(context->covariates.context, context, batch);
 }
 
 void output_covariates(bqsr_context *context)
 {
-    covariates_recaltable1::dump_table(context, context->covariates.recal_table_1);
+    covariates_quality_table::dump_table(context, context->covariates.quality);
 
     printf("#:GATKTable:8:2386:%%s:%%s:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n");
     printf("#:GATKTable:RecalTable2:\n");

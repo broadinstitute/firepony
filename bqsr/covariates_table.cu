@@ -25,26 +25,44 @@
 #include <thrust/sort.h>
 #include <thrust/reduce.h>
 
-void D_CovariateTable::concatenate(D_CovariateTable& other, size_t other_size)
+#include <cub/device/device_radix_sort.cuh>
+
+// xxxnsubtil: move this into primitives/parallel.h
+void D_CovariateTable::sort(D_Vector<covariate_key>& temp_keys, D_Vector<covariate_value>& temp_values,
+                            D_VectorU8& temp_storage, uint32 num_key_bits)
 {
-    size_t concat_index = size();
+    temp_keys.resize(size());
+    temp_values.resize(size());
 
-    resize(size() + other_size);
+    cub::DoubleBuffer<covariate_key>   d_keys(thrust::raw_pointer_cast(keys.data()),
+                                              thrust::raw_pointer_cast(temp_keys.data()));
+    cub::DoubleBuffer<covariate_value> d_values(thrust::raw_pointer_cast(values.data()),
+                                                thrust::raw_pointer_cast(temp_values.data()));
 
-    thrust::copy(other.keys.begin(), other.keys.begin() + other_size, keys.begin() + concat_index);
-    thrust::copy(other.values.begin(), other.values.begin() + other_size, values.begin() + concat_index);
-}
+    size_t temp_storage_bytes = 0;
+    cub::DeviceRadixSort::SortPairs(nullptr,
+                                    temp_storage_bytes,
+                                    d_keys,
+                                    d_values,
+                                    size());
 
-void D_CovariateTable::sort(D_VectorU32& indices, D_Vector<covariate_value>& temp)
-{
-    indices.resize(size());
-    temp.resize(size());
+    temp_storage.resize(temp_storage_bytes);
 
-    thrust::sequence(indices.begin(), indices.end());
-    thrust::sort_by_key(keys.begin(), keys.end(), indices.begin());
+    cub::DeviceRadixSort::SortPairs(thrust::raw_pointer_cast(temp_storage.data()),
+                                    temp_storage_bytes,
+                                    d_keys,
+                                    d_values,
+                                    size());
 
-    thrust::gather(indices.begin(), indices.end(), values.begin(), temp.begin());
-    values = temp;
+    if (thrust::raw_pointer_cast(keys.data()) != d_keys.Current())
+    {
+        cudaMemcpy(thrust::raw_pointer_cast(keys.data()), d_keys.Current(), sizeof(covariate_key) * size(), cudaMemcpyDeviceToDevice);
+    }
+
+    if (thrust::raw_pointer_cast(values.data()) != d_values.Current())
+    {
+        cudaMemcpy(thrust::raw_pointer_cast(values.data()), d_values.Current(), sizeof(covariate_value) * size(), cudaMemcpyDeviceToDevice);
+    }
 }
 
 struct covariate_value_sum

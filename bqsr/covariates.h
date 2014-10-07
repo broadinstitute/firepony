@@ -23,23 +23,21 @@
 
 struct covariates_context
 {
-    D_CovariatePool mempool;
+    D_CovariateTable scratch_table_space;
 
-    D_CovariateTable recal_table_1;
+    D_CovariateTable quality;
     D_CovariateTable cycle;
     D_CovariateTable context;
 
     struct view
     {
-        D_CovariatePool::view mempool;
-//        D_CovariateTable::view recal_table_1;
+        D_CovariateTable::view scratch_table_space;
     };
 
     operator view()
     {
         view v = {
-            mempool,
-//            recal_table_1,
+            scratch_table_space,
         };
 
         return v;

@@ -69,6 +69,7 @@ struct bqsr_context
     D_VectorU32 temp_u32_3;
     D_VectorU32 temp_u32_4;
     D_VectorF32 temp_f32;
+    D_VectorU8  temp_u8;
 
     // various pipeline states go here
     snp_filter_context snp_filter;
@@ -103,6 +104,7 @@ struct bqsr_context
         D_VectorU32::view                       temp_u32_2;
         D_VectorU32::view                       temp_u32_3;
         D_VectorU32::view                       temp_u32_4;
+        D_VectorU8::view                        temp_u8;
         snp_filter_context::view                snp_filter;
         cigar_context::view                     cigar;
         baq_context::view                       baq;
@@ -126,6 +128,7 @@ struct bqsr_context
             temp_u32_2,
             temp_u32_3,
             temp_u32_4,
+            temp_u8,
             snp_filter,
             cigar,
             baq,

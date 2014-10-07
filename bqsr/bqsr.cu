@@ -128,7 +128,7 @@ int main(int argc, char **argv)
                         AlignmentDataMask::MAPQ |
                         AlignmentDataMask::READ_GROUP;
 
-    while(bam.next_batch(&batch, data_mask, 100000))
+    while(bam.next_batch(&batch, data_mask, 80000))
 //    while(bam.next_batch(&batch, 500))
     {
         // load the next batch on the device

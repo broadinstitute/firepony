@@ -31,7 +31,7 @@ struct filter_if_any_set : public bqsr_lambda
 {
     using bqsr_lambda::bqsr_lambda;
 
-    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
+    CUDA_DEVICE bool operator() (const uint32 read_index)
     {
         if ((batch.flags[read_index] & flags) != 0)
         {
@@ -47,7 +47,7 @@ struct filter_mapq : public bqsr_lambda
 {
     using bqsr_lambda::bqsr_lambda;
 
-    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
+    CUDA_DEVICE bool operator() (const uint32 read_index)
     {
         if (batch.mapq[read_index] == 0 ||
             batch.mapq[read_index] == 255)
@@ -64,7 +64,7 @@ struct filter_malformed_reads : public bqsr_lambda
 {
     using bqsr_lambda::bqsr_lambda;
 
-    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
+    CUDA_DEVICE bool operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
 
@@ -141,7 +141,7 @@ struct filter_malformed_cigars : public bqsr_lambda
 {
     using bqsr_lambda::bqsr_lambda;
 
-    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
+    CUDA_DEVICE bool operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
 
@@ -264,22 +264,23 @@ void filter_reads(bqsr_context *context, const alignment_batch& batch)
     filter_malformed_cigars malformed_cigar_filter(*context, batch.device);
 
     start_count = active_read_list.size();
+    num_active = active_read_list.size();
 
     // make sure the temp buffer is big enough
     context->temp_u32.resize(active_read_list.size());
 
-    // apply the flags filter, copying from active_read_list into temp_u32
+    // apply the mapq filter, copying from active_read_list into temp_u32
     num_active = bqsr::copy_if(active_read_list.begin(),
-                               active_read_list.size(),
+                               num_active,
                                temp_u32.begin(),
-                               flags_filter,
+                               mapq_filter,
                                context->temp_storage);
 
-    // apply the mapq filters, copying from temp_u32 into active_read_list
+    // apply the flags filters, copying from temp_u32 into active_read_list
     num_active = bqsr::copy_if(temp_u32.begin(),
-                               temp_u32.size(),
+                               num_active,
                                active_read_list.begin(),
-                               mapq_filter,
+                               flags_filter,
                                context->temp_storage);
 
     // apply the malformed read filters, copying from active_read_list into temp_u32
@@ -299,16 +300,14 @@ void filter_reads(bqsr_context *context, const alignment_batch& batch)
     // resize active_read_list
     active_read_list.resize(num_active);
 
+    // track how many reads we filtered
     context->stats.filtered_reads += start_count - num_active;
 }
 
 // filter non-regular bases (anything other than A, C, G, T)
 struct filter_non_regular_bases : public bqsr_lambda
 {
-    filter_non_regular_bases(bqsr_context::view ctx,
-                             const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
-    { }
+    using bqsr_lambda::bqsr_lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -337,10 +336,7 @@ struct filter_non_regular_bases : public bqsr_lambda
 // filter bases with quality < MIN_USABLE_Q_SCORE
 struct filter_low_quality_bases : public bqsr_lambda
 {
-    filter_low_quality_bases(bqsr_context::view ctx,
-                             const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
-    { }
+    using bqsr_lambda::bqsr_lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {

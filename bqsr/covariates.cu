@@ -21,207 +21,18 @@
 #include "alignment_data.h"
 #include "bqsr_context.h"
 #include "covariates.h"
-#include "covariates_bit_packing.h"
+
+#include "covariates/table_context.h"
+#include "covariates/table_cycle_illumina.h"
+#include "covariates/table_quality_scores.h"
 
 #include "primitives/util.h"
 #include "primitives/parallel.h"
 
 #include <thrust/functional.h>
 
-// defines a covariate chain equivalent to GATK's RecalTable1
-struct covariates_quality_table
-{
-    // the type that represents the chain of covariates
-    typedef covariate_ReadGroup<
-             covariate_QualityScore<
-              covariate_EventTracker<> > > chain;
-
-    // the index of each covariate in the chain
-    // (used when decoding a key)
-    // the order is defined by the typedef above
-    typedef enum {
-        ReadGroup = 3,
-        QualityScore = 2,
-        EventTracker = 1,
-
-        // target covariate is mostly meaningless for recaltable1
-        TargetCovariate = QualityScore,
-    } CovariateID;
-
-    // extract a given covariate value from a key
-    static CUDA_HOST_DEVICE uint32 decode(covariate_key key, CovariateID id)
-    {
-        return chain::decode(key, id);
-    }
-
-    static void dump_table(bqsr_context *context, D_CovariateTable& d_table)
-    {
-        H_CovariateTable table;
-        table.copyfrom(d_table);
-
-        printf("#:GATKTable:6:138:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n");
-        printf("#:GATKTable:RecalTable1:\n");
-        printf("ReadGroup\tQualityScore\tEventType\tEmpiricalQuality\tObservations\tErrors\n");
-        for(uint32 i = 0; i < table.size(); i++)
-        {
-            uint32 rg_id = decode(table.keys[i], ReadGroup);
-            const std::string& rg_name = context->bam_header.read_groups_db.lookup(rg_id);
-
-            printf("%s\t%d\t\t%c\t\t%.4f\t\t\t%d\t\t%.2f\n",
-                    rg_name.c_str(),
-                    decode(table.keys[i], QualityScore),
-                    cigar_event::ascii(decode(table.keys[i], EventTracker)),
-                    float(decode(table.keys[i], QualityScore)),
-                    table.values[i].observations,
-                    table.values[i].mismatches);
-        }
-        printf("\n");
-    }
-};
-
-// the cycle portion of GATK's RecalTable2
-struct covariate_table_cycle_illumina
-{
-    // the type that represents the chain of covariates
-    typedef covariate_ReadGroup<
-             covariate_QualityScore<
-              covariate_Cycle_Illumina<
-               covariate_EventTracker<> > > > chain;
-
-    // the index of each covariate in the chain
-    // (used when decoding a key)
-    // the order is defined by the typedef above
-    typedef enum {
-        ReadGroup = 4,
-        QualityScore = 3,
-        Cycle = 2,
-        EventTracker = 1,
-
-        // defines which covariate is the "target" for this table
-        // used when checking for invalid keys
-        TargetCovariate = Cycle,
-    } CovariateID;
-
-    // extract a given covariate value from a key
-    static CUDA_HOST_DEVICE uint32 decode(covariate_key key, CovariateID id)
-    {
-        return chain::decode(key, id);
-    }
-
-    static void dump_table(bqsr_context *context, D_CovariateTable& d_table)
-    {
-        H_CovariateTable table;
-        table.copyfrom(d_table);
-
-        for(uint32 i = 0; i < table.size(); i++)
-        {
-            uint32 rg_id = decode(table.keys[i], ReadGroup);
-            const std::string& rg_name = context->bam_header.read_groups_db.lookup(rg_id);
-
-            // decode the group separately
-            uint32 raw_group = decode(table.keys[i], Cycle);
-            int group = raw_group >> 1;
-
-            // apply the "sign" bit
-            if (raw_group & 1)
-                group = -group;
-
-            // ReadGroup, QualityScore, CovariateValue, CovariateName, EventType, EmpiricalQuality, Observations, Errors
-            printf("%s\t%d\t\t%d\t\t%s\t\t%c\t\t%.4f\t\t%d\t\t%.2f\n",
-                    rg_name.c_str(),
-                    decode(table.keys[i], QualityScore),
-                    group,
-                    "Cycle",
-                    cigar_event::ascii(decode(table.keys[i], EventTracker)),
-                    float(decode(table.keys[i], QualityScore)),
-                    table.values[i].observations,
-                    table.values[i].mismatches);
-        }
-    }
-};
-
-// the context portion of GATK's RecalTable2
-struct covariate_table_context
-{
-    enum {
-        num_bases_mismatch = 2,
-        num_bases_indel = 3,
-
-        // xxxnsubtil: this is duplicated from covariate_Context
-        num_bases_in_context = constexpr_max(num_bases_mismatch, num_bases_indel),
-
-        base_bits = num_bases_in_context * 2,
-        base_bits_mismatch = num_bases_mismatch * 2,
-        base_bits_indel = num_bases_indel * 2,
-
-        length_bits = 4,
-    };
-
-    // the type that represents the chain of covariates
-    typedef covariate_ReadGroup<
-             covariate_QualityScore<
-              covariate_Context<num_bases_mismatch, num_bases_indel,
-               covariate_EventTracker<> > > > chain;
-
-    // the index of each covariate in the chain
-    // (used when decoding a key)
-    // the order is defined by the typedef above
-    typedef enum {
-        ReadGroup = 4,
-        QualityScore = 3,
-        Context = 2,
-        EventTracker = 1,
-
-        // defines which covariate is the "target" for this table
-        // used when checking for invalid keys
-        TargetCovariate = Context,
-    } CovariateID;
-
-    // extract a given covariate value from a key
-    static CUDA_HOST_DEVICE uint32 decode(covariate_key key, CovariateID id)
-    {
-        return chain::decode(key, id);
-    }
-
-    static void dump_table(bqsr_context *context, D_CovariateTable& d_table)
-    {
-        H_CovariateTable table;
-        table.copyfrom(d_table);
-
-        for(uint32 i = 0; i < table.size(); i++)
-        {
-            uint32 rg_id = decode(table.keys[i], ReadGroup);
-            const std::string& rg_name = context->bam_header.read_groups_db.lookup(rg_id);
-
-            // decode the context separately
-            covariate_key raw_context = decode(table.keys[i], Context);
-            int size = (raw_context & BITMASK(length_bits));
-            covariate_key context = raw_context >> length_bits;
-
-            char sequence[size + 1];
-
-            for(int j = 0; j < size; j++)
-            {
-                const int offset = j * 2;
-                sequence[j] = from_nvbio::dna_to_char((context >> offset) & 3);
-            }
-            sequence[size] = 0;
-
-            // ReadGroup, QualityScore, CovariateValue, CovariateName, EventType, EmpiricalQuality, Observations, Errors
-            printf("%s\t%d\t\t%s\t\t%s\t\t%c\t\t%.4f\t\t%d\t\t%.2f\n",
-                    rg_name.c_str(),
-                    decode(table.keys[i], QualityScore),
-                    sequence,
-                    "Context",
-                    cigar_event::ascii(decode(table.keys[i], EventTracker)),
-                    float(decode(table.keys[i], QualityScore)),
-                    table.values[i].observations,
-                    table.values[i].mismatches);
-        }
-    }
-};
-
-template <typename covariate_packer>
+// accumulates events from a read batch into a given covariate table
+template <typename covariate_table>
 struct covariate_gatherer : public bqsr_lambda
 {
     using bqsr_lambda::bqsr_lambda;
@@ -250,7 +61,7 @@ struct covariate_gatherer : public bqsr_lambda
                 continue;
             }
 
-            covariate_key_set keys = covariate_packer::chain::encode(ctx, batch, read_index, read_bp_offset, i, covariate_key_set{0, 0, 0});
+            covariate_key_set keys = covariate_table::chain::encode(ctx, batch, read_index, read_bp_offset, i, covariate_key_set{0, 0, 0});
 
             ctx.covariates.scratch_table_space.keys  [i * 3 + 0] = keys.M;
             ctx.covariates.scratch_table_space.values[i * 3 + 0].observations = 1;
@@ -267,7 +78,8 @@ struct covariate_gatherer : public bqsr_lambda
     }
 };
 
-template <typename covariate_packer>
+// functor used for filtering out invalid keys in a table
+template <typename covariate_table>
 struct flag_valid_keys : public bqsr_lambda
 {
     D_VectorU8::view flags;
@@ -280,12 +92,12 @@ struct flag_valid_keys : public bqsr_lambda
 
     CUDA_HOST_DEVICE void operator() (const uint32 key_index)
     {
-        constexpr bool sparse = covariate_packer::chain::is_sparse(covariate_packer::TargetCovariate);
+        constexpr bool sparse = covariate_table::chain::is_sparse(covariate_table::TargetCovariate);
 
         const covariate_key& key = ctx.covariates.scratch_table_space.keys[key_index];
 
         if (key == covariate_key(-1) ||
-            (sparse && covariate_packer::decode(key, covariate_packer::TargetCovariate) == covariate_packer::chain::invalid_key(covariate_packer::TargetCovariate)))
+            (sparse && covariate_table::decode(key, covariate_table::TargetCovariate) == covariate_table::chain::invalid_key(covariate_table::TargetCovariate)))
         {
             flags[key_index] = 0;
         } else {
@@ -294,8 +106,9 @@ struct flag_valid_keys : public bqsr_lambda
     }
 };
 
-template <typename covariate_packer>
-void build_covariates_table(D_CovariateTable& table, bqsr_context *context, const alignment_batch& batch)
+// processes a batch of reads and updates covariate table data for a given table
+template <typename covariate_table>
+static void build_covariates_table(D_CovariateTable& table, bqsr_context *context, const alignment_batch& batch)
 {
     covariates_context& cv = context->covariates;
     auto& scratch_table = cv.scratch_table_space;
@@ -318,12 +131,12 @@ void build_covariates_table(D_CovariateTable& table, bqsr_context *context, cons
     // generate keys into the scratch table
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
-                     covariate_gatherer<covariate_packer>(*context, batch.device));
+                     covariate_gatherer<covariate_table>(*context, batch.device));
 
     // flag valid keys
     thrust::for_each(thrust::make_counting_iterator(0u),
                      thrust::make_counting_iterator(0u) + cv.scratch_table_space.keys.size(),
-                     flag_valid_keys<covariate_packer>(*context, batch.device, flags));
+                     flag_valid_keys<covariate_table>(*context, batch.device, flags));
 
     // copy valid keys into the output table
     bqsr::copy_flagged(scratch_table.keys.begin(),
@@ -345,7 +158,7 @@ void build_covariates_table(D_CovariateTable& table, bqsr_context *context, cons
     table.resize(valid_keys);
 
     // sort and reduce the table by key
-    table.sort(temp_keys, temp_values, context->temp_storage, covariate_packer::chain::next_offset);
+    table.sort(temp_keys, temp_values, context->temp_storage, covariate_table::chain::next_offset);
     table.pack(temp_keys, temp_values);
 }
 
@@ -391,14 +204,14 @@ void gather_covariates(bqsr_context *context, const alignment_batch& batch)
                      context->active_read_list.end(),
                      compute_high_quality_windows(*context, batch.device));
 
-    build_covariates_table<covariates_quality_table>(cv.quality, context, batch);
+    build_covariates_table<covariate_table_quality>(cv.quality, context, batch);
     build_covariates_table<covariate_table_cycle_illumina>(cv.cycle, context, batch);
     build_covariates_table<covariate_table_context>(cv.context, context, batch);
 }
 
 void output_covariates(bqsr_context *context)
 {
-    covariates_quality_table::dump_table(context, context->covariates.quality);
+    covariate_table_quality::dump_table(context, context->covariates.quality);
 
     printf("#:GATKTable:8:2386:%%s:%%s:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n");
     printf("#:GATKTable:RecalTable2:\n");

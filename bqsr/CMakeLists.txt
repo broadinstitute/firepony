@@ -8,7 +8,6 @@ bqsr_types.h
 cigar.cu
 cigar.h
 covariates.h
-covariates_bit_packing.h
 covariates_table.cu
 covariates_table.h
 covariates.cu
@@ -32,6 +31,16 @@ util.cu
 util.h
 variant_data.cu
 variant_data.h
+
+covariates/bit_packers/bit_packing.h
+covariates/bit_packers/context.h
+covariates/bit_packers/cycle_illumina.h
+covariates/bit_packers/event_tracker.h
+covariates/bit_packers/quality_score.h
+covariates/bit_packers/read_group.h
+covariates/table_context.h
+covariates/table_cycle_illumina.h
+covariates/table_quality_scores.h
 
 from_nvbio/alphabet_inl.h
 from_nvbio/alphabet.h

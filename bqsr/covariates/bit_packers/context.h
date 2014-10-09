@@ -51,6 +51,7 @@ struct covariate_Context : public covariate<PreviousCovariate, 4 + constexpr_max
 
     static_assert(max_context_bases <= BITMASK(length_bits), "not enough length bits to represent context size");
 
+    // reverse a 2-bit encoded DNA sequence of (at most) base_bits_context length
     static CUDA_DEVICE covariate_key reverse_dna4(covariate_key input)
     {
         constexpr uint32 shift_bits = (sizeof(covariate_key) * 8) - base_bits_context;
@@ -59,14 +60,6 @@ struct covariate_Context : public covariate<PreviousCovariate, 4 + constexpr_max
 
         const auto rev = (sizeof(input) == 4 ? __brev(input) : __brevll(input)) >> shift_bits;
         return ((rev & pattern_hi) >> 1) | ((rev & pattern_lo) << 1);
-    }
-
-    static CUDA_DEVICE bool is_non_regular_base(uint8 b)
-    {
-        return b != from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::A &&
-               b != from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::C &&
-               b != from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::T &&
-               b != from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::G;
     }
 
     // context encoding (MSB to LSB): BB[bp_offset] BB[bp_offset-1] BB[bp_offset-2] ... SSSS
@@ -78,37 +71,40 @@ struct covariate_Context : public covariate<PreviousCovariate, 4 + constexpr_max
     {
         const auto idx = batch.crq_index(read_index);
         const auto& window = ctx.covariates.high_quality_window[read_index];
+        const bool negative_strand = batch.flags[read_index] & AlignmentFlags::REVERSE;
 
         covariate_key context = 0;
         covariate_key context_mismatch = base::invalid_key_pattern;
         covariate_key context_indel = base::invalid_key_pattern;
 
-        // do we have enough bases for the smallest context?
-        if (bp_offset >= window.x + (min_context_bases - 1))
-        {
-            const bool negative_strand = batch.flags[read_index] & AlignmentFlags::REVERSE;
+        // which direction do we need to move in the read?
+        const int direction = negative_strand ? -1 : 1;
+        // how many context bases do we have available?
+        const int context_bases = negative_strand ? min(window.y - bp_offset, max_context_bases - 1) : min(bp_offset - window.x, max_context_bases - 1);
+        // where is our starting point?
+        const int start_offset = negative_strand ? bp_offset + context_bases: bp_offset - context_bases;
+        // where is our stopping point?
+        const int stop_offset = bp_offset + direction;
 
-            // how many context bases do we have before the current base?
-            const int context_bases = min(bp_offset - window.x, max_context_bases - 1);
+        // do we have enough bases for the smallest context?
+        if (context_bases >= min_context_bases - 1)
+        {
             // gather base pairs over the context region
-            for(int i = bp_offset - context_bases; i <= bp_offset; i++)
+            for(int i = start_offset; i != stop_offset; i += direction)
             {
                 const uint8 bp = batch.reads[idx.read_start + i];
-
-                // note: we push these in reverse order for a forward-encoded read
-                // we'll reverse the context below
+                // note that we push in reverse order here and reverse the bits below
+                // this is to avoid tracking an extra bit offset per thread
                 context <<= 2;
                 context |= from_nvbio::iupac16_to_dna(bp);
             }
 
+            // we pushed in reverse order above, reverse the bits
+            context = reverse_dna4(context);
 
-            if (!negative_strand)
+            if (negative_strand)
             {
-                // this is counter intuitive, but we pushed in reverse order above
-                // therefore, reverse the context if this is *not* the negative strand
-                context = reverse_dna4(context);
-            } else {
-                // since we pushed in reverse order, there's no need to reverse the read data, just compute the complement
+                // we're on the negative strand, complement the context bits
                 context = ~context & BITMASK(base_bits_context);
             }
 

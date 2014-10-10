@@ -36,10 +36,17 @@ struct quantizer_context
     D_Vector<covariate_key> read_group_keys;
     D_Vector<covariate_empirical_value> read_group_values;
 
+    D_Vector<covariate_empirical_value> empirical_quality_values;
+
+    // histogram of quality values from the quality table
+    D_VectorU32 quality_histogram;
+
     struct view
     {
         D_Vector<covariate_key>::view read_group_keys;
         D_Vector<covariate_empirical_value>::view read_group_values;
+        D_Vector<covariate_empirical_value>::view empirical_quality_values;
+        D_VectorU32::view quality_histogram;
     };
 
     operator view()
@@ -47,6 +54,8 @@ struct quantizer_context
         view v = {
             read_group_keys,
             read_group_values,
+            empirical_quality_values,
+            quality_histogram,
         };
 
         return v;
@@ -55,3 +64,7 @@ struct quantizer_context
 
 void build_read_group_table(bqsr_context *context);
 void output_read_group_table(bqsr_context *context);
+
+void build_quality_quantization_table(bqsr_context *context);
+void output_quality_quantization_table(bqsr_context *context);
+void debug_quality_quantization_table(bqsr_context *context);

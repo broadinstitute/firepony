@@ -201,6 +201,9 @@ int main(int argc, char **argv)
     }
 
     build_read_group_table(&context);
+    build_quality_quantization_table(&context);
+
+    output_quality_quantization_table(&context);
     output_read_group_table(&context);
 
     output_covariates(&context);

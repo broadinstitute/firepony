@@ -32,6 +32,9 @@ struct covariates_context
     D_CovariateTable cycle;
     D_CovariateTable context;
 
+    H_VectorU32 quality_histogram;
+    H_VectorU8 quantization_map;
+
     struct view
     {
         D_VectorU16_2::view high_quality_window;

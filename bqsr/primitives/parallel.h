@@ -23,7 +23,11 @@
 
 #include <cub/device/device_reduce.cuh>
 #include <cub/device/device_select.cuh>
+#include <cub/device/device_histogram.cuh>
 #include <cub/device/device_radix_sort.cuh>
+
+#include <cub/iterator/tex_obj_input_iterator.cuh>
+#include <cub/iterator/transform_input_iterator.cuh>
 
 namespace bqsr
 {
@@ -177,6 +181,44 @@ inline void sort_by_key(D_Vector<Key>& keys,
     {
         cudaMemcpy(thrust::raw_pointer_cast(values.data()), d_values.Current(), sizeof(Value) * len, cudaMemcpyDeviceToDevice);
     }
+}
+
+template <typename InputIterator, typename HistogramType>
+inline void histogram(InputIterator input,
+                      size_t len,
+                      D_Vector<HistogramType>& output,
+                      D_VectorU8& temp_storage,
+                      int64 min_value = 0,
+                      int64 max_value = 0)
+{
+    typedef typeof(*input) input_type;
+
+    if (min_value == max_value)
+    {
+        max_value = (1 << sizeof(input_type)) * 8 - 1;
+    }
+
+    // figure out how much temporary storage we need
+    size_t temp_bytes = 0;
+    cub::DeviceHistogram::HistogramEven(nullptr,
+                                        temp_bytes,
+                                        input,
+                                        thrust::raw_pointer_cast(output.data()),
+                                        max_value + 1,
+                                        min_value,
+                                        max_value,
+                                        len);
+
+    temp_storage.resize(temp_bytes);
+
+    cub::DeviceHistogram::HistogramEven(thrust::raw_pointer_cast(temp_storage.data()),
+                                        temp_bytes,
+                                        input,
+                                        thrust::raw_pointer_cast(output.data()),
+                                        max_value + 1,
+                                        min_value,
+                                        max_value,
+                                        len);
 }
 
 } // namespace bqsr

@@ -51,6 +51,14 @@ struct covariate_Context : public covariate<PreviousCovariate, 4 + constexpr_max
 
     static_assert(max_context_bases <= BITMASK(length_bits), "not enough length bits to represent context size");
 
+    static CUDA_DEVICE bool is_non_regular_base(uint8 b)
+    {
+        return b != from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::A &&
+               b != from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::C &&
+               b != from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::T &&
+               b != from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::G;
+    }
+
     // reverse a 2-bit encoded DNA sequence of (at most) base_bits_context length
     static CUDA_DEVICE covariate_key reverse_dna4(covariate_key input)
     {
@@ -89,33 +97,41 @@ struct covariate_Context : public covariate<PreviousCovariate, 4 + constexpr_max
         // do we have enough bases for the smallest context?
         if (context_bases >= min_context_bases)
         {
+            int num_bases = 0;
+
             // gather base pairs over the context region, starting from the context base
             for(int i = start_offset; i != stop_offset; i += direction)
             {
                 const uint8 bp = batch.reads[idx.read_start + i];
 
+                if (is_non_regular_base(bp))
+                {
+                    break;
+                }
+
                 context <<= 2;
                 context |= from_nvbio::iupac16_to_dna(bp);
+                num_bases++;
             }
 
             if (negative_strand)
             {
                 // we're on the negative strand, complement the context bits
-                context = ~context & BITMASK(context_bases * 2);
+                context = ~context & BITMASK(num_bases * 2);
             }
 
-            if (context_bases >= num_bases_mismatch)
+            if (num_bases >= num_bases_mismatch)
             {
                 // remove any extra bases that are not required
-                context_mismatch = context >> (context_bases - num_bases_mismatch) * 2;
+                context_mismatch = context >> (num_bases - num_bases_mismatch) * 2;
                 // add in the size
                 context_mismatch = (context_mismatch << length_bits) | num_bases_mismatch;
             }
 
-            if (context_bases >= num_bases_indel)
+            if (num_bases >= num_bases_indel)
             {
                 // remove any extra bases that are not required
-                context_indel = context >> (context_bases - num_bases_indel) * 2;
+                context_indel = context >> (num_bases - num_bases_indel) * 2;
                 // add in the size
                 context_indel = (context_indel << length_bits) | num_bases_indel;
             }

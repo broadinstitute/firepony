@@ -21,35 +21,37 @@
 #include "bqsr_types.h"
 #include "covariates_table.h"
 
-struct covariates_context
+struct covariate_empirical_value
 {
-    // read window after clipping low quality ends
-    D_VectorU16_2 high_quality_window;
+    uint32 observations;
+    double mismatches;
+    double expected_errors;
+    double estimated_quality;
+    double empirical_quality;
+};
 
-    D_CovariateTable scratch_table_space;
-
-    D_CovariateTable quality;
-    D_CovariateTable cycle;
-    D_CovariateTable context;
+struct quantizer_context
+{
+    // read group table
+    D_Vector<covariate_key> read_group_keys;
+    D_Vector<covariate_empirical_value> read_group_values;
 
     struct view
     {
-        D_VectorU16_2::view high_quality_window;
-        D_CovariateTable::view scratch_table_space;
-        D_CovariateTable::view quality;
+        D_Vector<covariate_key>::view read_group_keys;
+        D_Vector<covariate_empirical_value>::view read_group_values;
     };
 
     operator view()
     {
         view v = {
-            high_quality_window,
-            scratch_table_space,
-            quality,
+            read_group_keys,
+            read_group_values,
         };
 
         return v;
     }
 };
 
-void gather_covariates(bqsr_context *context, const alignment_batch& batch);
-void output_covariates(bqsr_context *context);
+void build_read_group_table(bqsr_context *context);
+void output_read_group_table(bqsr_context *context);

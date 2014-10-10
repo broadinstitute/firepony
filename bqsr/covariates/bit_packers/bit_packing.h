@@ -116,6 +116,11 @@ public:
     {
         return (target_index == index ? invalid_key_pattern : PreviousCovariate::invalid_key(target_index));
     }
+
+    static constexpr CUDA_HOST_DEVICE uint32 key_mask(const uint32 target_index)
+    {
+        return (target_index == index ? mask : PreviousCovariate::key_mask(target_index));
+    }
 };
 
 // chain terminator
@@ -148,6 +153,11 @@ struct covariate_null
     }
 
     static constexpr CUDA_HOST_DEVICE uint32 invalid_key(const uint32 target_index)
+    {
+        return 0;
+    }
+
+    static constexpr CUDA_HOST_DEVICE uint32 key_mask(const uint32 target_index)
     {
         return 0;
     }

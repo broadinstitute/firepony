@@ -216,7 +216,7 @@ void output_covariates(bqsr_context *context)
     printf("#:GATKTable:8:2386:%%s:%%s:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n");
     printf("#:GATKTable:RecalTable2:\n");
     printf("ReadGroup\tQualityScore\tCovariateValue\tCovariateName\tEventType\tEmpiricalQuality\tObservations\tErrors\n");
-    covariate_table_cycle_illumina::dump_table(context, context->covariates.cycle);
     covariate_table_context::dump_table(context, context->covariates.context);
+    covariate_table_cycle_illumina::dump_table(context, context->covariates.cycle);
     printf("\n");
 }

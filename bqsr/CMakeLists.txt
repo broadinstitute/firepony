@@ -17,6 +17,8 @@ gamgee_loader.cu
 gamgee_loader.h
 mmap.cu
 mmap.h
+quantizer.cu
+quantizer.h
 read_filters.cu
 read_filters.h
 sequence_data.cu

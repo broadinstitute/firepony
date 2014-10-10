@@ -78,48 +78,44 @@ struct covariate_Context : public covariate<PreviousCovariate, 4 + constexpr_max
         covariate_key context_indel = base::invalid_key_pattern;
 
         // which direction do we need to move in the read?
-        const int direction = negative_strand ? -1 : 1;
+        const int direction = negative_strand ? 1 : -1;
         // how many context bases do we have available?
-        const int context_bases = negative_strand ? min(window.y - bp_offset, max_context_bases - 1) : min(bp_offset - window.x, max_context_bases - 1);
+        const int context_bases = negative_strand ? min(window.y - bp_offset + 1, max_context_bases) : min(bp_offset - window.x + 1, max_context_bases);
         // where is our starting point?
-        const int start_offset = negative_strand ? bp_offset + context_bases: bp_offset - context_bases;
+        const int start_offset = bp_offset;
         // where is our stopping point?
-        const int stop_offset = bp_offset + direction;
+        const int stop_offset = bp_offset + context_bases * direction;
 
         // do we have enough bases for the smallest context?
-        if (context_bases >= min_context_bases - 1)
+        if (context_bases >= min_context_bases)
         {
-            // gather base pairs over the context region
+            // gather base pairs over the context region, starting from the context base
             for(int i = start_offset; i != stop_offset; i += direction)
             {
                 const uint8 bp = batch.reads[idx.read_start + i];
-                // note that we push in reverse order here and reverse the bits below
-                // this is to avoid tracking an extra bit offset per thread
+
                 context <<= 2;
                 context |= from_nvbio::iupac16_to_dna(bp);
             }
 
-            // we pushed in reverse order above, reverse the bits
-            context = reverse_dna4(context);
-
             if (negative_strand)
             {
                 // we're on the negative strand, complement the context bits
-                context = ~context & BITMASK(base_bits_context);
+                context = ~context & BITMASK(context_bases * 2);
             }
 
-            if (context_bases >= num_bases_mismatch - 1)
+            if (context_bases >= num_bases_mismatch)
             {
                 // remove any extra bases that are not required
-                context_mismatch = context >> (max_context_bases - num_bases_mismatch) * 2;
+                context_mismatch = context >> (context_bases - num_bases_mismatch) * 2;
                 // add in the size
                 context_mismatch = (context_mismatch << length_bits) | num_bases_mismatch;
             }
 
-            if (context_bases >= num_bases_indel - 1)
+            if (context_bases >= num_bases_indel)
             {
                 // remove any extra bases that are not required
-                context_indel = context >> (max_context_bases - num_bases_indel) * 2;
+                context_indel = context >> (context_bases - num_bases_indel) * 2;
                 // add in the size
                 context_indel = (context_indel << length_bits) | num_bases_indel;
             }

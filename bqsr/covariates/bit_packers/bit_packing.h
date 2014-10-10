@@ -67,8 +67,10 @@ struct covariate
         offset = PreviousCovariate::next_offset,
         // our bit mask
         mask = BITMASK(num_bits) << PreviousCovariate::next_offset,
-        // the offset for the next covariate in the chain
-        next_offset = PreviousCovariate::next_offset + num_bits,
+        // the total number of bits used up until (and including) this node in the chain
+        bits_used = PreviousCovariate::next_offset + num_bits,
+        // the bit offset for the next covariate in the chain
+        next_offset = bits_used,
         // our maximum integral value (also used as an invalid token)
         max_value = (1 << num_bits) - 1,
         // sentinel value used when a given covariate key is skipped

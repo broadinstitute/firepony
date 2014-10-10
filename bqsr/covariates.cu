@@ -158,7 +158,7 @@ static void build_covariates_table(D_CovariateTable& table, bqsr_context *contex
     table.resize(valid_keys);
 
     // sort and reduce the table by key
-    table.sort(temp_keys, temp_values, context->temp_storage, covariate_table::chain::next_offset);
+    table.sort(temp_keys, temp_values, context->temp_storage, covariate_table::chain::bits_used);
     table.pack(temp_keys, temp_values);
 }
 

@@ -23,6 +23,7 @@
 
 #include <cub/device/device_reduce.cuh>
 #include <cub/device/device_select.cuh>
+#include <cub/device/device_radix_sort.cuh>
 
 namespace bqsr
 {
@@ -127,6 +128,55 @@ inline int64 sum(InputIterator first,
                            len);
 
     return int64(result[0]);
+}
+
+template <typename Key, typename Value>
+inline void sort_by_key(D_Vector<Key>& keys,
+                        D_Vector<Value>& values,
+                        D_Vector<Key>& temp_keys,
+                        D_Vector<Value>& temp_values,
+                        D_VectorU8& temp_storage,
+                        int num_key_bits = sizeof(Key) * 8)
+{
+    const size_t len = keys.size();
+    assert(keys.size() == values.size());
+
+    temp_keys.resize(len);
+    temp_values.resize(len);
+
+    cub::DoubleBuffer<Key> d_keys(thrust::raw_pointer_cast(keys.data()),
+                                  thrust::raw_pointer_cast(temp_keys.data()));
+    cub::DoubleBuffer<Value> d_values(thrust::raw_pointer_cast(values.data()),
+                                      thrust::raw_pointer_cast(temp_values.data()));
+
+    size_t temp_storage_bytes = 0;
+    cub::DeviceRadixSort::SortPairs(nullptr,
+                                    temp_storage_bytes,
+                                    d_keys,
+                                    d_values,
+                                    len,
+                                    0,
+                                    num_key_bits);
+
+    temp_storage.resize(temp_storage_bytes);
+
+    cub::DeviceRadixSort::SortPairs(thrust::raw_pointer_cast(temp_storage.data()),
+                                    temp_storage_bytes,
+                                    d_keys,
+                                    d_values,
+                                    len,
+                                    0,
+                                    num_key_bits);
+
+    if (thrust::raw_pointer_cast(keys.data()) != d_keys.Current())
+    {
+        cudaMemcpy(thrust::raw_pointer_cast(keys.data()), d_keys.Current(), sizeof(Key) * len, cudaMemcpyDeviceToDevice);
+    }
+
+    if (thrust::raw_pointer_cast(values.data()) != d_values.Current())
+    {
+        cudaMemcpy(thrust::raw_pointer_cast(values.data()), d_values.Current(), sizeof(Value) * len, cudaMemcpyDeviceToDevice);
+    }
 }
 
 } // namespace bqsr

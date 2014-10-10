@@ -698,6 +698,8 @@ struct cap_baq_qualities : public bqsr_lambda
                 break;
         }
 
+        const uint32 baq_start = i;
+
         for(; i < cigar_end - cigar_start; i++)
         {
             const uint16 read_bp_idx = ctx.cigar.cigar_event_read_coordinates[cigar_start + i];
@@ -722,7 +724,7 @@ struct cap_baq_qualities : public bqsr_lambda
                 break;
 
             case cigar_event::M:
-                const uint32 expectedPos = refI - refOffset + (current_op_offset - readI);
+                const uint32 expectedPos = refI - refOffset + (i - baq_start - readI);
                 ctx.baq.qualities[qual_idx] = capBaseByBAQ(batch.qualities[idx.qual_start + read_bp_idx],
                                                            ctx.baq.qualities[idx.qual_start + read_bp_idx],
                                                            baq_state[idx.qual_start + read_bp_idx],

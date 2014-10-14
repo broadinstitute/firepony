@@ -688,6 +688,7 @@ struct cap_baq_qualities : public bqsr_lambda
         uint32 readI = 0;
         uint32 refI = 0;
         uint32 current_op_offset = 0;
+        uint32 numD = 0;
 
         // scan for the start of the baq region
         uint32 i;
@@ -720,11 +721,12 @@ struct cap_baq_qualities : public bqsr_lambda
 
             case cigar_event::D:
                 refI++;
+                numD++;
                 current_op_offset = 0;
                 break;
 
             case cigar_event::M:
-                const uint32 expectedPos = refI - refOffset + (i - baq_start - readI);
+                const uint32 expectedPos = refI - refOffset + (i - numD - baq_start - readI);
                 ctx.baq.qualities[qual_idx] = capBaseByBAQ(batch.qualities[idx.qual_start + read_bp_idx],
                                                            ctx.baq.qualities[idx.qual_start + read_bp_idx],
                                                            baq_state[idx.qual_start + read_bp_idx],

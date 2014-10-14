@@ -349,7 +349,7 @@ void filter_known_snps(bqsr_context *context, const alignment_batch& batch)
 
     // finally apply the VCF filter
     // this will create zeros in the active location list for each BP that matches a known variant
-    thrust::for_each(snp.active_read_ids.begin(),
-                     snp.active_read_ids.end(),
-                     filter_bps(*context, batch.device));
+//    thrust::for_each(snp.active_read_ids.begin(),
+//                     snp.active_read_ids.end(),
+//                     filter_bps(*context, batch.device));
 }

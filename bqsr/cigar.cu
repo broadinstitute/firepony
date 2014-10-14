@@ -282,7 +282,7 @@ struct compute_error_vectors : public bqsr_lambda
 
                 if (!negative_strand)
                 {
-                    ctx.cigar.is_insertion[idx.read_start + current_bp_idx] = 1;
+                    ctx.cigar.is_insertion[idx.read_start + current_bp_idx - 1] = 1;
                 } else {
                     ctx.cigar.is_insertion[idx.read_start + current_bp_idx + batch.cigars[event].len - 1] = 1;
                 }
@@ -295,9 +295,9 @@ struct compute_error_vectors : public bqsr_lambda
                 // mark the read bp where a deletion begins
                 if (!negative_strand)
                 {
-                    ctx.cigar.is_deletion[idx.read_start + current_bp_idx] = 1;
+                    ctx.cigar.is_deletion[idx.read_start + current_bp_idx - 1] = 1;
                 } else {
-                    ctx.cigar.is_deletion[idx.read_start + current_bp_idx + 1] = 1;
+                    ctx.cigar.is_deletion[idx.read_start + current_bp_idx] = 1;
                 }
 
                 num_errors++;
@@ -551,7 +551,7 @@ void debug_cigar(bqsr_context *context, const alignment_batch& batch, int read_i
         uint16 bp_offset = ctx.cigar_event_read_coordinates[i];
         if (bp_offset == uint16(-1))
         {
-            printf("   - ");
+            printf("  - ");
         } else {
             printf("% 3d ", context->active_location_list[idx.read_start + bp_offset] ? 1 : 0);
         }

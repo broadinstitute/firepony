@@ -57,6 +57,8 @@ struct cigar_context
 
     // a vector of cigar "events"
     D_PackedVector_2b cigar_events;
+    // the read index for each cigar event
+    D_VectorU32 cigar_event_read_index;
     // the read coordinate for each cigar event
     D_VectorU16 cigar_event_read_coordinates;
     // the reference coordinate for each cigar event, relative to the start of the alignment window
@@ -86,6 +88,7 @@ struct cigar_context
     {
         D_VectorU32::view cigar_offsets;
         D_PackedVector_2b::view cigar_events;
+        D_VectorU32::view cigar_event_read_index;
         D_VectorU16::view cigar_event_read_coordinates;
         D_VectorU16::view cigar_event_reference_coordinates;
         D_VectorU16_2::view read_window_clipped;
@@ -102,6 +105,7 @@ struct cigar_context
         view v = {
                 cigar_offsets,
                 cigar_events,
+                cigar_event_read_index,
                 cigar_event_read_coordinates,
                 cigar_event_reference_coordinates,
                 read_window_clipped,

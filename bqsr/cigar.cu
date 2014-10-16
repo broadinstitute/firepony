@@ -128,6 +128,7 @@ struct cigar_coordinates_expand : public bqsr_lambda
         const cigar_op *cigar = &batch.cigars[idx.cigar_start];
 
         uint32 base = ctx.cigar.cigar_offsets[idx.cigar_start];
+        uint32 *output_read_index = &ctx.cigar.cigar_event_read_index[base];
         uint16 *output_read_coordinates = &ctx.cigar.cigar_event_read_coordinates[base];
         uint16 *output_reference_coordinates = &ctx.cigar.cigar_event_reference_coordinates[base];
 
@@ -152,6 +153,7 @@ struct cigar_coordinates_expand : public bqsr_lambda
                 {
                     leading_clips = false;
 
+                    *output_read_index++ = read_index;
                     *output_read_coordinates++ = read_offset;
                     *output_reference_coordinates++ = reference_offset;
 
@@ -171,6 +173,7 @@ struct cigar_coordinates_expand : public bqsr_lambda
                     // if we're in a clipping region, then we're either in the leading or trailing clipping region
                     trailing_clips = !leading_clips;
 
+                    *output_read_index++ = read_index;
                     *output_read_coordinates++ = read_offset;
                     *output_reference_coordinates++ = uint16(-1);
 
@@ -193,6 +196,7 @@ struct cigar_coordinates_expand : public bqsr_lambda
                 {
                     leading_clips = false;
 
+                    *output_read_index++ = read_index;
                     *output_read_coordinates++ = read_offset;
                     *output_reference_coordinates++ = uint16(-1);
 
@@ -211,6 +215,7 @@ struct cigar_coordinates_expand : public bqsr_lambda
             case cigar_op::OP_P: // xxxnsubtil: not sure how to handle P
                 for(uint32 i = 0; i < cigar[c].len; i++)
                 {
+                    *output_read_index++ = read_index;
                     *output_read_coordinates++ = uint16(-1);
                     *output_reference_coordinates++ = reference_offset;
 
@@ -412,6 +417,7 @@ void expand_cigars(bqsr_context *context, const alignment_batch& batch)
     pack_prepare_storage_2bit(context->temp_storage, expanded_cigar_len);
     ctx.cigar_events.resize(expanded_cigar_len);
 
+    ctx.cigar_event_read_index.resize(expanded_cigar_len);
     ctx.cigar_event_reference_coordinates.resize(expanded_cigar_len);
     ctx.cigar_event_read_coordinates.resize(expanded_cigar_len);
 
@@ -429,6 +435,10 @@ void expand_cigars(bqsr_context *context, const alignment_batch& batch)
     thrust::fill(ctx.is_insertion.m_storage.begin(), ctx.is_insertion.m_storage.end(), 0);
     thrust::fill(ctx.is_deletion.m_storage.begin(), ctx.is_deletion.m_storage.end(), 0);
     thrust::fill(ctx.num_errors.begin(), ctx.num_errors.end(), 0);
+
+    // cigar_events_read_index is initialized to -1; this means that all reads are considered inactive
+    // it will be filled in during cigar coordinate expansion to mark active reads
+    thrust::fill(ctx.cigar_event_read_index.begin(), ctx.cigar_event_read_index.end(), uint32(-1));
 
     // expand the cigar ops into temp storage (xxxnsubtil: same as above, active read list is ignored)
     thrust::for_each(thrust::make_counting_iterator(0),

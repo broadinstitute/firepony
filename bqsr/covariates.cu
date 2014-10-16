@@ -37,44 +37,46 @@ struct covariate_gatherer : public bqsr_lambda
 {
     using bqsr_lambda::bqsr_lambda;
 
-    CUDA_DEVICE void operator()(const uint32 read_index)
+    CUDA_DEVICE void operator()(const uint32 cigar_event_index)
     {
-        const CRQ_index idx = batch.crq_index(read_index);
-        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
-        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
+        const uint32 read_index = ctx.cigar.cigar_event_read_index[cigar_event_index];
 
-        for(uint32 i = cigar_start; i < cigar_end; i++)
+        if (read_index == uint32(-1))
         {
-            uint16 read_bp_offset = ctx.cigar.cigar_event_read_coordinates[i];
-            if (read_bp_offset == uint16(-1))
-            {
-                continue;
-            }
-
-            if (ctx.active_location_list[idx.read_start + read_bp_offset] == 0)
-            {
-                continue;
-            }
-
-            if (ctx.cigar.cigar_events[i] == cigar_event::S)
-            {
-                continue;
-            }
-
-            covariate_key_set keys = covariate_table::chain::encode(ctx, batch, read_index, read_bp_offset, i, covariate_key_set{0, 0, 0});
-
-            ctx.covariates.scratch_table_space.keys  [i * 3 + 0] = keys.M;
-            ctx.covariates.scratch_table_space.values[i * 3 + 0].observations = 1;
-            ctx.covariates.scratch_table_space.values[i * 3 + 0].mismatches = ctx.fractional_error.snp_errors[idx.qual_start + read_bp_offset];
-
-            ctx.covariates.scratch_table_space.keys  [i * 3 + 1] = keys.I;
-            ctx.covariates.scratch_table_space.values[i * 3 + 1].observations = 1;
-            ctx.covariates.scratch_table_space.values[i * 3 + 1].mismatches = ctx.fractional_error.insertion_errors[idx.qual_start + read_bp_offset];
-
-            ctx.covariates.scratch_table_space.keys  [i * 3 + 2] = keys.D;
-            ctx.covariates.scratch_table_space.values[i * 3 + 2].observations = 1;
-            ctx.covariates.scratch_table_space.values[i * 3 + 2].mismatches = ctx.fractional_error.deletion_errors[idx.qual_start + read_bp_offset];
+            // inactive read
+            return;
         }
+
+        const CRQ_index idx = batch.crq_index(read_index);
+        const uint16 read_bp_offset = ctx.cigar.cigar_event_read_coordinates[cigar_event_index];
+        if (read_bp_offset == uint16(-1))
+        {
+            return;
+        }
+
+        if (ctx.active_location_list[idx.read_start + read_bp_offset] == 0)
+        {
+            return;
+        }
+
+        if (ctx.cigar.cigar_events[cigar_event_index] == cigar_event::S)
+        {
+            return;
+        }
+
+        covariate_key_set keys = covariate_table::chain::encode(ctx, batch, read_index, read_bp_offset, cigar_event_index, covariate_key_set{0, 0, 0});
+
+        ctx.covariates.scratch_table_space.keys  [cigar_event_index * 3 + 0] = keys.M;
+        ctx.covariates.scratch_table_space.values[cigar_event_index * 3 + 0].observations = 1;
+        ctx.covariates.scratch_table_space.values[cigar_event_index * 3 + 0].mismatches = ctx.fractional_error.snp_errors[idx.qual_start + read_bp_offset];
+
+        ctx.covariates.scratch_table_space.keys  [cigar_event_index * 3 + 1] = keys.I;
+        ctx.covariates.scratch_table_space.values[cigar_event_index * 3 + 1].observations = 1;
+        ctx.covariates.scratch_table_space.values[cigar_event_index * 3 + 1].mismatches = ctx.fractional_error.insertion_errors[idx.qual_start + read_bp_offset];
+
+        ctx.covariates.scratch_table_space.keys  [cigar_event_index * 3 + 2] = keys.D;
+        ctx.covariates.scratch_table_space.values[cigar_event_index * 3 + 2].observations = 1;
+        ctx.covariates.scratch_table_space.values[cigar_event_index * 3 + 2].mismatches = ctx.fractional_error.deletion_errors[idx.qual_start + read_bp_offset];
     }
 };
 
@@ -129,8 +131,8 @@ static void build_covariates_table(D_CovariateTable& table, bqsr_context *contex
                  covariate_key(-1));
 
     // generate keys into the scratch table
-    thrust::for_each(context->active_read_list.begin(),
-                     context->active_read_list.end(),
+    thrust::for_each(thrust::make_counting_iterator(0u),
+                     thrust::make_counting_iterator(0u) + context->cigar.cigar_event_read_coordinates.size(),
                      covariate_gatherer<covariate_table>(*context, batch.device));
 
     // flag valid keys

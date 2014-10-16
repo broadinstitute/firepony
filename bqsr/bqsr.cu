@@ -240,19 +240,14 @@ int main(int argc, char **argv)
         stats.covariates.add(covariates);
     }
 
-    gpu_timer postprocessing_gpu;
-    cpu_timer postprocessing_cpu, output;
+    gpu_timer postprocessing;
+    cpu_timer output;
 
-    postprocessing_gpu.start();
+    postprocessing.start();
     build_read_group_table(&context);
-    postprocessing_gpu.stop();
-
-    postprocessing_cpu.start();
-    build_quality_quantization_table(&context);
-    postprocessing_cpu.stop();
+    postprocessing.stop();
 
     output.start();
-    output_quality_quantization_table(&context);
     output_read_group_table(&context);
     output_covariates(&context);
     output.stop();
@@ -279,8 +274,7 @@ int main(int argc, char **argv)
     printf("  baq: %.4f (%.2f%%)\n", stats.baq.elapsed_time, stats.baq.elapsed_time / wall_clock.elapsed_time() * 100.0);
     printf("  fractional error: %.4f (%.2f%%)\n", stats.fractional_error.elapsed_time, stats.fractional_error.elapsed_time / wall_clock.elapsed_time() * 100.0);
     printf("  covariates: %.4f (%.2f%%)\n", stats.covariates.elapsed_time, stats.covariates.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("  post-processing (GPU): %.4f (%.2f%%)\n", postprocessing_gpu.elapsed_time(), postprocessing_gpu.elapsed_time() / wall_clock.elapsed_time() * 100.0);
-    printf("  post-processing (CPU): %.4f (%.2f%%)\n", postprocessing_cpu.elapsed_time(), postprocessing_cpu.elapsed_time() / wall_clock.elapsed_time() * 100.0);
+    printf("  post-processing: %.4f (%.2f%%)\n", postprocessing.elapsed_time(), postprocessing.elapsed_time() / wall_clock.elapsed_time() * 100.0);
     printf("  output: %.4f (%.2f%%)\n", output.elapsed_time(), output.elapsed_time() / wall_clock.elapsed_time() * 100.0);
 
     return 0;

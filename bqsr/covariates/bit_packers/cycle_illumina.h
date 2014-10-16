@@ -47,8 +47,6 @@ struct covariate_Cycle_Illumina : public covariate<PreviousCovariate, 10, true>
                                                      uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
                                                      covariate_key_set input_key = {0, 0, 0})
     {
-        const CRQ_index idx = batch.crq_index(read_index);
-
         const bool paired = batch.flags[read_index] & AlignmentFlags::PAIRED;
         const bool second_of_pair = batch.flags[read_index] & AlignmentFlags::READ2;
         const bool negative_strand = batch.flags[read_index] & AlignmentFlags::REVERSE;

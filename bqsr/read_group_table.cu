@@ -18,13 +18,14 @@
 
 #include "bqsr_context.h"
 #include "covariates_table.h"
-#include "quantizer.h"
+#include "read_group_table.h"
 
 #include "primitives/parallel.h"
 
 #include "covariates/table_quality_scores.h"
 
 #include <thrust/reduce.h>
+
 struct generate_read_group_table : public bqsr_lambda_context
 {
     using bqsr_lambda_context::bqsr_lambda_context;
@@ -45,8 +46,8 @@ struct generate_read_group_table : public bqsr_lambda_context
         const auto& value_in = ctx.covariates.quality.values[index];
         const auto qual = covariate_table_quality::decode(key_in, covariate_table_quality::QualityScore);
 
-        auto& key_out = ctx.quantizer.read_group_keys[index];
-        auto& value_out = ctx.quantizer.read_group_values[index];
+        auto& key_out = ctx.read_group_table.read_group_keys[index];
+        auto& value_out = ctx.read_group_table.read_group_values[index];
 
         // remove the quality from the key
         key_out = key_in & ~covariate_table_quality::chain::key_mask(covariate_table_quality::QualityScore);
@@ -198,7 +199,7 @@ struct covariate_compute_empirical_quality : public bqsr_lambda_context
 
     CUDA_HOST_DEVICE void operator() (const uint32 index)
     {
-        covariate_empirical_value& val = ctx.quantizer.read_group_values[index];
+        covariate_empirical_value& val = ctx.read_group_table.read_group_values[index];
 
         val.estimated_quality = double(-10.0 * log10(val.expected_errors / double(val.observations)));
         val.empirical_quality = calcEmpiricalQuality(val);
@@ -208,10 +209,10 @@ struct covariate_compute_empirical_quality : public bqsr_lambda_context
 void build_read_group_table(bqsr_context *context)
 {
     const auto& cv = context->covariates;
-    auto& quant = context->quantizer;
+    auto& rg = context->read_group_table;
 
-    auto& rg_keys = quant.read_group_keys;
-    auto& rg_values = quant.read_group_values;
+    auto& rg_keys = rg.read_group_keys;
+    auto& rg_values = rg.read_group_values;
 
     // convert the quality table into the read group table
     rg_keys.resize(cv.quality.size());
@@ -252,9 +253,9 @@ void build_read_group_table(bqsr_context *context)
 
 void output_read_group_table(bqsr_context *context)
 {
-    auto& quant = context->quantizer;
-    auto& rg_keys = quant.read_group_keys;
-    auto& rg_values = quant.read_group_values;
+    auto& rg = context->read_group_table;
+    auto& rg_keys = rg.read_group_keys;
+    auto& rg_values = rg.read_group_values;
 
     printf("#:GATKTable:6:3:%%s:%%s:%%.4f:%%.4f:%%d:%%.2f:;\n");
     printf("#:GATKTable:RecalTable0:\n");

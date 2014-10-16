@@ -17,10 +17,10 @@ gamgee_loader.cu
 gamgee_loader.h
 mmap.cu
 mmap.h
-quantizer.cu
-quantizer.h
 read_filters.cu
 read_filters.h
+read_group_table.cu
+read_group_table.h
 sequence_data.cu
 sequence_data.h
 serialization.h

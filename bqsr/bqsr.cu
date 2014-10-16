@@ -33,7 +33,7 @@
 #include "covariates.h"
 #include "baq.h"
 #include "fractional_errors.h"
-#include "quantizer.h"
+#include "read_group_table.h"
 
 /*
 // sort batch by increasing alignment position

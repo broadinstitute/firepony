@@ -28,7 +28,7 @@
 #include "alignment_data.h"
 #include "baq.h"
 #include "fractional_errors.h"
-#include "quantizer.h"
+#include "read_group_table.h"
 #include "util.h"
 
 struct bqsr_statistics // host-only
@@ -86,7 +86,7 @@ struct bqsr_context
     baq_context baq;
     covariates_context covariates;
     fractional_error_context fractional_error;
-    quantizer_context quantizer;
+    read_group_table_context read_group_table;
 
     // --- everything below this line is host-only and not available on the device
     bqsr_statistics stats;
@@ -120,7 +120,7 @@ struct bqsr_context
         baq_context::view                       baq;
         covariates_context::view                covariates;
         fractional_error_context::view          fractional_error;
-        quantizer_context::view                 quantizer;
+        read_group_table_context::view          read_group_table;
     };
 
     operator view()
@@ -145,7 +145,7 @@ struct bqsr_context
             baq,
             covariates,
             fractional_error,
-            quantizer,
+            read_group_table,
         };
 
         return v;

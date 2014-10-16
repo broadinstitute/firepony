@@ -30,9 +30,8 @@ struct covariate_empirical_value
     double empirical_quality;
 };
 
-struct quantizer_context
+struct read_group_table_context
 {
-    // read group table
     D_Vector<covariate_key> read_group_keys;
     D_Vector<covariate_empirical_value> read_group_values;
 

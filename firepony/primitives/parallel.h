@@ -18,8 +18,13 @@
 
 #pragma once
 
+#ifdef RUN_ON_CPU
+#define NO_CUB
+#endif
+
 #include <thrust/scan.h>
 #include <thrust/copy.h>
+#include <thrust/sort.h>
 
 #include <cub/device/device_reduce.cuh>
 #include <cub/device/device_select.cuh>
@@ -37,7 +42,7 @@ inline void inclusive_scan(InputIterator first,
     thrust::inclusive_scan(first, first + len, result, op);
 }
 
-
+#ifndef NO_CUB
 // implementation of copy_if based on CUB
 template <typename InputIterator, typename OutputIterator, typename Predicate>
 inline size_t copy_if(InputIterator first,
@@ -178,5 +183,59 @@ inline void sort_by_key(D_Vector<Key>& keys,
         cudaMemcpy(thrust::raw_pointer_cast(values.data()), d_values.Current(), sizeof(Value) * len, cudaMemcpyDeviceToDevice);
     }
 }
+
+#else
+
+template <typename InputIterator, typename OutputIterator, typename Predicate>
+inline size_t copy_if(InputIterator first,
+                      size_t len,
+                      OutputIterator result,
+                      Predicate op,
+                      D_VectorU8& temp_storage)
+{
+    OutputIterator out_last;
+    out_last = thrust::copy_if(first, first + len, result, op);
+    return out_last - result;
+}
+
+struct copy_if_flagged
+{
+    CUDA_HOST_DEVICE bool operator() (const uint8 val)
+    {
+        return bool(val);
+    }
+};
+
+template <typename InputIterator, typename FlagIterator, typename OutputIterator>
+inline size_t copy_flagged(InputIterator first,
+                           size_t len,
+                           OutputIterator result,
+                           FlagIterator flags,
+                           D_VectorU8& temp_storage)
+{
+    OutputIterator out_last;
+    out_last = thrust::copy_if(first, first + len, flags, result, copy_if_flagged());
+    return out_last - result;
+}
+
+template <typename InputIterator>
+inline int64 sum(InputIterator first,
+                 size_t len,
+                 D_VectorU8& temp_storage)
+{
+    return thrust::reduce(first, first + len, int64(0));
+}
+
+template <typename Key, typename Value>
+inline void sort_by_key(D_Vector<Key>& keys,
+                        D_Vector<Value>& values,
+                        D_Vector<Key>& temp_keys,
+                        D_Vector<Value>& temp_values,
+                        D_VectorU8& temp_storage,
+                        int num_key_bits = sizeof(Key) * 8)
+{
+    thrust::sort_by_key(keys.begin(), keys.end(), values.begin());
+}
+#endif
 
 } // namespace bqsr

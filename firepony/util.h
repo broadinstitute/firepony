@@ -31,6 +31,32 @@ void pack_to_2bit(D_PackedVector_2b& dest, D_VectorU8& src);
 void pack_to_1bit(D_PackedVector_1b& dest, D_VectorU8& src);
 
 // timers
+struct cpu_timer
+{
+    struct timeval start_event, stop_event;
+
+    void start(void)
+    {
+        gettimeofday(&start_event, NULL);
+    }
+
+    void stop(void)
+    {
+        gettimeofday(&stop_event, NULL);
+    }
+
+    float elapsed_time(void) const
+    {
+        struct timeval res;
+
+        timersub(&stop_event, &start_event, &res);
+        return res.tv_sec + res.tv_usec / 1000000.0;
+    }
+};
+
+#ifdef RUN_ON_CPU
+typedef struct cpu_timer gpu_timer;
+#else
 struct gpu_timer
 {
     cudaEvent_t start_event, stop_event;
@@ -66,29 +92,7 @@ struct gpu_timer
     }
 
 };
-
-struct cpu_timer
-{
-    struct timeval start_event, stop_event;
-
-    void start(void)
-    {
-        gettimeofday(&start_event, NULL);
-    }
-
-    void stop(void)
-    {
-        gettimeofday(&stop_event, NULL);
-    }
-
-    float elapsed_time(void) const
-    {
-        struct timeval res;
-
-        timersub(&stop_event, &start_event, &res);
-        return res.tv_sec + res.tv_usec / 1000000.0;
-    }
-};
+#endif
 
 struct time_series
 {

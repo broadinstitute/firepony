@@ -51,7 +51,7 @@ struct covariate_Context : public covariate<PreviousCovariate, 4 + constexpr_max
 
     static_assert(max_context_bases <= BITMASK(length_bits), "not enough length bits to represent context size");
 
-    static CUDA_DEVICE bool is_non_regular_base(uint8 b)
+    static CUDA_HOST_DEVICE bool is_non_regular_base(uint8 b)
     {
         return b != from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::A &&
                b != from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::C &&
@@ -59,8 +59,24 @@ struct covariate_Context : public covariate<PreviousCovariate, 4 + constexpr_max
                b != from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::G;
     }
 
+#ifndef CUDA_DEVICE_COMPILATION
+    static uint32 __brev(uint32 x)
+    {
+        x = ((x & 0xF0F0F0F0) >> 4) | ((x & 0x0F0F0F0F) << 4);
+        x = ((x & 0xCCCCCCCC) >> 2) | ((x & 0x33333333) << 2);
+        return ((x & 0xAAAAAAAA) >> 1) | ((x & 0x55555555) << 1);
+    }
+
+    static uint64 __brevll(uint64 x)
+    {
+        x = ((x & 0xF0F0F0F0F0F0F0F0LLU) >> 4) | ((x & 0x0F0F0F0F0F0F0F0FLLU) << 4);
+        x = ((x & 0xCCCCCCCCCCCCCCCCLLU) >> 2) | ((x & 0x3333333333333333LLU) << 2);
+        return ((x & 0xAAAAAAAAAAAAAAAALLU) >> 1) | ((x & 0x5555555555555555LLU) << 1);
+    }
+#endif
+
     // reverse a 2-bit encoded DNA sequence of (at most) base_bits_context length
-    static CUDA_DEVICE covariate_key reverse_dna4(covariate_key input)
+    static CUDA_HOST_DEVICE covariate_key reverse_dna4(covariate_key input)
     {
         constexpr uint32 shift_bits = (sizeof(covariate_key) * 8) - base_bits_context;
         constexpr covariate_key pattern_hi = covariate_key((0xAAAAAAAAAAAAAAAAULL) & BITMASK(base_bits_context));

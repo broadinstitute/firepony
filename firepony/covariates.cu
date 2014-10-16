@@ -37,7 +37,7 @@ struct covariate_gatherer : public bqsr_lambda
 {
     using bqsr_lambda::bqsr_lambda;
 
-    CUDA_DEVICE void operator()(const uint32 cigar_event_index)
+    CUDA_HOST_DEVICE void operator()(const uint32 cigar_event_index)
     {
         const uint32 read_index = ctx.cigar.cigar_event_read_index[cigar_event_index];
 
@@ -173,7 +173,7 @@ struct compute_high_quality_windows : public bqsr_lambda
         LOW_QUAL_TAIL = 2
     };
 
-    CUDA_DEVICE void operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
 

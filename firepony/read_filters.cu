@@ -31,7 +31,7 @@ struct filter_if_any_set : public bqsr_lambda
 {
     using bqsr_lambda::bqsr_lambda;
 
-    CUDA_DEVICE bool operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
         if ((batch.flags[read_index] & flags) != 0)
         {
@@ -47,7 +47,7 @@ struct filter_mapq : public bqsr_lambda
 {
     using bqsr_lambda::bqsr_lambda;
 
-    CUDA_DEVICE bool operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
         if (batch.mapq[read_index] == 0 ||
             batch.mapq[read_index] == 255)
@@ -64,7 +64,7 @@ struct filter_malformed_reads : public bqsr_lambda
 {
     using bqsr_lambda::bqsr_lambda;
 
-    CUDA_DEVICE bool operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
 
@@ -141,7 +141,7 @@ struct filter_malformed_cigars : public bqsr_lambda
 {
     using bqsr_lambda::bqsr_lambda;
 
-    CUDA_DEVICE bool operator() (const uint32 read_index)
+    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
 

@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 2.8)
 
 include(ExternalProject)
 
+option(CPU
+       "Build for the CPU"
+       OFF)
+
 # default to debug builds
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
@@ -10,6 +14,10 @@ endif()
 
 # grab gcc flags
 include("gcc.cmake")
+
+if (CPU)
+add_definitions(-DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP -DRUN_ON_CPU=1)
+endif()
 
 # locate required packages
 # CUDA 7.0 is required to build

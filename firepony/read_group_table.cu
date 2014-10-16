@@ -225,6 +225,9 @@ void build_read_group_table(bqsr_context *context)
     D_Vector<covariate_empirical_value> temp_values;
     D_VectorU8& temp_storage = context->temp_storage;
 
+    temp_keys.resize(rg_keys.size());
+    temp_values.resize(rg_keys.size());
+
     bqsr::sort_by_key(rg_keys, rg_values, temp_keys, temp_values, temp_storage, covariate_table_quality::chain::bits_used);
 
     // reduce the read group table by key

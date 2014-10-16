@@ -65,7 +65,9 @@ int main(int argc, char **argv)
 
     parse_command_line(argc, argv);
 
+#ifndef RUN_ON_CPU
     init_cuda();
+#endif
 
     // load the reference genome
     printf("loading reference from %s...\n", command_line_options.reference);

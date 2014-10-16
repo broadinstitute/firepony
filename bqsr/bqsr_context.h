@@ -29,12 +29,20 @@
 #include "baq.h"
 #include "fractional_errors.h"
 #include "quantizer.h"
+#include "util.h"
 
 struct bqsr_statistics // host-only
 {
     uint32 total_reads;        // total number of reads processed
     uint32 filtered_reads;     // number of reads filtered out in pre-processing
     uint32 baq_reads;          // number of reads for which BAQ was computed
+
+    time_series io;
+    time_series preprocessing;
+    time_series cigar_expansion;
+    time_series baq;
+    time_series fractional_error;
+    time_series covariates;
 
     bqsr_statistics()
         : total_reads(0),

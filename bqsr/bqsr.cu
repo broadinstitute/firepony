@@ -129,13 +129,37 @@ int main(int argc, char **argv)
                         AlignmentDataMask::MAPQ |
                         AlignmentDataMask::READ_GROUP;
 
-    while(bam.next_batch(&batch, data_mask, 80000))
-//    while(bam.next_batch(&batch, 500))
+    auto& stats = context.stats;
+    cpu_timer wall_clock;
+    cpu_timer io;
+
+    gpu_timer preprocessing;
+    gpu_timer cigar_expansion;
+    gpu_timer baq;
+    gpu_timer fractional_error;
+    gpu_timer covariates;
+
+    wall_clock.start();
+
+    for(;;)
     {
+        // read in the next batch
+        io.start();
+        bool eof = !(bam.next_batch(&batch, data_mask, 80000));
+        io.stop();
+        stats.io.add(io);
+
+        if (eof)
+        {
+            // no more data, stop
+            break;
+        }
+
         // load the next batch on the device
         batch.download();
         context.start_batch(batch);
 
+        preprocessing.start();
         // build read offset list
         build_read_offset_list(&context, batch);
         // build read alignment window list
@@ -150,16 +174,26 @@ int main(int argc, char **argv)
         // filter known SNPs from active_loc_list
         filter_known_snps(&context, batch);
 
+        preprocessing.stop();
+
+        cigar_expansion.start();
         // generate cigar events and coordinates
         expand_cigars(&context, batch);
+        cigar_expansion.stop();
 
         // compute the base alignment quality for each read
+        baq.start();
         baq_reads(&context, batch);
+        baq.stop();
 
+        fractional_error.start();
         build_fractional_error_arrays(&context, batch);
+        fractional_error.stop();
 
         // build covariate tables
+        covariates.start();
         gather_covariates(&context, batch);
+        covariates.stop();
 
 #if 0
         for(uint32 read_id = 0; read_id < context.active_read_list.size(); read_id++)
@@ -198,15 +232,33 @@ int main(int argc, char **argv)
         printf("active BPs: %u out of %u (%f %%)\n", h_bplist.size() - zeros, h_bplist.size(), 100.0 * float(h_bplist.size() - zeros) / float(h_bplist.size()));
 #endif
 
+        cudaDeviceSynchronize();
+        stats.preprocessing.add(preprocessing);
+        stats.cigar_expansion.add(cigar_expansion);
+        stats.baq.add(baq);
+        stats.fractional_error.add(fractional_error);
+        stats.covariates.add(covariates);
     }
 
-    build_read_group_table(&context);
-    build_quality_quantization_table(&context);
+    gpu_timer postprocessing_gpu;
+    cpu_timer postprocessing_cpu, output;
 
+    postprocessing_gpu.start();
+    build_read_group_table(&context);
+    postprocessing_gpu.stop();
+
+    postprocessing_cpu.start();
+    build_quality_quantization_table(&context);
+    postprocessing_cpu.stop();
+
+    output.start();
     output_quality_quantization_table(&context);
     output_read_group_table(&context);
-
     output_covariates(&context);
+    output.stop();
+
+    cudaDeviceSynchronize();
+    wall_clock.stop();
 
     printf("%d reads filtered out of %d (%f%%)\n",
             context.stats.filtered_reads,
@@ -217,6 +269,19 @@ int main(int argc, char **argv)
             context.stats.baq_reads,
             context.stats.total_reads - context.stats.filtered_reads,
             float(context.stats.baq_reads) / float(context.stats.total_reads - context.stats.filtered_reads) * 100.0);
+
+    printf("\n");
+
+    printf("wall clock time: %f\n", wall_clock.elapsed_time());
+    printf("  io: %.4f (%.2f%%)\n", stats.io.elapsed_time, stats.io.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    printf("  preprocessing: %.4f (%.2f%%)\n", stats.preprocessing.elapsed_time, stats.preprocessing.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    printf("  cigar expansion: %.4f (%.2f%%)\n", stats.cigar_expansion.elapsed_time, stats.cigar_expansion.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    printf("  baq: %.4f (%.2f%%)\n", stats.baq.elapsed_time, stats.baq.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    printf("  fractional error: %.4f (%.2f%%)\n", stats.fractional_error.elapsed_time, stats.fractional_error.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    printf("  covariates: %.4f (%.2f%%)\n", stats.covariates.elapsed_time, stats.covariates.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    printf("  post-processing (GPU): %.4f (%.2f%%)\n", postprocessing_gpu.elapsed_time(), postprocessing_gpu.elapsed_time() / wall_clock.elapsed_time() * 100.0);
+    printf("  post-processing (CPU): %.4f (%.2f%%)\n", postprocessing_cpu.elapsed_time(), postprocessing_cpu.elapsed_time() / wall_clock.elapsed_time() * 100.0);
+    printf("  output: %.4f (%.2f%%)\n", output.elapsed_time(), output.elapsed_time() / wall_clock.elapsed_time() * 100.0);
 
     return 0;
 }

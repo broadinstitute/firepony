@@ -1,4 +1,4 @@
-set(bqsr_sources
+set(firepony_sources
 alignment_data.h
 baq.cu
 baq.h
@@ -59,13 +59,14 @@ primitives/util.h
 primitives/vector.h
 )
 
-cuda_add_library(bqsr-common ${bqsr_sources})
-add_dependencies(bqsr-common gamgee zlib)
+cuda_add_library(firepony-common ${firepony_sources})
+add_dependencies(firepony-common gamgee zlib)
 
-cuda_add_executable(bqsr bqsr.cu)
-target_link_libraries(bqsr bqsr-common rt ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
-add_dependencies(bqsr gamgee zlib)
+cuda_add_executable(firepony firepony.cu)
+target_link_libraries(firepony firepony-common rt ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+add_dependencies(firepony gamgee zlib)
 
-cuda_add_executable(bqsr-loader bqsr-loader.cu)
-target_link_libraries(bqsr-loader bqsr-common rt ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
-add_dependencies(bqsr-loader gamgee zlib cub)
+cuda_add_executable(firepony-loader firepony-loader.cu)
+target_link_libraries(firepony-loader firepony-common rt ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+add_dependencies(firepony-loader gamgee zlib cub)
+

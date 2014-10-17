@@ -1,4 +1,4 @@
-project(bqsr)
+project(firepony)
 cmake_minimum_required(VERSION 2.8)
 
 include(ExternalProject)
@@ -41,4 +41,4 @@ include("contrib/gamgee.cmake")
 include("contrib/zlib.cmake")
 include("contrib/cub.cmake")
 
-add_subdirectory(bqsr)
+add_subdirectory(firepony)

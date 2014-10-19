@@ -41,6 +41,12 @@ struct gpu_timer
         cudaEventCreate(&stop_event, cudaEventDefault);
     }
 
+    ~gpu_timer()
+    {
+        cudaEventDestroy(start_event);
+        cudaEventDestroy(stop_event);
+    }
+
     void start(void)
     {
         cudaEventRecord(start_event);

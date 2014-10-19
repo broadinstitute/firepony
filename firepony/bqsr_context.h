@@ -44,6 +44,10 @@ struct bqsr_statistics // host-only
     time_series fractional_error;
     time_series covariates;
 
+    time_series baq_setup;
+    time_series baq_hmm;
+    time_series baq_postprocess;
+
     bqsr_statistics()
         : total_reads(0),
           filtered_reads(0),

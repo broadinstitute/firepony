@@ -771,6 +771,10 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     D_VectorU32& active_baq_read_list = context->temp_u32;
     D_VectorU32& baq_state = context->temp_u32_2;
 
+    gpu_timer baq_setup, baq_hmm, baq_postprocess;
+
+    baq_setup.start();
+
     uint32 num_active;
 
     // collect the reads that we need to compute BAQ for
@@ -852,6 +856,9 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     thrust::fill_n(baq.backward.begin(), baq.backward.size(), 0.0);
     thrust::fill_n(baq.scaling.begin(), baq.scaling.size(), 0.0);
 
+    baq_setup.stop();
+
+    baq_hmm.start();
     // run the forward portion
     thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
                                                                   baq.matrix_index.begin(),
@@ -878,6 +885,9 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
                                                                   baq.matrix_index.end(),
                                                                   baq.scaling_index.end())),
                      hmm_glocal_map(*context, batch.device, baq_state));
+    baq_hmm.stop();
+
+    baq_postprocess.start();
 
     // for any reads that we did *not* compute a BAQ, mark the base pairs as having no BAQ uncertainty
     thrust::for_each(context->active_read_list.begin(),
@@ -893,7 +903,14 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
                      active_baq_read_list.end(),
                      recode_baq_qualities(*context, batch.device));
 
+    baq_postprocess.stop();
+
     context->stats.baq_reads += num_active;
+
+    cudaDeviceSynchronize();
+    context->stats.baq_setup.add(baq_setup);
+    context->stats.baq_hmm.add(baq_hmm);
+    context->stats.baq_postprocess.add(baq_postprocess);
 }
 
 void debug_baq(bqsr_context *context, const alignment_batch& batch, int read_index)

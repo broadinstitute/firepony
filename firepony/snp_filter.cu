@@ -304,6 +304,10 @@ public:
                     for(uint32 dead_bp = start; dead_bp < end; dead_bp++)
                         ctx.active_location_list[dead_bp] = 0;
 
+                    // xxxnsubtil: remove when SNP filter is fixed
+                    for(uint32 dead_bp = start; dead_bp < end; dead_bp++)
+                        ctx.active_location_list[dead_bp] = 1;
+
                     // move the BP counter forward
                     bp += end - start;
                 }
@@ -349,7 +353,7 @@ void filter_known_snps(bqsr_context *context, const alignment_batch& batch)
 
     // finally apply the VCF filter
     // this will create zeros in the active location list for each BP that matches a known variant
-//    thrust::for_each(snp.active_read_ids.begin(),
-//                     snp.active_read_ids.end(),
-//                     filter_bps(*context, batch.device));
+    thrust::for_each(snp.active_read_ids.begin(),
+                     snp.active_read_ids.end(),
+                     filter_bps(*context, batch.device));
 }

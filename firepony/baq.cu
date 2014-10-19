@@ -36,6 +36,8 @@
 #include "from_nvbio/dna.h"
 #include "from_nvbio/alphabet.h"
 
+#define BAQ_USE_LMEM
+
 #define MAX_PHRED_SCORE 93
 #define EM 0.33333333333
 #define EI 0.25
@@ -48,6 +50,9 @@
 
 #define GAP_OPEN_PROBABILITY (pow(10.0, (-40.0)/10.))
 #define GAP_EXTENSION_PROBABILITY 0.1
+
+#define MAX_READ_LEN 150
+#define MAT_SIZE ((MAX_READ_LEN + 1) * 6 * (2 * MAX_BAND_WIDTH + 1))
 
 struct compute_hmm_windows : public bqsr_lambda
 {
@@ -91,6 +96,448 @@ struct compute_hmm_windows : public bqsr_lambda
     }
 };
 
+#ifdef BAQ_USE_LMEM
+// runs the entire BAQ algorithm in a single kernel, storing forward and backward matrices in local memory
+struct hmm_glocal_full_lmem : public bqsr_lambda
+{
+    D_VectorU32::view baq_state;
+
+    hmm_glocal_full_lmem(bqsr_context::view ctx,
+                    const alignment_batch_device::const_view batch,
+                    D_VectorU32::view baq_state)
+        : bqsr_lambda(ctx, batch), baq_state(baq_state)
+    { }
+
+    int bandWidth, bandWidth2;
+
+    int referenceStart, referenceLength;
+    int queryStart, queryEnd, queryLen;
+
+    double *scalingFactors;
+
+    double sM, sI, bM, bI;
+
+    double m[9];
+
+    D_StreamDNA16 referenceBases;
+    D_StreamDNA16 queryBases;
+    const uint8 *inputQualities;
+
+    uint8 *outputQualities;
+    uint32 *outputState;
+
+    template<typename Tuple>
+    CUDA_HOST_DEVICE void setup(const Tuple& hmm_index)
+    {
+        const uint32 read_index    = thrust::get<0>(hmm_index);
+        const uint32 matrix_index  = thrust::get<1>(hmm_index);
+        const uint32 scaling_index = thrust::get<2>(hmm_index);
+
+        const CRQ_index idx = batch.crq_index(read_index);
+
+        // set up scaling factor pointers
+//        forwardMatrix = &ctx.baq.forward[matrix_index];
+//        backwardMatrix= &ctx.baq.backward[matrix_index];
+        scalingFactors = &ctx.baq.scaling[scaling_index];
+
+        // get the windows for the current read
+        const uint2& reference_window = ctx.baq.reference_windows[read_index];
+        const ushort2& read_window = ctx.cigar.read_window_clipped[read_index];
+
+        referenceStart = reference_window.x;
+        referenceLength = reference_window.y - reference_window.x + 1;
+
+        queryStart = read_window.x;
+        queryEnd = read_window.y;
+        queryLen = read_window.y - read_window.x + 1;
+
+        // compute band width
+        if (referenceLength > queryLen)
+            bandWidth = referenceLength;
+        else
+            bandWidth = queryLen;
+
+        if (MAX_BAND_WIDTH < abs(referenceLength - queryLen))
+        {
+            bandWidth = abs(referenceLength - queryLen) + 3;
+        }
+
+        if (bandWidth > MAX_BAND_WIDTH)
+            bandWidth = MAX_BAND_WIDTH;
+
+        if (bandWidth < abs(referenceLength - queryLen))
+        {
+            bandWidth = abs(referenceLength - queryLen);
+        }
+
+        bandWidth2 = bandWidth * 2 + 1;
+
+        // initialize transition probabilities
+        sM = 1.0 / (2 * queryLen + 2);
+        sI = sM;
+        bM = (1 - GAP_OPEN_PROBABILITY) / referenceLength;
+        bI = GAP_OPEN_PROBABILITY / referenceLength;
+
+        m[0*3+0] = (1 - GAP_OPEN_PROBABILITY - GAP_OPEN_PROBABILITY) * (1 - sM);
+        m[0*3+1] = GAP_OPEN_PROBABILITY * (1 - sM);
+        m[0*3+2] = m[0*3+1];
+        m[1*3+0] = (1 - GAP_EXTENSION_PROBABILITY) * (1 - sI);
+        m[1*3+1] = GAP_EXTENSION_PROBABILITY * (1 - sI);
+        m[1*3+2] = 0.0;
+        m[2*3+0] = 1 - GAP_EXTENSION_PROBABILITY;
+        m[2*3+1] = 0.0;
+        m[2*3+2] = GAP_EXTENSION_PROBABILITY;
+
+//        printf("referenceStart = %u\n", referenceStart);
+//        printf("queryStart = %u queryLen = %u\n", queryStart, queryLen);
+
+        queryBases = batch.reads + idx.read_start + queryStart;
+        referenceBases = ctx.reference.bases + referenceStart;
+        inputQualities = &batch.qualities[idx.qual_start] + queryStart;
+
+        if (ctx.baq.qualities.size() > 0)
+            outputQualities = &ctx.baq.qualities[idx.qual_start] + queryStart;
+        else
+            outputQualities = NULL;
+
+        if (baq_state.size() > 0)
+            outputState = &baq_state[idx.qual_start] + queryStart;
+        else
+            outputState = NULL;
+
+        queryStart = 0;
+    }
+
+    CUDA_HOST_DEVICE int set_u(const int b, const int i, const int k)
+    {
+        int x = i - b;
+        x = x > 0 ? x : 0;
+        return (k + 1 - x) * 3;
+    }
+
+    // computes a matrix offset for forwardMatrix or backwardMatrix
+    CUDA_HOST_DEVICE int off(int i, int j = 0)
+    {
+        return i * 6 * (2 * MAX_BAND_WIDTH + 1) + j;
+    }
+
+    // computes the required HMM matrix size for the given read length
+    CUDA_HOST_DEVICE static uint32 matrix_size(const uint32 read_len)
+    {
+        return (read_len + 1) * 6 * (2 * MAX_BAND_WIDTH + 1);
+    }
+
+    CUDA_HOST_DEVICE static double qual2prob(uint8 q)
+    {
+        return pow(10.0, -q/10.0);
+    }
+
+    CUDA_HOST_DEVICE static double calcEpsilon(uint8 ref, uint8 read, uint8 qualB)
+    {
+        if (ref == from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::N ||
+            read == from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::N)
+        {
+            return 1.0;
+        }
+
+        double qual = qual2prob(qualB < MIN_BASE_QUAL ? MIN_BASE_QUAL : qualB);
+        double e = (ref == read ? 1 - qual : qual * EM);
+        return e;
+    }
+
+    template<typename Tuple>
+    CUDA_HOST_DEVICE void operator() (const Tuple& hmm_index)
+    {
+        int i, k;
+
+        double forwardMatrix[MAT_SIZE];
+        double backwardMatrix[MAT_SIZE];
+
+        setup(hmm_index);
+
+//        const uint32 read_index    = thrust::get<0>(hmm_index);
+//        printf("read %d: hmm_glocal(l_ref=%d qstart=%d, l_query=%d)\n", read_index, referenceLength, queryStart, queryLen);
+//        printf("read %d: ref = { ", read_index);
+//        for(int c = 0; c < referenceLength; c++)
+//        {
+//            printf("%c ", from_nvbio::iupac16_to_char(referenceBases[c]));
+//        }
+//        printf("\n");
+//
+//        printf("read %d: que = { ", read_index);
+//        for(int c = 0; c < queryLen; c++)
+//        {
+//            printf("%c ", from_nvbio::iupac16_to_char(queryBases[c]));
+//        }
+//        printf("\n");
+
+//        printf("read %d: _iqual = { % 3d % 3d % 3d % 3d % 3d ... % 3d % 3d % 3d % 3d % 3d }\n", read_index,
+//                inputQualities[0], inputQualities[1], inputQualities[2], inputQualities[3], inputQualities[4],
+//                inputQualities[queryLen - 5], inputQualities[queryLen - 4], inputQualities[queryLen - 3], inputQualities[queryLen - 2], inputQualities[queryLen - 1]);
+//        printf("read %d: c->bw = %d, bw = %d, l_ref = %d, l_query = %d\n", read_index, MAX_BAND_WIDTH, bandWidth, referenceLength, queryLen);
+
+        /*** forward ***/
+        // f[0]
+        forwardMatrix[off(0, set_u(bandWidth, 0, 0))] = 1.0;
+        scalingFactors[0] = 1.0;
+        { // f[1]
+            double *fi = &forwardMatrix[off(1)];
+            double sum;
+            int beg = 1;
+            int end = referenceLength < bandWidth + 1? referenceLength : bandWidth + 1;
+            int _beg, _end;
+
+            sum = 0.0;
+            for (k = beg; k <= end; ++k)
+            {
+                int u;
+                double e = calcEpsilon(referenceBases[k-1], queryBases[queryStart], inputQualities[queryStart]);
+//                printf("read %d: referenceBases[%d-1] = %c inputQualities[%d] = %d queryBases[%d] = %c -> e = %.4f\n",
+//                        read_index,
+//                        k,
+//                        from_nvbio::iupac16_to_char(referenceBases[k-1]),
+//                        queryStart,
+//                        inputQualities[queryStart],
+//                        queryStart,
+//                        from_nvbio::iupac16_to_char(queryBases[queryStart]), e);
+
+                u = set_u(bandWidth, 1, k);
+
+                fi[u+0] = e * bM;
+                fi[u+1] = EI * bI;
+
+                sum += fi[u] + fi[u+1];
+            }
+
+            // rescale
+            scalingFactors[1] = sum;
+            _beg = set_u(bandWidth, 1, beg);
+            _end = set_u(bandWidth, 1, end);
+            _end += 2;
+
+            for (int k = _beg; k <= _end; ++k)
+                fi[k] /= sum;
+        }
+
+        // f[2..l_query]
+        for (i = 2; i <= queryLen; ++i)
+        {
+            double *fi = &forwardMatrix[off(i)];
+            double *fi1 = &forwardMatrix[off(i-1)];
+            double sum;
+
+            int beg = 1;
+            int end = referenceLength;
+            int x, _beg, _end;
+
+            char qyi = queryBases[queryStart+i-1];
+
+            x = i - bandWidth;
+            beg = beg > x? beg : x; // band start
+
+            x = i + bandWidth;
+            end = end < x? end : x; // band end
+
+            sum = 0.0;
+            for (k = beg; k <= end; ++k)
+            {
+                int u, v11, v01, v10;
+                double e = calcEpsilon(referenceBases[k-1], qyi, inputQualities[queryStart+i-1]);
+//                printf("read %d: referenceBases[%d-1] = %c inputQualities[%d+%d-1] = %d qyi = %c -> e = %.4f\n",
+//                        read_index,
+//                        k,
+//                        from_nvbio::iupac16_to_char(referenceBases[k-1]),
+//                        queryStart,
+//                        i,
+//                        inputQualities[queryStart+i-1],
+//                        from_nvbio::iupac16_to_char(qyi), e);
+
+                u = set_u(bandWidth, i, k);
+                v11 = set_u(bandWidth, i-1, k-1);
+                v10 = set_u(bandWidth, i-1, k);
+                v01 = set_u(bandWidth, i, k-1);
+
+                fi[u+0] = e * (m[0] * fi1[v11+0] + m[3] * fi1[v11+1] + m[6] * fi1[v11+2]);
+                fi[u+1] = EI * (m[1] * fi1[v10+0] + m[4] * fi1[v10+1]);
+                fi[u+2] = m[2] * fi[v01+0] + m[8] * fi[v01+2];
+
+                sum += fi[u] + fi[u+1] + fi[u+2];
+
+    //            printf("(%d,%d;%d): %.4f,%.4f,%.4f\n", i, k, u, fi[u], fi[u+1], fi[u+2]);
+    //            printf(" .. u = %d v11 = %d v01 = %d v10 = %d e = %f\n", u, v11, v01, v10, e);
+            }
+
+            // rescale
+            scalingFactors[i] = sum;
+
+            _beg = set_u(bandWidth, i, beg);
+            _end = set_u(bandWidth, i, end);
+            _end += 2;
+
+            for (k = _beg, sum = 1./sum; k <= _end; ++k)
+                fi[k] *= sum;
+        }
+
+        { // f[l_query+1]
+            double sum = 0.0;
+
+            for (k = 1; k <= referenceLength; ++k)
+            {
+                int u = set_u(bandWidth, queryLen, k);
+
+                if (u < 3 || u >= bandWidth2*3+3)
+                    continue;
+
+                sum += forwardMatrix[off(queryLen,u+0)] * sM + forwardMatrix[off(queryLen, u+1)] * sI;
+            }
+
+            scalingFactors[queryLen+1] = sum; // the last scaling factor
+        }
+
+        /*** backward ***/
+        // b[l_query] (b[l_query+1][0]=1 and thus \tilde{b}[][]=1/s[l_query+1]; this is where s[l_query+1] comes from)
+        for (k = 1; k <= referenceLength; ++k)
+        {
+            int u = set_u(bandWidth, queryLen, k);
+            double *bi = &backwardMatrix[off(queryLen)];
+
+            if (u < 3 || u >= bandWidth2*3+3)
+                continue;
+
+            bi[u+0] = sM / scalingFactors[queryLen] / scalingFactors[queryLen+1];
+            bi[u+1] = sI / scalingFactors[queryLen] / scalingFactors[queryLen+1];
+        }
+
+        // b[l_query-1..1]
+        for (i = queryLen - 1; i >= 1; --i)
+        {
+            int beg = 1;
+            int end = referenceLength;
+            int x, _beg, _end;
+
+            double *bi = &backwardMatrix[off(i)];
+            double *bi1 = &backwardMatrix[off(i+1)];
+            double y = (i > 1)? 1. : 0.;
+
+            char qyi1 = queryBases[queryStart+i];
+
+            x = i - bandWidth;
+            beg = beg > x? beg : x;
+
+            x = i + bandWidth;
+            end = end < x? end : x;
+
+            for (k = end; k >= beg; --k)
+            {
+                int u, v11, v01, v10;
+
+                u = set_u(bandWidth, i, k);
+                v11 = set_u(bandWidth, i+1, k+1);
+                v10 = set_u(bandWidth, i+1, k);
+                v01 = set_u(bandWidth, i, k+1);
+
+                /* const */ double e;
+                if (k >= referenceLength)
+                    e = 0;
+                else
+                    e = calcEpsilon(referenceBases[k], qyi1, inputQualities[queryStart+i]) * bi1[v11];
+
+                bi[u+0] = e * m[0] + EI * m[1] * bi1[v10+1] + m[2] * bi[v01+2]; // bi1[v11] has been folded into e.
+                bi[u+1] = e * m[3] + EI * m[4] * bi1[v10+1];
+                bi[u+2] = (e * m[6] + m[8] * bi[v01+2]) * y;
+            }
+
+            // rescale
+            _beg = set_u(bandWidth, i, beg);
+            _end = set_u(bandWidth, i, end);
+            _end += 2;
+
+            y = 1.0 / scalingFactors[i];
+            for (k = _beg; k <= _end; ++k)
+                bi[k] *= y;
+        }
+
+//        double pb = 0.0;
+        { // b[0]
+            int beg = 1;
+            int end = referenceLength < bandWidth + 1? referenceLength : bandWidth + 1;
+
+            double sum = 0.0;
+            for (k = end; k >= beg; --k)
+            {
+                int u = set_u(bandWidth, 1, k);
+                double e = calcEpsilon(referenceBases[k-1], queryBases[queryStart], inputQualities[queryStart]);
+
+                if (u < 3 || u >= bandWidth2*3+3)
+                    continue;
+
+                sum += e * backwardMatrix[off(1, u+0)] * bM + EI * backwardMatrix[off(1, u+1)] * bI;
+            }
+
+            backwardMatrix[off(0, set_u(bandWidth, 0, 0))] = sum / scalingFactors[0];
+//            pb = backwardMatrix[off(0, set_u(bandWidth, 0, 0))]; // if everything works as is expected, pb == 1.0
+        }
+
+        /*** MAP ***/
+        for (i = 1; i <= queryLen; ++i)
+        {
+            double sum = 0.0;
+            double max = 0.0;
+
+            const double *fi = &forwardMatrix[off(i)];
+            const double *bi = &backwardMatrix[off(i)];
+
+            int beg = 1;
+            int end = referenceLength;
+            int x, max_k = -1;
+
+            x = i - bandWidth;
+            beg = beg > x? beg : x;
+
+            x = i + bandWidth;
+            end = end < x? end : x;
+
+            for (k = beg; k <= end; ++k)
+            {
+                const int u = set_u(bandWidth, i, k);
+                double z = 0.0;
+
+                z = fi[u+0] * bi[u+0];
+                sum += z;
+                if (z > max)
+                {
+                    max = z;
+                    max_k = (k-1) << 2 | 0;
+                }
+
+                z = fi[u+1] * bi[u+1];
+                sum += z;
+                if (z > max)
+                {
+                    max = z;
+                    max_k = (k-1) << 2 | 1;
+                }
+            }
+
+            max /= sum;
+            sum *= scalingFactors[i]; // if everything works as is expected, sum == 1.0
+
+//            if (outputState != NULL)
+                outputState[queryStart+i-1] = max_k;
+
+//            if (outputQualities != NULL)
+            {
+                k = (int)(double(-4.343) * log(double(1.0) - double(max)) + double(.499)); // = 10*log10(1-max)
+                outputQualities[queryStart+i-1] = (char)(k > 100? 99 : (k < MIN_BASE_QUAL ? MIN_BASE_QUAL : k));
+
+//                printf("read %d: outputQualities[%d]: max = %.16f k = %d -> %d\n", read_index, queryStart+i-1, max, k, outputQualities[queryStart+i-1]);
+            }
+
+    //        printf("(%.4f,%.4f) (%d,%d,%d,%.4f)\n", pb, sum, (i-1), (max_k>>2), (max_k&3), max);
+        }
+    }
+};
+#else
 // encapsulates common state for the HMM algorithm
 struct hmm_common : public bqsr_lambda
 {
@@ -574,6 +1021,7 @@ struct compute_hmm_matrix_size : public thrust::unary_function<uint32, uint32>, 
         return hmm_common::matrix_size(idx.read_len);
     }
 };
+#endif
 
 struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, uint32>, public bqsr_lambda
 {
@@ -788,6 +1236,7 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
 
     active_baq_read_list.resize(num_active);
 
+#ifndef BAQ_USE_LMEM
     // compute the index and size of the HMM matrices
     baq.matrix_index.resize(num_active + 1);
     // first offset is zero
@@ -799,6 +1248,12 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
                          baq.matrix_index.begin() + 1,
                          thrust::plus<uint32>());
 
+    uint32 matrix_len = baq.matrix_index[num_active];
+
+    baq.forward.resize(matrix_len);
+    baq.backward.resize(matrix_len);
+#endif
+
     // compute the index and size of the HMM scaling factors
     baq.scaling_index.resize(num_active + 1);
     // first offset is zero
@@ -809,9 +1264,8 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
                          baq.scaling_index.begin() + 1,
                          thrust::plus<uint32>());
 
-    // read back the last elements, which contain the size of the buffer required
-    uint32 matrix_len = baq.matrix_index[num_active];
     uint32 scaling_len = baq.scaling_index[num_active];
+    baq.scaling.resize(scaling_len);
 
 //    printf("reads: %u\n", batch.num_reads);
 //    printf("forward len = %u bytes = %lu\n", matrix_len, matrix_len * sizeof(double));
@@ -819,11 +1273,6 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
 //            hmm_common::matrix_size(100) * context->active_read_list.size(),
 //            hmm_common::matrix_size(100) * context->active_read_list.size() * sizeof(double));
 //    printf("per read matrix size = %u bytes = %lu\n", hmm_common::matrix_size(100), hmm_common::matrix_size(100) * sizeof(double));
-
-    baq.forward.resize(matrix_len);
-    baq.backward.resize(matrix_len);
-    baq.scaling.resize(scaling_len);
-
 //    printf("matrix index = [ ");
 //    for(uint32 i = 0; i < 20; i++)
 //    {
@@ -852,13 +1301,16 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
                      compute_hmm_windows(*context, batch.device));
 
     // initialize matrices and scaling factors
+#ifndef BAQ_USE_LMEM
     thrust::fill_n(baq.forward.begin(), baq.forward.size(), 0.0);
     thrust::fill_n(baq.backward.begin(), baq.backward.size(), 0.0);
+#endif
     thrust::fill_n(baq.scaling.begin(), baq.scaling.size(), 0.0);
 
     baq_setup.stop();
 
     baq_hmm.start();
+#ifndef BAQ_USE_LMEM
     // run the forward portion
     thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
                                                                   baq.matrix_index.begin(),
@@ -885,6 +1337,15 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
                                                                   baq.matrix_index.end(),
                                                                   baq.scaling_index.end())),
                      hmm_glocal_map(*context, batch.device, baq_state));
+#else
+    thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
+                                                                  baq.matrix_index.begin(),
+                                                                  baq.scaling_index.begin())),
+                     thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
+                                                                  baq.matrix_index.end(),
+                                                                  baq.scaling_index.end())),
+                     hmm_glocal_full_lmem(*context, batch.device, baq_state));
+#endif
     baq_hmm.stop();
 
     baq_postprocess.start();

@@ -34,18 +34,7 @@
 #include "baq.h"
 #include "fractional_errors.h"
 #include "read_group_table.h"
-
-/*
-// sort batch by increasing alignment position
-void device_sort_batch(BAM_alignment_batch_device *batch)
-{
-    D_VectorU32 temp_pos = batch->alignment_positions;
-
-    thrust::sort_by_key(temp_pos.begin(),
-                        temp_pos.begin() + temp_pos.size(),
-                        batch->read_order.begin());
-}
-*/
+#include "options.h"
 
 void debug_read(bqsr_context *context, const alignment_batch& batch, int read_index);
 
@@ -69,42 +58,36 @@ void init_cuda(void)
 
 int main(int argc, char **argv)
 {
-    // load the reference genome
-    const char *default_ref_name = "/home/nsubtil/hg96/hs37d5.fa";
-    const char *default_bam_name = "/home/nsubtil/hg96/HG00096.chrom20.ILLUMINA.bwa.GBR.low_coverage.20120522.fixed.bam";
-    const char *default_vcf_name = "/home/nsubtil/hg96/ALL.chr20.integrated_phase1_v3.20101123.snps_indels_svs.genotypes.vcf";
-
-    const char *bam_name = (argc < 2 ? default_bam_name : argv[1]);
-    const char *vcf_name = (argc < 3 ? default_vcf_name : argv[2]);
-    const char *ref_name = (argc < 4 ? default_ref_name : argv[3]);
-
     sequence_data reference;
     variant_database vcf;
     size_t num_bytes;
     bool ret;
 
+    parse_command_line(argc, argv);
+
     init_cuda();
 
-    printf("loading reference from %s...\n", ref_name);
-    ret = gamgee_load_sequences(&reference, ref_name,
+    // load the reference genome
+    printf("loading reference from %s...\n", command_line_options.reference);
+    ret = gamgee_load_sequences(&reference, command_line_options.reference,
                                 SequenceDataMask::BASES |
                                 SequenceDataMask::NAMES);
     if (ret == false)
     {
-        printf("failed to load reference %s\n", ref_name);
+        printf("failed to load reference %s\n", command_line_options.reference);
         exit(1);
     }
 
     num_bytes = reference.download();
     printf("downloaded %lu MB of reference data\n", num_bytes / (1024 * 1024));
 
-    printf("loading variant database %s...\n", vcf_name);
-    ret = gamgee_load_vcf(&vcf, reference, vcf_name, VariantDataMask::CHROMOSOME |
-                                                     VariantDataMask::ALIGNMENT |
-                                                     VariantDataMask::REFERENCE);
+    printf("loading variant database %s...\n", command_line_options.snp_database);
+    ret = gamgee_load_vcf(&vcf, reference, command_line_options.snp_database, VariantDataMask::CHROMOSOME |
+                                                                              VariantDataMask::ALIGNMENT |
+                                                                              VariantDataMask::REFERENCE);
     if (ret == false)
     {
-        printf("failed to load variant database %s\n", vcf_name);
+        printf("failed to load variant database %s\n", command_line_options.snp_database);
         exit(1);
     }
 
@@ -113,8 +96,8 @@ int main(int argc, char **argv)
     num_bytes = vcf.download();
     printf("downloaded %lu MB of variant data\n", num_bytes / (1024 * 1024));
 
-    printf("reading BAM %s...\n", bam_name);
-    gamgee_alignment_file bam(bam_name);
+    printf("processing file %s...\n", command_line_options.input);
+    gamgee_alignment_file bam(command_line_options.input);
     alignment_batch batch;
 
     bqsr_context context(bam.header, vcf, reference);

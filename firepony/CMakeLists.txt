@@ -17,6 +17,8 @@ gamgee_loader.cu
 gamgee_loader.h
 mmap.cu
 mmap.h
+options.cu
+options.h
 read_filters.cu
 read_filters.h
 read_group_table.cu

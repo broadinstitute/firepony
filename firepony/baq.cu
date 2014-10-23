@@ -130,7 +130,6 @@ struct hmm_glocal_full_lmem : public bqsr_lambda
     CUDA_HOST_DEVICE void setup(const Tuple& hmm_index)
     {
         const uint32 read_index    = thrust::get<0>(hmm_index);
-        const uint32 matrix_index  = thrust::get<1>(hmm_index);
         const uint32 scaling_index = thrust::get<2>(hmm_index);
 
         const CRQ_index idx = batch.crq_index(read_index);

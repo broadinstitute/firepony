@@ -116,7 +116,9 @@ int main(int argc, char **argv)
     cpu_timer wall_clock;
     cpu_timer io;
 
-    gpu_timer preprocessing;
+    gpu_timer read_filter;
+    gpu_timer bp_filter;
+    gpu_timer snp_filter;
     gpu_timer cigar_expansion;
     gpu_timer baq;
     gpu_timer fractional_error;
@@ -142,27 +144,31 @@ int main(int argc, char **argv)
         batch.download();
         context.start_batch(batch);
 
-        cigar_expansion.start();
-        // generate cigar events and coordinates
-        expand_cigars(&context, batch);
-        cigar_expansion.stop();
+        read_filter.start();
 
-        preprocessing.start();
-        // build read offset list
+        // build read offset and alignment window list (required by read filters)
         build_read_offset_list(&context, batch);
-        // build read alignment window list
         build_alignment_windows(&context, batch);
-
         // apply read filters
         filter_reads(&context, batch);
 
+        read_filter.stop();
+
+        // generate cigar events and coordinates
+        // this will generate -1 read indices for events belonging to inactive reads, so it must happen after read filtering
+        cigar_expansion.start();
+        expand_cigars(&context, batch);
+        cigar_expansion.stop();
+
         // apply per-BP filters
+        bp_filter.start();
         filter_bases(&context, batch);
+        bp_filter.stop();
 
         // filter known SNPs from active_loc_list
+        snp_filter.start();
         filter_known_snps(&context, batch);
-
-        preprocessing.stop();
+        snp_filter.stop();
 
         // compute the base alignment quality for each read
         baq.start();
@@ -216,8 +222,10 @@ int main(int argc, char **argv)
 #endif
 
         cudaDeviceSynchronize();
+        stats.read_filter.add(read_filter);
         stats.cigar_expansion.add(cigar_expansion);
-        stats.preprocessing.add(preprocessing);
+        stats.snp_filter.add(snp_filter);
+        stats.bp_filter.add(bp_filter);
         stats.baq.add(baq);
         stats.fractional_error.add(fractional_error);
         stats.covariates.add(covariates);
@@ -252,8 +260,10 @@ int main(int argc, char **argv)
 
     printf("wall clock time: %f\n", wall_clock.elapsed_time());
     printf("  io: %.4f (%.2f%%)\n", stats.io.elapsed_time, stats.io.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    printf("  read filtering: %.4f (%.2f%%)\n", stats.read_filter.elapsed_time, stats.read_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
     printf("  cigar expansion: %.4f (%.2f%%)\n", stats.cigar_expansion.elapsed_time, stats.cigar_expansion.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("  preprocessing: %.4f (%.2f%%)\n", stats.preprocessing.elapsed_time, stats.preprocessing.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    printf("  snp filtering: %.4f (%.2f%%)\n", stats.snp_filter.elapsed_time, stats.snp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    printf("  bp filtering: %.4f (%.2f%%)\n", stats.bp_filter.elapsed_time, stats.bp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
     printf("  baq: %.4f (%.2f%%)\n", stats.baq.elapsed_time, stats.baq.elapsed_time / wall_clock.elapsed_time() * 100.0);
     printf("    setup: %.4f (%.2f%%)\n", stats.baq_setup.elapsed_time, stats.baq_setup.elapsed_time / stats.baq.elapsed_time * 100.0);
     printf("    hmm: %.4f (%.2f%%)\n", stats.baq_hmm.elapsed_time, stats.baq_hmm.elapsed_time / stats.baq.elapsed_time * 100.0);

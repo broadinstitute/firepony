@@ -38,7 +38,9 @@ struct bqsr_statistics // host-only
     uint32 baq_reads;          // number of reads for which BAQ was computed
 
     time_series io;
-    time_series preprocessing;
+    time_series read_filter;
+    time_series snp_filter;
+    time_series bp_filter;
     time_series cigar_expansion;
     time_series baq;
     time_series fractional_error;

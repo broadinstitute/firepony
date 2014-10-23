@@ -287,8 +287,9 @@ public:
             end = min(end, read_window_clipped.y);
 
 
-            // count the number of insertions behind the feature
+            // count the number of indels behind the feature
             uint32 num_insertions = 0;
+            uint32 num_deletions = 0;
 
             const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
             for(uint32 ev = cigar_start + read_window_clipped.x; ev < cigar_start + read_window_clipped.y; ev++)
@@ -299,11 +300,14 @@ public:
 
                 if (ctx.cigar.cigar_events[ev] == cigar_event::I)
                     num_insertions++;
+
+                if (ctx.cigar.cigar_events[ev] == cigar_event::D)
+                    num_deletions++;
             }
 
 
-            // xxxnsubtil: this might be wrong if there are insertions within the feature range!
-            for(uint32 dead_bp = uint32(start) + num_insertions; dead_bp <= uint32(end) + num_insertions; dead_bp++)
+            // xxxnsubtil: this might be wrong if there are indels within the feature range!
+            for(uint32 dead_bp = uint32(start) + num_insertions - num_deletions; dead_bp <= uint32(end) + num_insertions - num_deletions; dead_bp++)
                 ctx.active_location_list[idx.read_start + dead_bp] = 0;
         }
     }

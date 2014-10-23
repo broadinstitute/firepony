@@ -160,34 +160,52 @@ struct compute_vcf_ranges : public bqsr_lambda
     {
         const auto& db = ctx.variant_db;
 
-        const uint2& alignment_window = ctx.alignment_windows[read_index];
-        uint2& vcf_range = ctx.snp_filter.active_vcf_ranges[read_index];
+        // figure out the genome alignment window for this read
+        const ushort2& reference_window_clipped = ctx.cigar.reference_window_clipped[read_index];
 
-        // search for the starting range
-        const uint32 *vcf_start;
-        vcf_start = bqsr::lower_bound(alignment_window.x,
-                                      db.reference_window_start.begin(),
-                                      db.reference_window_start.size());
+        const uint32 ref_sequence_id = batch.chromosome[read_index];
+        const uint32 ref_sequence_base = ctx.reference.sequence_bp_start[ref_sequence_id];
+        const uint32 ref_sequence_offset = ref_sequence_base + batch.alignment_start[read_index];
+
+        const uint2 alignment_window = make_uint2(ref_sequence_offset,
+                                                  ref_sequence_offset + uint32(reference_window_clipped.y));
+
+        // do a binary search for a feature that starts inside our read
+        const uint32 *vcf_start = bqsr::lower_bound(alignment_window.x,
+                                                    db.reference_window_start.begin(),
+                                                    db.reference_window_start.size());
+
+        // compute the initial vcf range
+        uint2 vcf_range = make_uint2(vcf_start - db.reference_window_start.begin(),
+                                     vcf_start - db.reference_window_start.begin());
+
+        vcf_range.x = vcf_start - db.reference_window_start.begin();
+        vcf_range.y = vcf_range.x;
+
 
         // do a linear search to find the end of the VCF range
         // (there are generally very few VCF entries for an average read length --- and often none --- so this is expected to be faster than a binary search)
-        const uint32 *vcf_end = vcf_start;
-        while(vcf_end < db.reference_window_start.begin() + db.reference_window_start.size() &&
-              *vcf_end < alignment_window.y)
+        while(vcf_range.y < db.reference_window_start.size() - 1 &&
+                db.reference_window_start[vcf_range.y + 1] <= alignment_window.y)
         {
-            vcf_end++;
+            vcf_range.y++;
         }
 
-        if (vcf_end == vcf_start)
+        // expand the start of the range backwards to find the first feature that overlaps with our alignment window
+        while(vcf_range.x != 0 &&
+              db.reference_window_start[vcf_range.x - 1] + db.alignment_window_len[vcf_range.x - 1] >= alignment_window.x)
+        {
+            vcf_range.x--;
+        }
+
+        // check for overlap at the edges of the range
+        if (db.reference_window_start[vcf_range.x] < alignment_window.x &&
+                db.reference_window_start[vcf_range.y] + db.alignment_window_len[vcf_range.y] > alignment_window.y)
         {
             // emit an empty VCF range
-            vcf_range = make_uint2(uint32(-1), uint32(-1));
+            ctx.snp_filter.active_vcf_ranges[read_index] = make_uint2(uint32(-1), uint32(-1));
         } else {
-            if (vcf_end >= db.reference_window_start.begin() + db.reference_window_start.size())
-                vcf_end--;
-
-            vcf_range = make_uint2(vcf_start - db.reference_window_start.begin(),
-                                   vcf_end - db.reference_window_start.begin());
+            ctx.snp_filter.active_vcf_ranges[read_index] = vcf_range;
         }
     }
 };
@@ -245,83 +263,48 @@ public:
         const auto& db = ctx.variant_db;
 
         const CRQ_index& idx = batch.crq_index(read_index);
-        const uint2& alignment_window = ctx.alignment_windows[read_index];
-        const uint16 *offset_list = &ctx.read_offset_list[0];
+        const ushort2& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
+
+        // figure out the genome alignment window for this read
+        const uint32 ref_sequence_id = batch.chromosome[read_index];
+        const uint32 ref_sequence_base = ctx.reference.sequence_bp_start[ref_sequence_id];
+        const uint32 ref_sequence_offset = ref_sequence_base + batch.alignment_start[read_index];
 
         uint2 vcf_db_range = ctx.snp_filter.active_vcf_ranges[read_index];
-        uint2 vcf_range = make_uint2(db.reference_window_start[vcf_db_range.x],
-                                      db.reference_window_start[vcf_db_range.y]);
 
-        // traverse the list of reads together with the VCF list; when we find a match, stop
-        for(uint32 bp = idx.read_start; bp < idx.read_start + idx.read_len; bp++)
+
+
+        // traverse the VCF range and mark corresponding read BPs as inactive
+        for(uint32 feature = vcf_db_range.x; feature <= vcf_db_range.y; feature++)
         {
-            if (offset_list[bp] == uint16(-1))
+            // compute the feature range in read coordinates
+            int start = db.reference_window_start[feature] - ref_sequence_offset + read_window_clipped.x;
+            int end = db.reference_window_start[feature] + db.alignment_window_len[feature] - ref_sequence_offset + read_window_clipped.x;
+
+
+            // truncate any portions of the feature range that fall outside the clipped read region
+            start = max(start, read_window_clipped.x);
+            end = min(end, read_window_clipped.y);
+
+
+            // count the number of insertions behind the feature
+            uint32 num_insertions = 0;
+
+            const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
+            for(uint32 ev = cigar_start + read_window_clipped.x; ev < cigar_start + read_window_clipped.y; ev++)
             {
-                // skip bases that don't exist in the reference
-                // (every starting point of a VCF entry must exist, even if the rest are insertions to the reference --- I think!)
-                continue;
+                if (ctx.cigar.cigar_event_read_coordinates[ev] != uint16(-1) &&
+                        ctx.cigar.cigar_event_read_coordinates[ev] >= end)
+                    break;
+
+                if (ctx.cigar.cigar_events[ev] == cigar_event::I)
+                    num_insertions++;
             }
 
-            // compute the reference offset for the current BP
-            const uint32 ref_offset = alignment_window.x + offset_list[bp];
 
-            if (ref_offset < vcf_range.x)
-            {
-                // we're behind the known VCF range, skip this BP
-                continue;
-            }
-
-            if (ref_offset > vcf_range.y)
-            {
-                // we've gone past the end of the range, stop the search
-                return;
-            }
-
-            while (ref_offset > vcf_range.x)
-            {
-                // we've moved past the beginning of the current VCF entry
-                // move forward in the VCF range
-                vcf_db_range.x++;
-                if (vcf_db_range.x > vcf_db_range.y)
-                {
-                    // no more VCF entries to test
-                    return;
-                }
-
-                vcf_range.x = db.reference_window_start[vcf_db_range.x];
-            }
-
-            // if we found the start of a variant, mark the corresponding BP range
-            while (ref_offset == vcf_range.x)
-            {
-                uint32 vcf_len = db.alignment_window_len[vcf_db_range.x];
-                if (vcf_len)
-                {
-                    // turn off vcf_match_len BPs since they match the variant database
-                    const uint32 start = idx.read_start;
-                    const uint32 end = bqsr::min(start + vcf_len, start + idx.read_len);
-
-                    for(uint32 dead_bp = start; dead_bp < end; dead_bp++)
-                        ctx.active_location_list[dead_bp] = 0;
-
-                    // xxxnsubtil: remove when SNP filter is fixed
-                    for(uint32 dead_bp = start; dead_bp < end; dead_bp++)
-                        ctx.active_location_list[dead_bp] = 1;
-
-                    // move the BP counter forward
-                    bp += end - start;
-                }
-
-                // move forward in the VCF range
-                vcf_db_range.x++;
-                if (vcf_db_range.x > vcf_db_range.y)
-                {
-                    // no more VCF entries to test
-                    return;
-                }
-
-                vcf_range.x = db.reference_window_start[vcf_db_range.x];
-            }
+            // xxxnsubtil: this might be wrong if there are insertions within the feature range!
+            for(uint32 dead_bp = uint32(start) + num_insertions; dead_bp <= uint32(end) + num_insertions; dead_bp++)
+                ctx.active_location_list[idx.read_start + dead_bp] = 0;
         }
     }
 };

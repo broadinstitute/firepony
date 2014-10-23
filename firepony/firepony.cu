@@ -142,6 +142,11 @@ int main(int argc, char **argv)
         batch.download();
         context.start_batch(batch);
 
+        cigar_expansion.start();
+        // generate cigar events and coordinates
+        expand_cigars(&context, batch);
+        cigar_expansion.stop();
+
         preprocessing.start();
         // build read offset list
         build_read_offset_list(&context, batch);
@@ -158,11 +163,6 @@ int main(int argc, char **argv)
         filter_known_snps(&context, batch);
 
         preprocessing.stop();
-
-        cigar_expansion.start();
-        // generate cigar events and coordinates
-        expand_cigars(&context, batch);
-        cigar_expansion.stop();
 
         // compute the base alignment quality for each read
         baq.start();
@@ -216,8 +216,8 @@ int main(int argc, char **argv)
 #endif
 
         cudaDeviceSynchronize();
-        stats.preprocessing.add(preprocessing);
         stats.cigar_expansion.add(cigar_expansion);
+        stats.preprocessing.add(preprocessing);
         stats.baq.add(baq);
         stats.fractional_error.add(fractional_error);
         stats.covariates.add(covariates);
@@ -252,8 +252,8 @@ int main(int argc, char **argv)
 
     printf("wall clock time: %f\n", wall_clock.elapsed_time());
     printf("  io: %.4f (%.2f%%)\n", stats.io.elapsed_time, stats.io.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("  preprocessing: %.4f (%.2f%%)\n", stats.preprocessing.elapsed_time, stats.preprocessing.elapsed_time / wall_clock.elapsed_time() * 100.0);
     printf("  cigar expansion: %.4f (%.2f%%)\n", stats.cigar_expansion.elapsed_time, stats.cigar_expansion.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    printf("  preprocessing: %.4f (%.2f%%)\n", stats.preprocessing.elapsed_time, stats.preprocessing.elapsed_time / wall_clock.elapsed_time() * 100.0);
     printf("  baq: %.4f (%.2f%%)\n", stats.baq.elapsed_time, stats.baq.elapsed_time / wall_clock.elapsed_time() * 100.0);
     printf("    setup: %.4f (%.2f%%)\n", stats.baq_setup.elapsed_time, stats.baq_setup.elapsed_time / stats.baq.elapsed_time * 100.0);
     printf("    hmm: %.4f (%.2f%%)\n", stats.baq_hmm.elapsed_time, stats.baq_hmm.elapsed_time / stats.baq.elapsed_time * 100.0);

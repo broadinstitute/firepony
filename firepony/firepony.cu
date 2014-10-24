@@ -85,8 +85,7 @@ int main(int argc, char **argv)
 
     printf("loading variant database %s...\n", command_line_options.snp_database);
     ret = gamgee_load_vcf(&vcf, reference, command_line_options.snp_database, VariantDataMask::CHROMOSOME |
-                                                                              VariantDataMask::ALIGNMENT |
-                                                                              VariantDataMask::REFERENCE);
+                                                                              VariantDataMask::ALIGNMENT);
     if (ret == false)
     {
         printf("failed to load variant database %s\n", command_line_options.snp_database);

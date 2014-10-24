@@ -75,8 +75,7 @@ void load_vcf(const char *fname)
     // load the variant data
     ret = gamgee_load_vcf(&data, reference, fname,
                           VariantDataMask::CHROMOSOME |
-                          VariantDataMask::ALIGNMENT |
-                          VariantDataMask::REFERENCE,
+                          VariantDataMask::ALIGNMENT,
                           false);
 
     if (ret == false)

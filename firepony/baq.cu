@@ -185,8 +185,8 @@ struct hmm_glocal_full_lmem : public bqsr_lambda
         m[2*3+1] = 0.0;
         m[2*3+2] = GAP_EXTENSION_PROBABILITY;
 
-//        printf("referenceStart = %u\n", referenceStart);
-//        printf("queryStart = %u queryLen = %u\n", queryStart, queryLen);
+//        fprintf(stderr, "referenceStart = %u\n", referenceStart);
+//        fprintf(stderr, "queryStart = %u queryLen = %u\n", queryStart, queryLen);
 
         queryBases = batch.reads + idx.read_start + queryStart;
         referenceBases = ctx.reference.bases + referenceStart;
@@ -256,25 +256,25 @@ struct hmm_glocal_full_lmem : public bqsr_lambda
         setup(hmm_index);
 
 //        const uint32 read_index    = thrust::get<0>(hmm_index);
-//        printf("read %d: hmm_glocal(l_ref=%d qstart=%d, l_query=%d)\n", read_index, referenceLength, queryStart, queryLen);
-//        printf("read %d: ref = { ", read_index);
+//        fprintf(stderr, "read %d: hmm_glocal(l_ref=%d qstart=%d, l_query=%d)\n", read_index, referenceLength, queryStart, queryLen);
+//        fprintf(stderr, "read %d: ref = { ", read_index);
 //        for(int c = 0; c < referenceLength; c++)
 //        {
-//            printf("%c ", from_nvbio::iupac16_to_char(referenceBases[c]));
+//            fprintf(stderr, "%c ", from_nvbio::iupac16_to_char(referenceBases[c]));
 //        }
-//        printf("\n");
+//        fprintf(stderr, "\n");
 //
-//        printf("read %d: que = { ", read_index);
+//        fprintf(stderr, "read %d: que = { ", read_index);
 //        for(int c = 0; c < queryLen; c++)
 //        {
-//            printf("%c ", from_nvbio::iupac16_to_char(queryBases[c]));
+//            fprintf(stderr, "%c ", from_nvbio::iupac16_to_char(queryBases[c]));
 //        }
-//        printf("\n");
+//        fprintf(stderr, "\n");
 
-//        printf("read %d: _iqual = { % 3d % 3d % 3d % 3d % 3d ... % 3d % 3d % 3d % 3d % 3d }\n", read_index,
+//        fprintf(stderr, "read %d: _iqual = { % 3d % 3d % 3d % 3d % 3d ... % 3d % 3d % 3d % 3d % 3d }\n", read_index,
 //                inputQualities[0], inputQualities[1], inputQualities[2], inputQualities[3], inputQualities[4],
 //                inputQualities[queryLen - 5], inputQualities[queryLen - 4], inputQualities[queryLen - 3], inputQualities[queryLen - 2], inputQualities[queryLen - 1]);
-//        printf("read %d: c->bw = %d, bw = %d, l_ref = %d, l_query = %d\n", read_index, MAX_BAND_WIDTH, bandWidth, referenceLength, queryLen);
+//        fprintf(stderr, "read %d: c->bw = %d, bw = %d, l_ref = %d, l_query = %d\n", read_index, MAX_BAND_WIDTH, bandWidth, referenceLength, queryLen);
 
         /*** forward ***/
         // f[0]
@@ -292,7 +292,7 @@ struct hmm_glocal_full_lmem : public bqsr_lambda
             {
                 int u;
                 double e = calcEpsilon(referenceBases[k-1], queryBases[queryStart], inputQualities[queryStart]);
-//                printf("read %d: referenceBases[%d-1] = %c inputQualities[%d] = %d queryBases[%d] = %c -> e = %.4f\n",
+//                fprintf(stderr, "read %d: referenceBases[%d-1] = %c inputQualities[%d] = %d queryBases[%d] = %c -> e = %.4f\n",
 //                        read_index,
 //                        k,
 //                        from_nvbio::iupac16_to_char(referenceBases[k-1]),
@@ -343,7 +343,7 @@ struct hmm_glocal_full_lmem : public bqsr_lambda
             {
                 int u, v11, v01, v10;
                 double e = calcEpsilon(referenceBases[k-1], qyi, inputQualities[queryStart+i-1]);
-//                printf("read %d: referenceBases[%d-1] = %c inputQualities[%d+%d-1] = %d qyi = %c -> e = %.4f\n",
+//                fprintf(stderr, "read %d: referenceBases[%d-1] = %c inputQualities[%d+%d-1] = %d qyi = %c -> e = %.4f\n",
 //                        read_index,
 //                        k,
 //                        from_nvbio::iupac16_to_char(referenceBases[k-1]),
@@ -363,8 +363,8 @@ struct hmm_glocal_full_lmem : public bqsr_lambda
 
                 sum += fi[u] + fi[u+1] + fi[u+2];
 
-    //            printf("(%d,%d;%d): %.4f,%.4f,%.4f\n", i, k, u, fi[u], fi[u+1], fi[u+2]);
-    //            printf(" .. u = %d v11 = %d v01 = %d v10 = %d e = %f\n", u, v11, v01, v10, e);
+    //            fprintf(stderr, "(%d,%d;%d): %.4f,%.4f,%.4f\n", i, k, u, fi[u], fi[u+1], fi[u+2]);
+    //            fprintf(stderr, " .. u = %d v11 = %d v01 = %d v10 = %d e = %f\n", u, v11, v01, v10, e);
             }
 
             // rescale
@@ -530,10 +530,10 @@ struct hmm_glocal_full_lmem : public bqsr_lambda
                 k = (int)(double(-4.343) * log(double(1.0) - double(max)) + double(.499)); // = 10*log10(1-max)
                 outputQualities[queryStart+i-1] = (char)(k > 100? 99 : (k < MIN_BASE_QUAL ? MIN_BASE_QUAL : k));
 
-//                printf("read %d: outputQualities[%d]: max = %.16f k = %d -> %d\n", read_index, queryStart+i-1, max, k, outputQualities[queryStart+i-1]);
+//                fprintf(stderr, "read %d: outputQualities[%d]: max = %.16f k = %d -> %d\n", read_index, queryStart+i-1, max, k, outputQualities[queryStart+i-1]);
             }
 
-    //        printf("(%.4f,%.4f) (%d,%d,%d,%.4f)\n", pb, sum, (i-1), (max_k>>2), (max_k&3), max);
+    //        fprintf(stderr, "(%.4f,%.4f) (%d,%d,%d,%.4f)\n", pb, sum, (i-1), (max_k>>2), (max_k&3), max);
         }
     }
 };
@@ -631,8 +631,8 @@ struct hmm_common : public bqsr_lambda
         m[2*3+1] = 0.0;
         m[2*3+2] = GAP_EXTENSION_PROBABILITY;
 
-//        printf("referenceStart = %u\n", referenceStart);
-//        printf("queryStart = %u queryLen = %u\n", queryStart, queryLen);
+//        fprintf(stderr, "referenceStart = %u\n", referenceStart);
+//        fprintf(stderr, "queryStart = %u queryLen = %u\n", queryStart, queryLen);
 
         queryBases = batch.reads + idx.read_start + queryStart;
         referenceBases = ctx.reference.bases + referenceStart;
@@ -701,25 +701,25 @@ struct hmm_glocal_forward : public hmm_common
         hmm_common::setup(hmm_index);
 
 //        const uint32 read_index    = thrust::get<0>(hmm_index);
-//        printf("read %d: hmm_glocal(l_ref=%d qstart=%d, l_query=%d)\n", read_index, referenceLength, queryStart, queryLen);
-//        printf("read %d: ref = { ", read_index);
+//        fprintf(stderr, "read %d: hmm_glocal(l_ref=%d qstart=%d, l_query=%d)\n", read_index, referenceLength, queryStart, queryLen);
+//        fprintf(stderr, "read %d: ref = { ", read_index);
 //        for(int c = 0; c < referenceLength; c++)
 //        {
-//            printf("%c ", from_nvbio::iupac16_to_char(referenceBases[c]));
+//            fprintf(stderr, "%c ", from_nvbio::iupac16_to_char(referenceBases[c]));
 //        }
-//        printf("\n");
+//        fprintf(stderr, "\n");
 //
-//        printf("read %d: que = { ", read_index);
+//        fprintf(stderr, "read %d: que = { ", read_index);
 //        for(int c = 0; c < queryLen; c++)
 //        {
-//            printf("%c ", from_nvbio::iupac16_to_char(queryBases[c]));
+//            fprintf(stderr, "%c ", from_nvbio::iupac16_to_char(queryBases[c]));
 //        }
-//        printf("\n");
+//        fprintf(stderr, "\n");
 
-//        printf("read %d: _iqual = { % 3d % 3d % 3d % 3d % 3d ... % 3d % 3d % 3d % 3d % 3d }\n", read_index,
+//        fprintf(stderr, "read %d: _iqual = { % 3d % 3d % 3d % 3d % 3d ... % 3d % 3d % 3d % 3d % 3d }\n", read_index,
 //                inputQualities[0], inputQualities[1], inputQualities[2], inputQualities[3], inputQualities[4],
 //                inputQualities[queryLen - 5], inputQualities[queryLen - 4], inputQualities[queryLen - 3], inputQualities[queryLen - 2], inputQualities[queryLen - 1]);
-//        printf("read %d: c->bw = %d, bw = %d, l_ref = %d, l_query = %d\n", read_index, MAX_BAND_WIDTH, bandWidth, referenceLength, queryLen);
+//        fprintf(stderr, "read %d: c->bw = %d, bw = %d, l_ref = %d, l_query = %d\n", read_index, MAX_BAND_WIDTH, bandWidth, referenceLength, queryLen);
 
         /*** forward ***/
         // f[0]
@@ -737,7 +737,7 @@ struct hmm_glocal_forward : public hmm_common
             {
                 int u;
                 double e = calcEpsilon(referenceBases[k-1], queryBases[queryStart], inputQualities[queryStart]);
-//                printf("read %d: referenceBases[%d-1] = %c inputQualities[%d] = %d queryBases[%d] = %c -> e = %.4f\n",
+//                fprintf(stderr, "read %d: referenceBases[%d-1] = %c inputQualities[%d] = %d queryBases[%d] = %c -> e = %.4f\n",
 //                        read_index,
 //                        k,
 //                        from_nvbio::iupac16_to_char(referenceBases[k-1]),
@@ -788,7 +788,7 @@ struct hmm_glocal_forward : public hmm_common
             {
                 int u, v11, v01, v10;
                 double e = calcEpsilon(referenceBases[k-1], qyi, inputQualities[queryStart+i-1]);
-//                printf("read %d: referenceBases[%d-1] = %c inputQualities[%d+%d-1] = %d qyi = %c -> e = %.4f\n",
+//                fprintf(stderr, "read %d: referenceBases[%d-1] = %c inputQualities[%d+%d-1] = %d qyi = %c -> e = %.4f\n",
 //                        read_index,
 //                        k,
 //                        from_nvbio::iupac16_to_char(referenceBases[k-1]),
@@ -808,8 +808,8 @@ struct hmm_glocal_forward : public hmm_common
 
                 sum += fi[u] + fi[u+1] + fi[u+2];
 
-    //            printf("(%d,%d;%d): %.4f,%.4f,%.4f\n", i, k, u, fi[u], fi[u+1], fi[u+2]);
-    //            printf(" .. u = %d v11 = %d v01 = %d v10 = %d e = %f\n", u, v11, v01, v10, e);
+    //            fprintf(stderr, "(%d,%d;%d): %.4f,%.4f,%.4f\n", i, k, u, fi[u], fi[u+1], fi[u+2]);
+    //            fprintf(stderr, " .. u = %d v11 = %d v01 = %d v10 = %d e = %f\n", u, v11, v01, v10, e);
             }
 
             // rescale
@@ -1001,10 +1001,10 @@ struct hmm_glocal_map : public hmm_common
                 k = (int)(double(-4.343) * log(double(1.0) - double(max)) + double(.499)); // = 10*log10(1-max)
                 outputQualities[queryStart+i-1] = (char)(k > 100? 99 : (k < MIN_BASE_QUAL ? MIN_BASE_QUAL : k));
 
-//                printf("read %d: outputQualities[%d]: max = %.16f k = %d -> %d\n", read_index, queryStart+i-1, max, k, outputQualities[queryStart+i-1]);
+//                fprintf(stderr, "read %d: outputQualities[%d]: max = %.16f k = %d -> %d\n", read_index, queryStart+i-1, max, k, outputQualities[queryStart+i-1]);
             }
 
-    //        printf("(%.4f,%.4f) (%d,%d,%d,%.4f)\n", pb, sum, (i-1), (max_k>>2), (max_k&3), max);
+    //        fprintf(stderr, "(%.4f,%.4f) (%d,%d,%d,%.4f)\n", pb, sum, (i-1), (max_k>>2), (max_k&3), max);
         }
     }
 };
@@ -1267,23 +1267,23 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     uint32 scaling_len = baq.scaling_index[num_active];
     baq.scaling.resize(scaling_len);
 
-//    printf("reads: %u\n", batch.num_reads);
-//    printf("forward len = %u bytes = %lu\n", matrix_len, matrix_len * sizeof(double));
-//    printf("expected len = %lu expected bytes = %lu\n",
+//    fprintf(stderr, "reads: %u\n", batch.num_reads);
+//    fprintf(stderr, "forward len = %u bytes = %lu\n", matrix_len, matrix_len * sizeof(double));
+//    fprintf(stderr, "expected len = %lu expected bytes = %lu\n",
 //            hmm_common::matrix_size(100) * context->active_read_list.size(),
 //            hmm_common::matrix_size(100) * context->active_read_list.size() * sizeof(double));
-//    printf("per read matrix size = %u bytes = %lu\n", hmm_common::matrix_size(100), hmm_common::matrix_size(100) * sizeof(double));
-//    printf("matrix index = [ ");
+//    fprintf(stderr, "per read matrix size = %u bytes = %lu\n", hmm_common::matrix_size(100), hmm_common::matrix_size(100) * sizeof(double));
+//    fprintf(stderr, "matrix index = [ ");
 //    for(uint32 i = 0; i < 20; i++)
 //    {
-//        printf("%u, ", baq.matrix_index[i] + 0);
+//        fprintf(stderr, "%u, ", baq.matrix_index[i] + 0);
 //    }
-//    printf(" ... ");
+//    fprintf(stderr, " ... ");
 //    for(uint32 i = baq.matrix_index.size() - 20; i < baq.matrix_index.size(); i++)
 //    {
-//        printf("%u, ", baq.matrix_index[i] + 0);
+//        fprintf(stderr, "%u, ", baq.matrix_index[i] + 0);
 //    }
-//    printf("]\n");
+//    fprintf(stderr, "]\n");
 //    fflush(stdout);
 
     baq.reference_windows.resize(batch.device.num_reads);
@@ -1378,32 +1378,32 @@ void debug_baq(bqsr_context *context, const alignment_batch& batch, int read_ind
 {
     const alignment_batch_host& h_batch = batch.host;
 
-    printf("  BAQ info:\n");
+    fprintf(stderr, "  BAQ info:\n");
 
     const CRQ_index idx = h_batch.crq_index(read_index);
 
     ushort2 read_window = context->cigar.read_window_clipped[read_index];
     uint2 reference_window = context->baq.reference_windows[read_index];
 
-    printf("    read window                 = [ %u %u ]\n", read_window.x, read_window.y);
-    printf("    absolute reference window   = [ %u %u ]\n", reference_window.x, reference_window.y);
-    //printf("    sequence base: %u\n", genome.sequence_offsets[batch.alignment_sequence_IDs[read_index]]);
-    printf("    relative reference window   = [ %lu %lu ]\n",
+    fprintf(stderr, "    read window                 = [ %u %u ]\n", read_window.x, read_window.y);
+    fprintf(stderr, "    absolute reference window   = [ %u %u ]\n", reference_window.x, reference_window.y);
+    //fprintf(stderr, "    sequence base: %u\n", genome.sequence_offsets[batch.alignment_sequence_IDs[read_index]]);
+    fprintf(stderr, "    relative reference window   = [ %lu %lu ]\n",
             reference_window.x - context->reference.host.sequence_bp_start[h_batch.chromosome[read_index]],
             reference_window.y - context->reference.host.sequence_bp_start[h_batch.chromosome[read_index]]);
 
-    printf("    BAQ quals                   = [ ");
+    fprintf(stderr, "    BAQ quals                   = [ ");
     for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
     {
         uint8 q = context->baq.qualities[i];
         if (q == uint8(-1))
         {
-            printf("  - ");
+            fprintf(stderr, "  - ");
         } else {
-            printf("% 3d ", q);
+            fprintf(stderr, "% 3d ", q);
         }
     }
-    printf(" ]\n");
+    fprintf(stderr, " ]\n");
 
-    printf("\n");
+    fprintf(stderr, "\n");
 }

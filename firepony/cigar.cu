@@ -474,113 +474,113 @@ void debug_cigar(bqsr_context *context, const alignment_batch& batch, int read_i
     const CRQ_index idx = h_batch.crq_index(read_index);
     const cigar_context& ctx = context->cigar;
 
-    printf("  cigar info:\n");
+    fprintf(stderr, "  cigar info:\n");
 
-    printf("    cigar                       = [");
+    fprintf(stderr, "    cigar                       = [");
     for(uint32 i = idx.cigar_start; i < idx.cigar_start + idx.cigar_len; i++)
     {
         cigar_op op = h_batch.cigars[i];
-        printf("%d%c", op.len, op.ascii_op());
+        fprintf(stderr, "%d%c", op.len, op.ascii_op());
     }
-    printf("]\n");
+    fprintf(stderr, "]\n");
 
     uint32 cigar_start = ctx.cigar_offsets[idx.cigar_start];
     uint32 cigar_end = ctx.cigar_offsets[idx.cigar_start + idx.cigar_len];
-    printf("    offset range                = [% 3d, % 3d]\n", cigar_start, cigar_end);
+    fprintf(stderr, "    offset range                = [% 3d, % 3d]\n", cigar_start, cigar_end);
 
-    printf("                                    ");
+    fprintf(stderr, "                                    ");
     for(uint32 i = 0; i < cigar_end - cigar_start; i++)
     {
-        printf("% 3d ", i);
+        fprintf(stderr, "% 3d ", i);
     }
-    printf("\n");
+    fprintf(stderr, "\n");
 
-    printf("    event list                  = [ ");
+    fprintf(stderr, "    event list                  = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
-        printf("  %c ", cigar_event::ascii(ctx.cigar_events[i]));
+        fprintf(stderr, "  %c ", cigar_event::ascii(ctx.cigar_events[i]));
     }
-    printf("]\n");
+    fprintf(stderr, "]\n");
 
-    printf("    event idx -> read coords    = [ ");
+    fprintf(stderr, "    event idx -> read coords    = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
-        printf("% 3d ", (int16) ctx.cigar_event_read_coordinates[i]);
+        fprintf(stderr, "% 3d ", (int16) ctx.cigar_event_read_coordinates[i]);
     }
-    printf("]\n");
+    fprintf(stderr, "]\n");
 
-    printf("    event reference coordinates = [ ");
+    fprintf(stderr, "    event reference coordinates = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
-        printf("% 3d ", (int16) ctx.cigar_event_reference_coordinates[i]);
+        fprintf(stderr, "% 3d ", (int16) ctx.cigar_event_reference_coordinates[i]);
     }
-    printf("]\n");
+    fprintf(stderr, "]\n");
 
-    printf("    is snp                      = [ ");
-    for(uint32 i = cigar_start; i < cigar_end; i++)
-    {
-        uint16 read_bp_idx = ctx.cigar_event_read_coordinates[i];
-        if (read_bp_idx == uint16(-1))
-        {
-            printf("  - ");
-        } else {
-            printf("% 3d ", (uint8) ctx.is_snp[idx.read_start + read_bp_idx]);
-        }
-    }
-    printf("]\n");
-
-    printf("    is insertion                = [ ");
+    fprintf(stderr, "    is snp                      = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
         uint16 read_bp_idx = ctx.cigar_event_read_coordinates[i];
         if (read_bp_idx == uint16(-1))
         {
-            printf("  - ");
+            fprintf(stderr, "  - ");
         } else {
-            printf("% 3d ", (uint8) ctx.is_insertion[read_bp_idx]);
+            fprintf(stderr, "% 3d ", (uint8) ctx.is_snp[idx.read_start + read_bp_idx]);
         }
     }
-    printf("]\n");
+    fprintf(stderr, "]\n");
 
-    printf("    is deletion                 = [ ");
+    fprintf(stderr, "    is insertion                = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
         uint16 read_bp_idx = ctx.cigar_event_read_coordinates[i];
         if (read_bp_idx == uint16(-1))
         {
-            printf("  - ");
+            fprintf(stderr, "  - ");
         } else {
-            printf("% 3d ", (uint8) ctx.is_deletion[read_bp_idx]);
+            fprintf(stderr, "% 3d ", (uint8) ctx.is_insertion[read_bp_idx]);
         }
     }
-    printf("]\n");
+    fprintf(stderr, "]\n");
 
-    printf("    active location list        = [ ");
+    fprintf(stderr, "    is deletion                 = [ ");
+    for(uint32 i = cigar_start; i < cigar_end; i++)
+    {
+        uint16 read_bp_idx = ctx.cigar_event_read_coordinates[i];
+        if (read_bp_idx == uint16(-1))
+        {
+            fprintf(stderr, "  - ");
+        } else {
+            fprintf(stderr, "% 3d ", (uint8) ctx.is_deletion[read_bp_idx]);
+        }
+    }
+    fprintf(stderr, "]\n");
+
+    fprintf(stderr, "    active location list        = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
         uint16 bp_offset = ctx.cigar_event_read_coordinates[i];
         if (bp_offset == uint16(-1))
         {
-            printf("  - ");
+            fprintf(stderr, "  - ");
         } else {
-            printf("% 3d ", context->active_location_list[idx.read_start + bp_offset] ? 1 : 0);
+            fprintf(stderr, "% 3d ", context->active_location_list[idx.read_start + bp_offset] ? 1 : 0);
         }
     }
-    printf("]\n");
+    fprintf(stderr, "]\n");
 
     const uint32 ref_sequence_id = h_batch.chromosome[read_index];
     const uint32 ref_sequence_base = context->reference.host.sequence_bp_start[ref_sequence_id];
     const uint32 ref_sequence_offset = ref_sequence_base + h_batch.alignment_start[read_index];
 
-    printf("    reference sequence data     = [ ");
+    fprintf(stderr, "    reference sequence data     = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
         const uint16 ref_bp = ctx.cigar_event_reference_coordinates[i];
-        printf("  %c ", ref_bp == uint16(-1) ? '-' : from_nvbio::iupac16_to_char(context->reference.host.bases[ref_sequence_offset + ref_bp]));
+        fprintf(stderr, "  %c ", ref_bp == uint16(-1) ? '-' : from_nvbio::iupac16_to_char(context->reference.host.bases[ref_sequence_offset + ref_bp]));
     }
-    printf("]\n");
+    fprintf(stderr, "]\n");
 
-    printf("    read sequence data          = [ ");
+    fprintf(stderr, "    read sequence data          = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
         const uint16 read_bp = ctx.cigar_event_read_coordinates[i];
@@ -598,51 +598,51 @@ void debug_cigar(bqsr_context *context, const alignment_batch& batch, int read_i
             }
         }
 
-        printf("  %c ", base);
+        fprintf(stderr, "  %c ", base);
     }
-    printf("]\n");
+    fprintf(stderr, "]\n");
 
-    printf("    read quality data           = [ ");
+    fprintf(stderr, "    read quality data           = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
         const uint16 read_bp = ctx.cigar_event_read_coordinates[i];
 
         if (read_bp == uint16(-1))
         {
-            printf("    ");
+            fprintf(stderr, "    ");
         } else {
-            printf("% 3d ", h_batch.qualities[idx.qual_start + read_bp]);
+            fprintf(stderr, "% 3d ", h_batch.qualities[idx.qual_start + read_bp]);
         }
     }
-    printf("]\n");
+    fprintf(stderr, "]\n");
 
-    printf("    ... in ascii                = [ ");
+    fprintf(stderr, "    ... in ascii                = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
         const uint16 read_bp = ctx.cigar_event_read_coordinates[i];
 
         if (read_bp == uint16(-1))
         {
-            printf(" -  ");
+            fprintf(stderr, " -  ");
         } else {
-            printf("  %c ", h_batch.qualities[idx.qual_start + read_bp] + '!');
+            fprintf(stderr, "  %c ", h_batch.qualities[idx.qual_start + read_bp] + '!');
         }
     }
-    printf("]\n");
+    fprintf(stderr, "]\n");
 
     ushort2 read_window_clipped = ctx.read_window_clipped[read_index];
-    printf("    clipped read window         = [ % 3d, % 3d ]\n", read_window_clipped.x, read_window_clipped.y);
+    fprintf(stderr, "    clipped read window         = [ % 3d, % 3d ]\n", read_window_clipped.x, read_window_clipped.y);
 
     ushort2 read_window_clipped_no_insertions = ctx.read_window_clipped_no_insertions[read_index];
-    printf("    ... lead/trail insertions   = [ % 3d, % 3d ]\n",
+    fprintf(stderr, "    ... lead/trail insertions   = [ % 3d, % 3d ]\n",
                 read_window_clipped_no_insertions.x, read_window_clipped_no_insertions.y);
 
     ushort2 reference_window_clipped = ctx.reference_window_clipped[read_index];
-    printf("    clipped reference window    = [ % 3d, % 3d ]\n",
+    fprintf(stderr, "    clipped reference window    = [ % 3d, % 3d ]\n",
                 reference_window_clipped.x, reference_window_clipped.y);
 
     uint16 err = ctx.num_errors[read_index];
-    printf("    number of errors            = [ % 3d ]\n", err);
+    fprintf(stderr, "    number of errors            = [ % 3d ]\n", err);
 
-    printf("\n");
+    fprintf(stderr, "\n");
 }

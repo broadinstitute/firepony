@@ -124,33 +124,33 @@ void debug_fractional_error_arrays(bqsr_context *context, const alignment_batch&
 {
     const alignment_batch_host& h_batch = batch.host;
 
-    printf("  fractional error arrays:\n");
+    fprintf(stderr, "  fractional error arrays:\n");
 
     const CRQ_index idx = h_batch.crq_index(read_index);
 
-    printf("    snp                        = [ ");
+    fprintf(stderr, "    snp                        = [ ");
     for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
     {
         double err = context->fractional_error.snp_errors[i];
-        printf(" %.1f", err);
+        fprintf(stderr, " %.1f", err);
     }
-    printf(" ]\n");
+    fprintf(stderr, " ]\n");
 
-    printf("    ins                        = [ ");
+    fprintf(stderr, "    ins                        = [ ");
     for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
     {
         double err = context->fractional_error.insertion_errors[i];
-        printf(" %.1f", err);
+        fprintf(stderr, " %.1f", err);
     }
-    printf(" ]\n");
+    fprintf(stderr, " ]\n");
 
-    printf("    del                        = [ ");
+    fprintf(stderr, "    del                        = [ ");
     for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
     {
         double err = context->fractional_error.deletion_errors[i];
-        printf(" %.1f", err);
+        fprintf(stderr, " %.1f", err);
     }
-    printf(" ]\n");
+    fprintf(stderr, " ]\n");
 
-    printf("\n");
+    fprintf(stderr, "\n");
 }

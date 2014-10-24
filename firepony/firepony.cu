@@ -45,15 +45,15 @@ void init_cuda(void)
     int runtime_version;
 
     // trigger runtime initialization
-    printf("loading CUDA runtime...\n");
+    fprintf(stderr, "loading CUDA runtime...\n");
     cudaFree(0);
 
     cudaRuntimeGetVersion(&runtime_version);
     cudaGetDevice(&dev);
     cudaGetDeviceProperties(&prop, dev);
 
-    printf("CUDA runtime version: %d.%d\n", runtime_version / 1000, runtime_version % 100);
-    printf("device: %s (%lu MB)\n", prop.name, prop.totalGlobalMem / (1024 * 1024));
+    fprintf(stderr, "CUDA runtime version: %d.%d\n", runtime_version / 1000, runtime_version % 100);
+    fprintf(stderr, "device: %s (%lu MB)\n", prop.name, prop.totalGlobalMem / (1024 * 1024));
 }
 
 int main(int argc, char **argv)
@@ -70,34 +70,34 @@ int main(int argc, char **argv)
 #endif
 
     // load the reference genome
-    printf("loading reference from %s...\n", command_line_options.reference);
+    fprintf(stderr, "loading reference from %s...\n", command_line_options.reference);
     ret = gamgee_load_sequences(&reference, command_line_options.reference,
                                 SequenceDataMask::BASES |
                                 SequenceDataMask::NAMES);
     if (ret == false)
     {
-        printf("failed to load reference %s\n", command_line_options.reference);
+        fprintf(stderr, "failed to load reference %s\n", command_line_options.reference);
         exit(1);
     }
 
     num_bytes = reference.download();
-    printf("downloaded %lu MB of reference data\n", num_bytes / (1024 * 1024));
+    fprintf(stderr, "downloaded %lu MB of reference data\n", num_bytes / (1024 * 1024));
 
-    printf("loading variant database %s...\n", command_line_options.snp_database);
+    fprintf(stderr, "loading variant database %s...\n", command_line_options.snp_database);
     ret = gamgee_load_vcf(&vcf, reference, command_line_options.snp_database, VariantDataMask::CHROMOSOME |
                                                                               VariantDataMask::ALIGNMENT);
     if (ret == false)
     {
-        printf("failed to load variant database %s\n", command_line_options.snp_database);
+        fprintf(stderr, "failed to load variant database %s\n", command_line_options.snp_database);
         exit(1);
     }
 
-    printf("%u variants\n", vcf.host.num_variants);
+    fprintf(stderr, "%u variants\n", vcf.host.num_variants);
 
     num_bytes = vcf.download();
-    printf("downloaded %lu MB of variant data\n", num_bytes / (1024 * 1024));
+    fprintf(stderr, "downloaded %lu MB of variant data\n", num_bytes / (1024 * 1024));
 
-    printf("processing file %s...\n", command_line_options.input);
+    fprintf(stderr, "processing file %s...\n", command_line_options.input);
     gamgee_alignment_file bam(command_line_options.input);
     alignment_batch batch;
 
@@ -206,7 +206,7 @@ int main(int argc, char **argv)
 #endif
 
 #if 0
-        printf("active VCF ranges: %lu out of %lu reads (%f %%)\n",
+        fprintf(stderr, "active VCF ranges: %lu out of %lu reads (%f %%)\n",
                 context.snp_filter.active_read_ids.size(),
                 context.active_read_list.size(),
                 100.0 * float(context.snp_filter.active_read_ids.size()) / context.active_read_list.size());
@@ -219,7 +219,7 @@ int main(int argc, char **argv)
                 zeros++;
         }
 
-        printf("active BPs: %u out of %u (%f %%)\n", h_bplist.size() - zeros, h_bplist.size(), 100.0 * float(h_bplist.size() - zeros) / float(h_bplist.size()));
+        fprintf(stderr, "active BPs: %u out of %u (%f %%)\n", h_bplist.size() - zeros, h_bplist.size(), 100.0 * float(h_bplist.size() - zeros) / float(h_bplist.size()));
 #endif
 
         cudaDeviceSynchronize();
@@ -231,11 +231,11 @@ int main(int argc, char **argv)
         stats.fractional_error.add(fractional_error);
         stats.covariates.add(covariates);
 
-        printf(".");
-        fflush(stdout);
+        fprintf(stderr, ".");
+        fflush(stderr);
     }
 
-    printf("\n");
+    fprintf(stderr, "\n");
 
     gpu_timer postprocessing;
     cpu_timer output;
@@ -252,36 +252,36 @@ int main(int argc, char **argv)
     cudaDeviceSynchronize();
     wall_clock.stop();
 
-    printf("%d reads filtered out of %d (%f%%)\n",
+    fprintf(stderr, "%d reads filtered out of %d (%f%%)\n",
             context.stats.filtered_reads,
             context.stats.total_reads,
             float(context.stats.filtered_reads) / float(context.stats.total_reads) * 100.0);
 
-    printf("computed base alignment quality for %d reads out of %d (%f%%)\n",
+    fprintf(stderr, "computed base alignment quality for %d reads out of %d (%f%%)\n",
             context.stats.baq_reads,
             context.stats.total_reads - context.stats.filtered_reads,
             float(context.stats.baq_reads) / float(context.stats.total_reads - context.stats.filtered_reads) * 100.0);
 
-    printf("\n");
+    fprintf(stderr, "\n");
 
-    printf("wall clock time: %f\n", wall_clock.elapsed_time());
-    printf("  io: %.4f (%.2f%%)\n", stats.io.elapsed_time, stats.io.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("  read filtering: %.4f (%.2f%%)\n", stats.read_filter.elapsed_time, stats.read_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("  cigar expansion: %.4f (%.2f%%)\n", stats.cigar_expansion.elapsed_time, stats.cigar_expansion.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("  bp filtering: %.4f (%.2f%%)\n", stats.bp_filter.elapsed_time, stats.bp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("  snp filtering: %.4f (%.2f%%)\n", stats.snp_filter.elapsed_time, stats.snp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("  baq: %.4f (%.2f%%)\n", stats.baq.elapsed_time, stats.baq.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("    setup: %.4f (%.2f%%)\n", stats.baq_setup.elapsed_time, stats.baq_setup.elapsed_time / stats.baq.elapsed_time * 100.0);
-    printf("    hmm: %.4f (%.2f%%)\n", stats.baq_hmm.elapsed_time, stats.baq_hmm.elapsed_time / stats.baq.elapsed_time * 100.0);
-    printf("    post: %.4f (%.2f%%)\n", stats.baq_postprocess.elapsed_time, stats.baq_postprocess.elapsed_time / stats.baq.elapsed_time * 100.0);
-    printf("  fractional error: %.4f (%.2f%%)\n", stats.fractional_error.elapsed_time, stats.fractional_error.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("  covariates: %.4f (%.2f%%)\n", stats.covariates.elapsed_time, stats.covariates.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("    gather: %.4f (%.2f%%)\n", stats.covariates_gather.elapsed_time, stats.covariates_gather.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("    filter: %.4f (%.2f%%)\n", stats.covariates_filter.elapsed_time, stats.covariates_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("    sort: %.4f (%.2f%%)\n", stats.covariates_sort.elapsed_time, stats.covariates_sort.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("    pack: %.4f (%.2f%%)\n", stats.covariates_pack.elapsed_time, stats.covariates_pack.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("  post-processing: %.4f (%.2f%%)\n", postprocessing.elapsed_time(), postprocessing.elapsed_time() / wall_clock.elapsed_time() * 100.0);
-    printf("  output: %.4f (%.2f%%)\n", output.elapsed_time(), output.elapsed_time() / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "wall clock time: %f\n", wall_clock.elapsed_time());
+    fprintf(stderr, "  io: %.4f (%.2f%%)\n", stats.io.elapsed_time, stats.io.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "  read filtering: %.4f (%.2f%%)\n", stats.read_filter.elapsed_time, stats.read_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "  cigar expansion: %.4f (%.2f%%)\n", stats.cigar_expansion.elapsed_time, stats.cigar_expansion.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "  bp filtering: %.4f (%.2f%%)\n", stats.bp_filter.elapsed_time, stats.bp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "  snp filtering: %.4f (%.2f%%)\n", stats.snp_filter.elapsed_time, stats.snp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "  baq: %.4f (%.2f%%)\n", stats.baq.elapsed_time, stats.baq.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "    setup: %.4f (%.2f%%)\n", stats.baq_setup.elapsed_time, stats.baq_setup.elapsed_time / stats.baq.elapsed_time * 100.0);
+    fprintf(stderr, "    hmm: %.4f (%.2f%%)\n", stats.baq_hmm.elapsed_time, stats.baq_hmm.elapsed_time / stats.baq.elapsed_time * 100.0);
+    fprintf(stderr, "    post: %.4f (%.2f%%)\n", stats.baq_postprocess.elapsed_time, stats.baq_postprocess.elapsed_time / stats.baq.elapsed_time * 100.0);
+    fprintf(stderr, "  fractional error: %.4f (%.2f%%)\n", stats.fractional_error.elapsed_time, stats.fractional_error.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "  covariates: %.4f (%.2f%%)\n", stats.covariates.elapsed_time, stats.covariates.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "    gather: %.4f (%.2f%%)\n", stats.covariates_gather.elapsed_time, stats.covariates_gather.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "    filter: %.4f (%.2f%%)\n", stats.covariates_filter.elapsed_time, stats.covariates_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "    sort: %.4f (%.2f%%)\n", stats.covariates_sort.elapsed_time, stats.covariates_sort.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "    pack: %.4f (%.2f%%)\n", stats.covariates_pack.elapsed_time, stats.covariates_pack.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "  post-processing: %.4f (%.2f%%)\n", postprocessing.elapsed_time(), postprocessing.elapsed_time() / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "  output: %.4f (%.2f%%)\n", output.elapsed_time(), output.elapsed_time() / wall_clock.elapsed_time() * 100.0);
 
     return 0;
 }
@@ -293,29 +293,29 @@ void debug_read(bqsr_context *context, const alignment_batch& batch, int read_id
     const uint32 read_index = context->active_read_list[read_id];
     const CRQ_index idx = h_batch.crq_index(read_index);
 
-    printf("== read order %d read %d\n", read_id, read_index);
+    fprintf(stderr, "== read order %d read %d\n", read_id, read_index);
 
-    printf("name = [%s]\n", h_batch.name[read_index].c_str());
+    fprintf(stderr, "name = [%s]\n", h_batch.name[read_index].c_str());
 
-    printf("  offset list = [ ");
+    fprintf(stderr, "  offset list = [ ");
     for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
     {
         uint16 off = context->read_offset_list[i];
         if (off == uint16(-1))
         {
-            printf("  - ");
+            fprintf(stderr, "  - ");
         } else {
-            printf("% 3d ", off);
+            fprintf(stderr, "% 3d ", off);
         }
     }
-    printf("]\n");
+    fprintf(stderr, "]\n");
 
     debug_cigar(context, batch, read_index);
     debug_baq(context, batch, read_index);
     debug_fractional_error_arrays(context, batch, read_index);
 
     const uint2 alignment_window = context->alignment_windows[read_index];
-    printf("  sequence name [%s]\n  sequence base [%lu]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
+    fprintf(stderr, "  sequence name [%s]\n  sequence base [%lu]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
             context->reference.sequence_names.lookup(h_batch.chromosome[read_index]).c_str(),
             context->reference.host.sequence_bp_start[h_batch.chromosome[read_index]],
             h_batch.alignment_start[read_index],
@@ -323,7 +323,7 @@ void debug_read(bqsr_context *context, const alignment_batch& batch, int read_id
             alignment_window.y);
 
     const uint2 vcf_range = context->snp_filter.active_vcf_ranges[read_index];
-    printf("  active VCF range: [%u, %u[\n", vcf_range.x, vcf_range.y);
+    fprintf(stderr, "  active VCF range: [%u, %u[\n", vcf_range.x, vcf_range.y);
 
-    printf("\n");
+    fprintf(stderr, "\n");
 }

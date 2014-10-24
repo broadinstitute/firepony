@@ -28,13 +28,13 @@ struct runtime_options command_line_options;
 
 static void usage(void)
 {
-    printf("usage: firepony <options> <input-file-name>\n");
-    printf("\n");
-    printf("  -r, --reference <genome-file-name>    Use <genome-file-name> as reference (required, fasta format)\n");
-    printf("  -s, --snp-database <dbsnp-file-name>  Use <dbsnp-file-name> as a SNP database\n");
-    printf("  --no-reference-mmap\n");
-    printf("  --no-snp-database-mmap                Do not attempt to use system shared memory for reference or dbSNP\n");
-    printf("\n");
+    fprintf(stderr, "usage: firepony <options> <input-file-name>\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "  -r, --reference <genome-file-name>    Use <genome-file-name> as reference (required, fasta format)\n");
+    fprintf(stderr, "  -s, --snp-database <dbsnp-file-name>  Use <dbsnp-file-name> as a SNP database\n");
+    fprintf(stderr, "  --no-reference-mmap\n");
+    fprintf(stderr, "  --no-snp-database-mmap                Do not attempt to use system shared memory for reference or dbSNP\n");
+    fprintf(stderr, "\n");
 
     exit(1);
 }
@@ -103,25 +103,25 @@ void parse_command_line(int argc, char **argv)
     // check that we got required arguments
     if (command_line_options.reference == nullptr)
     {
-        printf("error: missing reference file name\n\n");
+        fprintf(stderr, "error: missing reference file name\n\n");
         usage();
     }
 
     if (command_line_options.snp_database == nullptr)
     {
-        printf("error: missing SNP database file name\n\n");
+        fprintf(stderr, "error: missing SNP database file name\n\n");
         usage();
     }
 
     if (optind == argc)
     {
-        printf("error: missing input file name\n\n");
+        fprintf(stderr, "error: missing input file name\n\n");
         usage();
     }
 
     if (optind != argc - 1)
     {
-        printf("error: extraneous arguments\n\n");
+        fprintf(stderr, "error: extraneous arguments\n\n");
         usage();
     }
 

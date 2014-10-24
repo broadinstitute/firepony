@@ -348,7 +348,7 @@ bool gamgee_load_vcf(variant_database *output, const sequence_data& reference, c
             uint32 id = reference.sequence_names.lookup(chromosome_name);
             if (id == uint32(-1))
             {
-                printf("WARNING: chromosome %s not found in reference data, skipping\n", chromosome_name.c_str());
+                fprintf(stderr, "WARNING: chromosome %s not found in reference data, skipping\n", chromosome_name.c_str());
                 continue;
             }
 

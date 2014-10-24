@@ -72,6 +72,8 @@ void load_vcf(const char *fname)
     size_t size;
     bool ret;
 
+    printf("loading %s...\n", fname);
+
     // load the variant data
     ret = gamgee_load_vcf(&data, reference, fname,
                           VariantDataMask::CHROMOSOME |

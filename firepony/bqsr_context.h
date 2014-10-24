@@ -50,6 +50,11 @@ struct bqsr_statistics // host-only
     time_series baq_hmm;
     time_series baq_postprocess;
 
+    time_series covariates_gather;
+    time_series covariates_filter;
+    time_series covariates_sort;
+    time_series covariates_pack;
+
     bqsr_statistics()
         : total_reads(0),
           filtered_reads(0),

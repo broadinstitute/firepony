@@ -120,6 +120,10 @@ static void build_covariates_table(D_CovariateTable& table, bqsr_context *contex
     D_Vector<covariate_value> temp_values;
     D_Vector<covariate_key> temp_keys;
 
+    gpu_timer covariates_gather, covariates_filter, covariates_sort, covariates_pack;
+
+    covariates_gather.start();
+
     // set up a scratch table space with enough room for 3 keys per cigar event
     scratch_table.resize(context->cigar.cigar_events.size() * 3);
     table.resize(context->cigar.cigar_events.size() * 3);
@@ -134,6 +138,10 @@ static void build_covariates_table(D_CovariateTable& table, bqsr_context *contex
     thrust::for_each(thrust::make_counting_iterator(0u),
                      thrust::make_counting_iterator(0u) + context->cigar.cigar_event_read_coordinates.size(),
                      covariate_gatherer<covariate_table>(*context, batch.device));
+
+    covariates_gather.stop();
+
+    covariates_filter.start();
 
     // flag valid keys
     thrust::for_each(thrust::make_counting_iterator(0u),
@@ -159,9 +167,22 @@ static void build_covariates_table(D_CovariateTable& table, bqsr_context *contex
     // resize the table
     table.resize(valid_keys);
 
+    covariates_filter.stop();
+
     // sort and reduce the table by key
+    covariates_sort.start();
     table.sort(temp_keys, temp_values, context->temp_storage, covariate_table::chain::bits_used);
+    covariates_sort.stop();
+
+    covariates_pack.start();
     table.pack(temp_keys, temp_values);
+    covariates_pack.stop();
+
+    cudaDeviceSynchronize();
+    context->stats.covariates_gather.add(covariates_gather);
+    context->stats.covariates_filter.add(covariates_filter);
+    context->stats.covariates_sort.add(covariates_sort);
+    context->stats.covariates_pack.add(covariates_pack);
 }
 
 struct compute_high_quality_windows : public bqsr_lambda

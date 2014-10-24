@@ -276,6 +276,10 @@ int main(int argc, char **argv)
     printf("    post: %.4f (%.2f%%)\n", stats.baq_postprocess.elapsed_time, stats.baq_postprocess.elapsed_time / stats.baq.elapsed_time * 100.0);
     printf("  fractional error: %.4f (%.2f%%)\n", stats.fractional_error.elapsed_time, stats.fractional_error.elapsed_time / wall_clock.elapsed_time() * 100.0);
     printf("  covariates: %.4f (%.2f%%)\n", stats.covariates.elapsed_time, stats.covariates.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    printf("    gather: %.4f (%.2f%%)\n", stats.covariates_gather.elapsed_time, stats.covariates_gather.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    printf("    filter: %.4f (%.2f%%)\n", stats.covariates_filter.elapsed_time, stats.covariates_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    printf("    sort: %.4f (%.2f%%)\n", stats.covariates_sort.elapsed_time, stats.covariates_sort.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    printf("    pack: %.4f (%.2f%%)\n", stats.covariates_pack.elapsed_time, stats.covariates_pack.elapsed_time / wall_clock.elapsed_time() * 100.0);
     printf("  post-processing: %.4f (%.2f%%)\n", postprocessing.elapsed_time(), postprocessing.elapsed_time() / wall_clock.elapsed_time() * 100.0);
     printf("  output: %.4f (%.2f%%)\n", output.elapsed_time(), output.elapsed_time() / wall_clock.elapsed_time() * 100.0);
 

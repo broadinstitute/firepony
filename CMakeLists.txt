@@ -37,7 +37,7 @@ endif()
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
     set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -g -lineinfo -G -DTHRUST_DEBUG")
 else()
-    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -O3")
+    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -O3 -lineinfo -g")
 endif()
 
 include_directories(${CMAKE_SOURCE_DIR})

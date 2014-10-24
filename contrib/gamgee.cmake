@@ -14,8 +14,7 @@ set(gamgee_PREFIX ${CMAKE_BINARY_DIR}/contrib/gamgee-prefix)
 ExternalProject_Add(gamgee
     PREFIX ${gamgee_PREFIX}
     DEPENDS boost htslib
-    #GIT_REPOSITORY "https://github.com/broadinstitute/gamgee.git"
-    GIT_REPOSITORY "git://wilkins/broadinstitute/gamgee.git"
+    GIT_REPOSITORY "https://github.com/broadinstitute/gamgee.git"
     GIT_TAG "37213c0dd9c43476a0e29b0e688c6cb9d7738a8d"
     BUILD_IN_SOURCE 1
     CONFIGURE_COMMAND ""

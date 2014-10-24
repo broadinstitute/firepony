@@ -9,8 +9,7 @@ set(Boost_PREFIX ${CMAKE_BINARY_DIR}/contrib/boost-prefix)
 
 ExternalProject_Add(boost
     PREFIX ${Boost_PREFIX}
-    #GIT_REPOSITORY "https://github.com/boostorg/boost.git"
-    GIT_REPOSITORY "git://wilkins/boostorg/boost.git"
+    GIT_REPOSITORY "https://github.com/boostorg/boost.git"
     GIT_TAG "boost-1.56.0"
     BUILD_IN_SOURCE 1
     UPDATE_COMMAND ""

@@ -2,8 +2,7 @@
 set(htslib_PREFIX ${CMAKE_BINARY_DIR}/contrib/htslib-prefix)
 ExternalProject_Add(htslib
     PREFIX ${htslib_PREFIX}
-    #GIT_REPOSITORY "https://github.com/samtools/htslib.git"
-    GIT_REPOSITORY "git://wilkins/broadinstitute/htslib.git"
+    GIT_REPOSITORY "https://github.com/broadinstitute/htslib.git"
     # NOTE: gamgee tracks the 'broad' branch
     # we should always sync to a commit from that branch for consistency
     GIT_TAG "b1758c18004597ff970a5fc2e67953f3f2fc0df1"

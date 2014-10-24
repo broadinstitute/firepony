@@ -131,7 +131,7 @@ int main(int argc, char **argv)
     {
         // read in the next batch
         io.start();
-        bool eof = !(bam.next_batch(&batch, data_mask, 80000));
+        bool eof = !(bam.next_batch(&batch, data_mask, 20000));
         io.stop();
         stats.io.add(io);
 
@@ -225,12 +225,17 @@ int main(int argc, char **argv)
         cudaDeviceSynchronize();
         stats.read_filter.add(read_filter);
         stats.cigar_expansion.add(cigar_expansion);
-        stats.snp_filter.add(snp_filter);
         stats.bp_filter.add(bp_filter);
+        stats.snp_filter.add(snp_filter);
         stats.baq.add(baq);
         stats.fractional_error.add(fractional_error);
         stats.covariates.add(covariates);
+
+        printf(".");
+        fflush(stdout);
     }
+
+    printf("\n");
 
     gpu_timer postprocessing;
     cpu_timer output;
@@ -263,8 +268,8 @@ int main(int argc, char **argv)
     printf("  io: %.4f (%.2f%%)\n", stats.io.elapsed_time, stats.io.elapsed_time / wall_clock.elapsed_time() * 100.0);
     printf("  read filtering: %.4f (%.2f%%)\n", stats.read_filter.elapsed_time, stats.read_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
     printf("  cigar expansion: %.4f (%.2f%%)\n", stats.cigar_expansion.elapsed_time, stats.cigar_expansion.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    printf("  snp filtering: %.4f (%.2f%%)\n", stats.snp_filter.elapsed_time, stats.snp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
     printf("  bp filtering: %.4f (%.2f%%)\n", stats.bp_filter.elapsed_time, stats.bp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    printf("  snp filtering: %.4f (%.2f%%)\n", stats.snp_filter.elapsed_time, stats.snp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
     printf("  baq: %.4f (%.2f%%)\n", stats.baq.elapsed_time, stats.baq.elapsed_time / wall_clock.elapsed_time() * 100.0);
     printf("    setup: %.4f (%.2f%%)\n", stats.baq_setup.elapsed_time, stats.baq_setup.elapsed_time / stats.baq.elapsed_time * 100.0);
     printf("    hmm: %.4f (%.2f%%)\n", stats.baq_hmm.elapsed_time, stats.baq_hmm.elapsed_time / stats.baq.elapsed_time * 100.0);

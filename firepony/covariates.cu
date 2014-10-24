@@ -189,7 +189,7 @@ struct compute_high_quality_windows : public bqsr_lambda
         }
 
         while(batch.qualities[idx.qual_start + low_qual_window.y] <= LOW_QUAL_TAIL &&
-                low_qual_window.y >= window.x)
+                low_qual_window.y > low_qual_window.x)
         {
             low_qual_window.y--;
         }

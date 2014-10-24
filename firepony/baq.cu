@@ -135,8 +135,6 @@ struct hmm_glocal_full_lmem : public bqsr_lambda
         const CRQ_index idx = batch.crq_index(read_index);
 
         // set up scaling factor pointers
-//        forwardMatrix = &ctx.baq.forward[matrix_index];
-//        backwardMatrix= &ctx.baq.backward[matrix_index];
         scalingFactors = &ctx.baq.scaling[scaling_index];
 
         // get the windows for the current read
@@ -251,6 +249,9 @@ struct hmm_glocal_full_lmem : public bqsr_lambda
 
         double forwardMatrix[MAT_SIZE];
         double backwardMatrix[MAT_SIZE];
+
+        memset(forwardMatrix, 0, sizeof(double) * MAT_SIZE);
+        memset(backwardMatrix, 0, sizeof(double) * MAT_SIZE);
 
         setup(hmm_index);
 

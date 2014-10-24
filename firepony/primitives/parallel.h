@@ -42,7 +42,7 @@ inline void inclusive_scan(InputIterator first,
     thrust::inclusive_scan(first, first + len, result, op);
 }
 
-#ifndef NO_CUB
+#if !defined(NO_CUB)
 // implementation of copy_if based on CUB
 template <typename InputIterator, typename OutputIterator, typename Predicate>
 inline size_t copy_if(InputIterator first,
@@ -76,7 +76,22 @@ inline size_t copy_if(InputIterator first,
 
     return size_t(num_selected[0]);
 }
+#else
+template <typename InputIterator, typename OutputIterator, typename Predicate>
+inline size_t copy_if(InputIterator first,
+                      size_t len,
+                      OutputIterator result,
+                      Predicate op,
+                      D_VectorU8& temp_storage)
+{
+    OutputIterator out_last;
+    out_last = thrust::copy_if(first, first + len, result, op);
+    return out_last - result;
+}
+#endif
 
+// xxxnsubtil: cub::DeviceSelect::Flagged seems problematic
+#if !defined(NO_CUB) && 0
 template <typename InputIterator, typename FlagIterator, typename OutputIterator>
 inline size_t copy_flagged(InputIterator first,
                            size_t len,
@@ -109,7 +124,29 @@ inline size_t copy_flagged(InputIterator first,
 
     return size_t(num_selected[0]);
 }
+#else
+struct copy_if_flagged
+{
+    CUDA_HOST_DEVICE bool operator() (const uint8 val)
+    {
+        return bool(val);
+    }
+};
 
+template <typename InputIterator, typename FlagIterator, typename OutputIterator>
+inline size_t copy_flagged(InputIterator first,
+                           size_t len,
+                           OutputIterator result,
+                           FlagIterator flags,
+                           D_VectorU8& temp_storage)
+{
+    OutputIterator out_last;
+    out_last = thrust::copy_if(first, first + len, flags, result, copy_if_flagged());
+    return out_last - result;
+}
+#endif
+
+#if !defined(NO_CUB)
 template <typename InputIterator>
 inline int64 sum(InputIterator first,
                  size_t len,
@@ -134,7 +171,17 @@ inline int64 sum(InputIterator first,
 
     return int64(result[0]);
 }
+#else
+template <typename InputIterator>
+inline int64 sum(InputIterator first,
+                 size_t len,
+                 D_VectorU8& temp_storage)
+{
+    return thrust::reduce(first, first + len, int64(0));
+}
+#endif
 
+#if !defined(NO_CUB)
 template <typename Key, typename Value>
 inline void sort_by_key(D_Vector<Key>& keys,
                         D_Vector<Value>& values,
@@ -183,49 +230,7 @@ inline void sort_by_key(D_Vector<Key>& keys,
         cudaMemcpy(thrust::raw_pointer_cast(values.data()), d_values.Current(), sizeof(Value) * len, cudaMemcpyDeviceToDevice);
     }
 }
-
 #else
-
-template <typename InputIterator, typename OutputIterator, typename Predicate>
-inline size_t copy_if(InputIterator first,
-                      size_t len,
-                      OutputIterator result,
-                      Predicate op,
-                      D_VectorU8& temp_storage)
-{
-    OutputIterator out_last;
-    out_last = thrust::copy_if(first, first + len, result, op);
-    return out_last - result;
-}
-
-struct copy_if_flagged
-{
-    CUDA_HOST_DEVICE bool operator() (const uint8 val)
-    {
-        return bool(val);
-    }
-};
-
-template <typename InputIterator, typename FlagIterator, typename OutputIterator>
-inline size_t copy_flagged(InputIterator first,
-                           size_t len,
-                           OutputIterator result,
-                           FlagIterator flags,
-                           D_VectorU8& temp_storage)
-{
-    OutputIterator out_last;
-    out_last = thrust::copy_if(first, first + len, flags, result, copy_if_flagged());
-    return out_last - result;
-}
-
-template <typename InputIterator>
-inline int64 sum(InputIterator first,
-                 size_t len,
-                 D_VectorU8& temp_storage)
-{
-    return thrust::reduce(first, first + len, int64(0));
-}
-
 template <typename Key, typename Value>
 inline void sort_by_key(D_Vector<Key>& keys,
                         D_Vector<Value>& values,

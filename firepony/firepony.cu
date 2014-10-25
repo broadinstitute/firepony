@@ -38,6 +38,100 @@
 
 void debug_read(bqsr_context *context, const alignment_batch& batch, int read_index);
 
+#include <thread>
+
+struct io_thread
+{
+    static constexpr bool DISABLE_THREADING = false;
+    static constexpr int NUM_BUFFERS = 3;
+
+    alignment_batch batches[NUM_BUFFERS];
+    volatile int put, get;
+    volatile bool eof;
+
+    gamgee_alignment_file file;
+    uint32 data_mask;
+
+    std::thread thread;
+
+    io_thread(const char *fname, uint32 data_mask)
+        : put(1),
+          get(0),
+          eof(false),
+          file(fname),
+          data_mask(data_mask)
+    { }
+
+    void start(void)
+    {
+        if (!DISABLE_THREADING)
+        {
+            thread = std::thread(&io_thread::run, this);
+        }
+    }
+
+    void join(void)
+    {
+        if (!DISABLE_THREADING)
+        {
+            thread.join();
+        }
+    }
+
+    int wrap(int val)
+    {
+        return val % NUM_BUFFERS;
+    }
+
+    alignment_batch& next_buffer(void)
+    {
+        if (DISABLE_THREADING)
+        {
+            return batches[0];
+        } else {
+            while(wrap(get + 1) == put)
+                std::this_thread::yield();
+
+            get = wrap(get + 1);
+            return batches[get];
+        }
+    }
+
+    bool done(void)
+    {
+        if (DISABLE_THREADING)
+        {
+            eof = !(file.next_batch(&batches[0], data_mask, command_line_options.batch_size));
+            return eof;
+        } else {
+            if (!eof)
+                return false;
+
+            if (wrap(get + 1) != put)
+                return false;
+
+            return true;
+        }
+    }
+
+private:
+    void run(void)
+    {
+        while(!eof)
+        {
+            // wait for a slot
+            while (put == get)
+                std::this_thread::yield();
+
+            eof = !(file.next_batch(&batches[put], data_mask, command_line_options.batch_size));
+            if (!eof)
+            {
+                put = wrap(put + 1);
+            }
+        }
+    }
+};
+
 void init_cuda(void)
 {
     cudaDeviceProp prop;
@@ -98,20 +192,21 @@ int main(int argc, char **argv)
     fprintf(stderr, "downloaded %lu MB of variant data\n", num_bytes / (1024 * 1024));
 
     fprintf(stderr, "processing file %s...\n", command_line_options.input);
-    gamgee_alignment_file bam(command_line_options.input);
-    alignment_batch batch;
 
-    bqsr_context context(bam.header, vcf, reference);
+    const uint32 data_mask = AlignmentDataMask::NAME |
+                             AlignmentDataMask::CHROMOSOME |
+                             AlignmentDataMask::ALIGNMENT_START |
+                             AlignmentDataMask::CIGAR |
+                             AlignmentDataMask::READS |
+                             AlignmentDataMask::QUALITIES |
+                             AlignmentDataMask::FLAGS |
+                             AlignmentDataMask::MAPQ |
+                             AlignmentDataMask::READ_GROUP;
 
-    uint32 data_mask = AlignmentDataMask::NAME |
-                        AlignmentDataMask::CHROMOSOME |
-                        AlignmentDataMask::ALIGNMENT_START |
-                        AlignmentDataMask::CIGAR |
-                        AlignmentDataMask::READS |
-                        AlignmentDataMask::QUALITIES |
-                        AlignmentDataMask::FLAGS |
-                        AlignmentDataMask::MAPQ |
-                        AlignmentDataMask::READ_GROUP;
+    io_thread bam_thread(command_line_options.input, data_mask);
+    bam_thread.start();
+
+    bqsr_context context(bam_thread.file.header, vcf, reference);
 
     auto& stats = context.stats;
     cpu_timer wall_clock;
@@ -127,23 +222,16 @@ int main(int argc, char **argv)
 
     wall_clock.start();
 
-    for(;;)
+    while(!bam_thread.done())
     {
-        // read in the next batch
         io.start();
-        bool eof = !(bam.next_batch(&batch, data_mask, 20000));
-        io.stop();
-        stats.io.add(io);
-
-        if (eof)
-        {
-            // no more data, stop
-            break;
-        }
+        // fetch the next batch
+        alignment_batch& batch = bam_thread.next_buffer();
 
         // load the next batch on the device
         batch.download();
         context.start_batch(batch);
+        io.stop();
 
         read_filter.start();
 
@@ -265,7 +353,7 @@ int main(int argc, char **argv)
     fprintf(stderr, "\n");
 
     fprintf(stderr, "wall clock time: %f\n", wall_clock.elapsed_time());
-    fprintf(stderr, "  io: %.4f (%.2f%%)\n", stats.io.elapsed_time, stats.io.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "  blocked on io: %.4f (%.2f%%)\n", stats.io.elapsed_time, stats.io.elapsed_time / wall_clock.elapsed_time() * 100.0);
     fprintf(stderr, "  read filtering: %.4f (%.2f%%)\n", stats.read_filter.elapsed_time, stats.read_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
     fprintf(stderr, "  cigar expansion: %.4f (%.2f%%)\n", stats.cigar_expansion.elapsed_time, stats.cigar_expansion.elapsed_time / wall_clock.elapsed_time() * 100.0);
     fprintf(stderr, "  bp filtering: %.4f (%.2f%%)\n", stats.bp_filter.elapsed_time, stats.bp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
@@ -282,6 +370,8 @@ int main(int argc, char **argv)
     fprintf(stderr, "    pack: %.4f (%.2f%%)\n", stats.covariates_pack.elapsed_time, stats.covariates_pack.elapsed_time / wall_clock.elapsed_time() * 100.0);
     fprintf(stderr, "  post-processing: %.4f (%.2f%%)\n", postprocessing.elapsed_time(), postprocessing.elapsed_time() / wall_clock.elapsed_time() * 100.0);
     fprintf(stderr, "  output: %.4f (%.2f%%)\n", output.elapsed_time(), output.elapsed_time() / wall_clock.elapsed_time() * 100.0);
+
+    bam_thread.join();
 
     return 0;
 }

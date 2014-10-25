@@ -182,7 +182,6 @@ struct compute_vcf_ranges : public bqsr_lambda
         vcf_range.x = vcf_start - db.reference_window_start.begin();
         vcf_range.y = vcf_range.x;
 
-
         // do a linear search to find the end of the VCF range
         // (there are generally very few VCF entries for an average read length --- and often none --- so this is expected to be faster than a binary search)
         while(vcf_range.y < db.reference_window_start.size() - 1 &&
@@ -231,32 +230,6 @@ struct filter_bps : public bqsr_lambda
         : bqsr_lambda(ctx, batch)
     { }
 
-private:
-#if 0
-    // xxxnsubtil: GATK doesn't actually test the read data, it only seems to look at the coordinates
-    // test a VCF entry (identified by index in the db) against a read
-    CUDA_HOST_DEVICE uint32 test_vcf(uint32 vcf_entry, const uint32 read_index, const uint32 read_bp_offset)
-    {
-        const BAM_CRQ_index& idx = batch.crq_index[read_index];
-        const io::SNP_sequence_index& vcf_idx = ctx.db.ref_variant_index[vcf_entry];
-
-        if (read_bp_offset + vcf_idx.variant_len > idx.read_len)
-        {
-            // if the variant ends past the end of the read, we can't test it
-            return 0;
-        }
-
-        for(uint32 i = 0; i < vcf_idx.variant_len; i++)
-        {
-            if (batch.reads[idx.read_start + read_bp_offset + i] != ctx.db.variants[vcf_idx.variant_start + i])
-            //if (batch.reads[idx.read_start + read_bp_offset + i] != ctx.db.reference_sequences[vcf_idx.reference_start + i])
-                return 0;
-        }
-
-        return vcf_idx.variant_len;
-    }
-#endif
-
 public:
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -272,8 +245,6 @@ public:
 
         uint2 vcf_db_range = ctx.snp_filter.active_vcf_ranges[read_index];
 
-
-
         // traverse the VCF range and mark corresponding read BPs as inactive
         for(uint32 feature = vcf_db_range.x; feature <= vcf_db_range.y; feature++)
         {
@@ -281,15 +252,11 @@ public:
             int start = db.reference_window_start[feature] - ref_sequence_offset + read_window_clipped.x;
             int end = db.reference_window_start[feature] + db.alignment_window_len[feature] - ref_sequence_offset + read_window_clipped.x;
 
-
-            // truncate any portions of the feature range that fall outside the clipped read region
-            start = max(start, read_window_clipped.x);
-            end = min(end, read_window_clipped.y);
-
-
-            // count the number of indels behind the feature
-            uint32 num_insertions = 0;
-            uint32 num_deletions = 0;
+            // adjust feature range for indels
+            // feature coordinates are expressed in terms of the reference sequence
+            // every insertion to the reference shifts the corresponding read coordinate forward
+            // every deletion shifts the read coordinate backward
+            int indel_offset = 0;
 
             const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
             for(uint32 ev = cigar_start + read_window_clipped.x; ev < cigar_start + read_window_clipped.y; ev++)
@@ -299,15 +266,32 @@ public:
                     break;
 
                 if (ctx.cigar.cigar_events[ev] == cigar_event::I)
-                    num_insertions++;
+                    indel_offset++;
 
                 if (ctx.cigar.cigar_events[ev] == cigar_event::D)
-                    num_deletions++;
+                    indel_offset--;
             }
 
+            // xxxnsubtil: this assumes there are no indels inside the feature itself!
+            start += indel_offset;
+            end += indel_offset;
 
-            // xxxnsubtil: this might be wrong if there are indels within the feature range!
-            for(uint32 dead_bp = uint32(start) + num_insertions - num_deletions; dead_bp <= uint32(end) + num_insertions - num_deletions; dead_bp++)
+            // if both start and end are behind the start of the read window...
+            if ((start < read_window_clipped.x && end < read_window_clipped.x) ||
+                    // or both are beyond the end of the read window...
+                    (start > read_window_clipped.y && end > read_window_clipped.y))
+            {
+                // ... then there's nothing to do
+                continue;
+            }
+
+            // truncate any portions of the feature range that fall outside the clipped read region
+            start = max(start, read_window_clipped.x);
+            start = min(start, read_window_clipped.y);
+            end = max(end, read_window_clipped.x);
+            end = min(end, read_window_clipped.y);
+
+            for(uint32 dead_bp = uint32(start); dead_bp <= uint32(end); dead_bp++)
                 ctx.active_location_list[idx.read_start + dead_bp] = 0;
         }
     }

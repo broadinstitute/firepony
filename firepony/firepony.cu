@@ -273,25 +273,14 @@ int main(int argc, char **argv)
         gather_covariates(&context, batch);
         covariates.stop();
 
-#if 0
-        for(uint32 read_id = 0; read_id < context.active_read_list.size(); read_id++)
+        if (command_line_options.debug)
         {
-            const uint32 read_index = context.active_read_list[read_id];
-
-            /*
-            const char *name = &h_batch.names[h_batch.index[read_index].name];
-
-            if (!strcmp(name, "SRR062635.1797528") ||
-                !strcmp(name, "SRR062635.22970839") ||
-                !strcmp(name, "SRR062641.22789430") ||
-                !strcmp(name, "SRR062641.16264831"))
+            for(uint32 read_id = 0; read_id < context.active_read_list.size(); read_id++)
             {
-                debug_read(&context, genome, h_batch, read_index);
-            }*/
-
-            debug_read(&context, batch, read_index);
+                const uint32 read_index = context.active_read_list[read_id];
+                debug_read(&context, batch, read_index);
+            }
         }
-#endif
 
 #if 0
         fprintf(stderr, "active VCF ranges: %lu out of %lu reads (%f %%)\n",

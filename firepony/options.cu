@@ -34,6 +34,7 @@ static void usage(void)
     fprintf(stderr, "  -s, --snp-database <dbsnp-file-name>  Use <dbsnp-file-name> as a SNP database\n");
     fprintf(stderr, "  --no-reference-mmap\n");
     fprintf(stderr, "  --no-snp-database-mmap                Do not attempt to use system shared memory for reference or dbSNP\n");
+    fprintf(stderr, "  -d, --debug                           Enable debugging (*extremely* verbose)\n");
     fprintf(stderr, "\n");
 
     exit(1);
@@ -57,12 +58,13 @@ static void parse_env_vars(void)
 
 void parse_command_line(int argc, char **argv)
 {
-    static const char *options_short = "r:s:";
+    static const char *options_short = "r:s:d";
     static struct option options_long[] = {
             { "reference", required_argument, NULL, 'r' },
             { "snp-database", required_argument, NULL, 's' },
             { "no-reference-mmap", no_argument, NULL, 'k' },
             { "no-snp-database-mmap", no_argument, NULL, 'l' },
+            { "debug", no_argument, NULL, 'd' },
     };
 
     parse_env_vars();
@@ -90,6 +92,11 @@ void parse_command_line(int argc, char **argv)
         case 'l':
             // --no-snp-database-mmap
             command_line_options.snp_database_use_mmap = false;
+            break;
+
+        case 'd':
+            // -d, --debug
+            command_line_options.debug = true;
             break;
 
         case '?':

@@ -34,6 +34,9 @@ struct runtime_options
     // the batch size to use
     uint32 batch_size;
 
+    // enable debugging
+    bool debug;
+
     runtime_options()
     {
         reference = nullptr;
@@ -43,6 +46,8 @@ struct runtime_options
         reference_use_mmap = true;
         snp_database_use_mmap = true;
         batch_size = 20000;
+
+        debug = false;
     }
 };
 

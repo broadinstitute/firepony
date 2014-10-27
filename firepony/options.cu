@@ -35,6 +35,7 @@ static void usage(void)
     fprintf(stderr, "  --no-reference-mmap\n");
     fprintf(stderr, "  --no-snp-database-mmap                Do not attempt to use system shared memory for reference or dbSNP\n");
     fprintf(stderr, "  -d, --debug                           Enable debugging (*extremely* verbose)\n");
+    fprintf(stderr, "  -b, --batch-size <n>                  Process input in batches of <n> reads\n");
     fprintf(stderr, "\n");
 
     exit(1);
@@ -58,13 +59,14 @@ static void parse_env_vars(void)
 
 void parse_command_line(int argc, char **argv)
 {
-    static const char *options_short = "r:s:d";
+    static const char *options_short = "r:s:db:";
     static struct option options_long[] = {
             { "reference", required_argument, NULL, 'r' },
             { "snp-database", required_argument, NULL, 's' },
             { "no-reference-mmap", no_argument, NULL, 'k' },
             { "no-snp-database-mmap", no_argument, NULL, 'l' },
             { "debug", no_argument, NULL, 'd' },
+            { "batch-size", required_argument, NULL, 'b' },
     };
 
     parse_env_vars();
@@ -97,6 +99,18 @@ void parse_command_line(int argc, char **argv)
         case 'd':
             // -d, --debug
             command_line_options.debug = true;
+            break;
+
+        case 'b':
+            // -b, --batch-size
+            errno = 0;
+            command_line_options.batch_size = strtol(optarg, NULL, 10);
+            if (errno != 0)
+            {
+                fprintf(stderr, "error: invalid batch size\n");
+                usage();
+            }
+
             break;
 
         case '?':

@@ -100,27 +100,194 @@ struct cigar_op_compact : public bqsr_lambda
     }
 };
 
+// initialize read windows
+// note: this does not initialize the reference window, as it needs to be computed once all clipping has been done
+struct read_window_init : public bqsr_lambda
+{
+    using bqsr_lambda::bqsr_lambda;
+
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
+    {
+        const CRQ_index idx = batch.crq_index(read_index);
+        ctx.cigar.read_window_clipped[read_index] = make_ushort2(0, idx.read_len - 1);
+    }
+};
+
+// remove soft-clip regions from the active read window
+struct remove_soft_clips : public bqsr_lambda
+{
+    using bqsr_lambda::bqsr_lambda;
+
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
+    {
+        const CRQ_index idx = batch.crq_index(read_index);
+
+        auto read_window_clipped = ctx.cigar.read_window_clipped[read_index];
+
+        uint32 cigar_index = idx.cigar_start;
+        uint32 read_offset = 0;
+
+        // note: we assume that the leading/trailing clip regions have been validated by the read filtering stage!
+
+        // iterate forward through the leading clip region
+        while(cigar_index < idx.cigar_start + idx.cigar_len &&
+                read_offset < idx.read_len)
+        {
+            const auto& op = batch.cigars[cigar_index];
+
+            if (op.op == cigar_op::OP_H || op.op == cigar_op::OP_S)
+            {
+                if (read_offset + op.len > read_window_clipped.x)
+                {
+                    read_window_clipped.x = min(read_offset + op.len, read_window_clipped.y);
+                }
+
+                read_offset += op.len;
+                cigar_index++;
+            } else {
+                break;
+            }
+        }
+
+        // iterate backward through the trailing clip region
+        cigar_index = idx.cigar_start + idx.cigar_len - 1;
+        read_offset = read_window_clipped.y;
+
+        while(cigar_index >= idx.cigar_start &&
+                read_offset > read_window_clipped.x)
+        {
+            const auto& op = batch.cigars[cigar_index];
+
+            if (op.op == cigar_op::OP_H || op.op == cigar_op::OP_S)
+            {
+                if (read_offset - op.len < read_window_clipped.y)
+                {
+                    read_window_clipped.y = max(read_offset - op.len, read_window_clipped.x);
+                }
+
+                read_offset -= op.len;
+                cigar_index--;
+            } else {
+                break;
+            }
+        }
+
+        ctx.cigar.read_window_clipped[read_index] = read_window_clipped;
+    }
+};
+
+// compute clipped read window without leading/trailing insertions
+struct compute_no_insertions_window : public bqsr_lambda
+{
+    using bqsr_lambda::bqsr_lambda;
+
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
+    {
+        const CRQ_index idx = batch.crq_index(read_index);
+        const auto& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
+        auto read_window_clipped_no_insertions = ctx.cigar.read_window_clipped_no_insertions[read_index];
+
+        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
+        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
+
+        read_window_clipped_no_insertions = read_window_clipped;
+
+        // iterate forward at the start
+        uint32 ev = cigar_start;
+        uint32 read_offset = read_window_clipped.x;
+
+        while(ev < cigar_start + read_window_clipped.y &&
+              read_offset < read_window_clipped.y &&
+              ctx.cigar.cigar_events[ev] == cigar_event::I)
+        {
+            read_window_clipped_no_insertions.x++;
+            read_offset++;
+            ev++;
+        }
+
+        ev = cigar_end - 1;
+        read_offset = read_window_clipped.y;
+
+        while(ev > cigar_start + read_window_clipped_no_insertions.x &&
+                read_offset > read_window_clipped_no_insertions.x &&
+                ctx.cigar.cigar_events[ev] == cigar_event::I)
+        {
+            read_window_clipped_no_insertions.y--;
+            read_offset--;
+            ev--;
+        }
+
+        ctx.cigar.read_window_clipped_no_insertions[read_index] = read_window_clipped_no_insertions;
+    }
+};
+
+struct compute_reference_window : public bqsr_lambda
+{
+    using bqsr_lambda::bqsr_lambda;
+
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
+    {
+        const CRQ_index idx = batch.crq_index(read_index);
+
+        const auto& read_window_clipped_no_insertions = ctx.cigar.read_window_clipped_no_insertions[read_index];
+        auto& reference_window_clipped = ctx.cigar.reference_window_clipped[read_index];
+
+        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
+        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
+
+        // do a linear search for the read offset
+        // (this could be smarter, but it doesn't seem to matter)
+        for(uint32 i = cigar_start; i < cigar_end; i++)
+        {
+            if (ctx.cigar.cigar_event_read_coordinates[i] == read_window_clipped_no_insertions.x)
+            {
+                while(ctx.cigar.cigar_event_reference_coordinates[i] == uint16(-1) &&
+                        i < cigar_end)
+                {
+                    i++;
+                }
+
+                if (i == cigar_end)
+                {
+                    // should never happen
+                    reference_window_clipped = make_ushort2(uint16(-1), uint16(-1));
+                    return;
+                }
+
+                reference_window_clipped.x = ctx.cigar.cigar_event_reference_coordinates[i];
+                break;
+            }
+        }
+
+        for(uint32 i = cigar_end - 1; i >= cigar_start; i--)
+        {
+            if (ctx.cigar.cigar_event_read_coordinates[i] == read_window_clipped_no_insertions.y)
+            {
+                while(ctx.cigar.cigar_event_reference_coordinates[i] == uint16(-1) &&
+                        i > cigar_start)
+                {
+                    i--;
+                }
+
+                if (i == cigar_start)
+                {
+                    // should never happen
+                    reference_window_clipped = make_ushort2(uint16(-1), uint16(-1));
+                    return;
+                }
+
+                reference_window_clipped.y = ctx.cigar.cigar_event_reference_coordinates[i];
+                break;
+            }
+        }
+    }
+};
+
 // expand cigar coordinates for a read
 // xxxnsubtil: this is very similar to compute_alignment_window, should merge
 struct cigar_coordinates_expand : public bqsr_lambda
 {
-    cigar_coordinates_expand(bqsr_context::view ctx,
-                             const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
-    { }
-
-    // update a coordinate window when we reach a new valid offset for the window
-    template<typename W, typename O>
-    CUDA_HOST_DEVICE void update(W& window, O new_offset,
-                                 bool update_start = true,
-                                 bool update_end = true)
-    {
-        if (update_start)
-            window.x = bqsr::min(window.x, new_offset);
-
-        if (update_end)
-            window.y = bqsr::max(window.y, new_offset);
-    }
+    using bqsr_lambda::bqsr_lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -132,15 +299,8 @@ struct cigar_coordinates_expand : public bqsr_lambda
         uint16 *output_read_coordinates = &ctx.cigar.cigar_event_read_coordinates[base];
         uint16 *output_reference_coordinates = &ctx.cigar.cigar_event_reference_coordinates[base];
 
-        ushort2 read_window_clipped = make_ushort2(uint16(~0), 0);
-        ushort2 read_window_clipped_no_insertions = make_ushort2(uint16(~0), 0);
-        ushort2 reference_window_clipped = make_ushort2(uint16(~0), 0);
-
         uint16 read_offset = 0;
         uint16 reference_offset = 0;
-
-        bool leading_clips = true;
-        bool trailing_clips = false;
 
         for(uint32 c = 0; c < idx.cigar_len; c++)
         {
@@ -151,15 +311,9 @@ struct cigar_coordinates_expand : public bqsr_lambda
             case cigar_op::OP_X:
                 for(uint32 i = 0; i < cigar[c].len; i++)
                 {
-                    leading_clips = false;
-
                     *output_read_index++ = read_index;
                     *output_read_coordinates++ = read_offset;
                     *output_reference_coordinates++ = reference_offset;
-
-                    update(read_window_clipped, read_offset);
-                    update(read_window_clipped_no_insertions, read_offset);
-                    update(reference_window_clipped, reference_offset);
 
                     read_offset++;
                     reference_offset++;
@@ -170,20 +324,9 @@ struct cigar_coordinates_expand : public bqsr_lambda
             case cigar_op::OP_S:
                 for(uint32 i = 0; i < cigar[c].len; i++)
                 {
-                    // if we're in a clipping region, then we're either in the leading or trailing clipping region
-                    trailing_clips = !leading_clips;
-
                     *output_read_index++ = read_index;
                     *output_read_coordinates++ = read_offset;
                     *output_reference_coordinates++ = uint16(-1);
-
-                    // if we haven't reached the trailing clipping region yet...
-                    if (!trailing_clips)
-                    {
-                        // ... then update the end of the read windows
-                        update(read_window_clipped, read_offset, false, true);
-                        update(read_window_clipped_no_insertions, read_offset, false, true);
-                    }
 
                     read_offset++;
                 }
@@ -194,16 +337,9 @@ struct cigar_coordinates_expand : public bqsr_lambda
             case cigar_op::OP_I:
                 for(uint32 i = 0; i < cigar[c].len; i++)
                 {
-                    leading_clips = false;
-
                     *output_read_index++ = read_index;
                     *output_read_coordinates++ = read_offset;
                     *output_reference_coordinates++ = uint16(-1);
-
-                    // update the trailing clipped read region
-                    update(read_window_clipped, read_offset);
-
-                    // the no-insertion window never moves with I
 
                     read_offset++;
                 }
@@ -219,16 +355,10 @@ struct cigar_coordinates_expand : public bqsr_lambda
                     *output_read_coordinates++ = uint16(-1);
                     *output_reference_coordinates++ = reference_offset;
 
-                    update(reference_window_clipped, reference_offset);
-
                     reference_offset++;
                 }
             }
         }
-
-        ctx.cigar.read_window_clipped[read_index] = read_window_clipped;
-        ctx.cigar.read_window_clipped_no_insertions[read_index] = read_window_clipped_no_insertions;
-        ctx.cigar.reference_window_clipped[read_index] = reference_window_clipped;
     }
 };
 
@@ -459,6 +589,27 @@ void expand_cigars(bqsr_context *context, const alignment_batch& batch)
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
                      cigar_coordinates_expand(*context, batch.device));
+
+    // initialize read windows
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     read_window_init(*context, batch.device));
+
+    // apply read clips
+    // hard-clip the soft clip regions
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     remove_soft_clips(*context, batch.device));
+
+    // compute the no insertions window based on the clipping window
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     compute_no_insertions_window(*context, batch.device));
+
+    // finally, compute the reference window (using the no insertions window)
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     compute_reference_window(*context, batch.device));
 
     // compute the error bit vectors
     // this also counts the number of errors in each read

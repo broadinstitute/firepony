@@ -196,6 +196,9 @@ int main(int argc, char **argv)
     const uint32 data_mask = AlignmentDataMask::NAME |
                              AlignmentDataMask::CHROMOSOME |
                              AlignmentDataMask::ALIGNMENT_START |
+                             AlignmentDataMask::ALIGNMENT_STOP |
+                             AlignmentDataMask::MATE_ALIGNMENT_START |
+                             AlignmentDataMask::INFERRED_INSERT_SIZE |
                              AlignmentDataMask::CIGAR |
                              AlignmentDataMask::READS |
                              AlignmentDataMask::QUALITIES |

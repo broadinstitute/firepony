@@ -152,6 +152,11 @@ bool gamgee_alignment_file::next_batch(alignment_batch *batch, uint32 data_mask,
             h_batch->mate_alignment_start.push_back(record.mate_alignment_start() - 1);
         }
 
+        if (data_mask & AlignmentDataMask::INFERRED_INSERT_SIZE)
+        {
+            h_batch->inferred_insert_size.push_back(record.insert_size());
+        }
+
         if (data_mask & AlignmentDataMask::CIGAR)
         {
             gamgee::Cigar cigar = record.cigar();

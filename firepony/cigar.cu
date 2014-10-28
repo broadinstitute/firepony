@@ -113,6 +113,134 @@ struct read_window_init : public bqsr_lambda
     }
 };
 
+// clips sequencing adapters from the reads
+struct remove_adapters : public bqsr_lambda
+{
+    using bqsr_lambda::bqsr_lambda;
+
+    CUDA_HOST_DEVICE bool hasWellDefinedFragmentSize(const uint32 read_index)
+    {
+        const auto flags = batch.flags[read_index];
+        const auto inferred_insert_size = batch.inferred_insert_size[read_index];
+
+        if (inferred_insert_size == 0)
+            // no adaptors in reads with mates in another chromosome or unmapped pairs
+            return false;
+
+        if (!(flags & AlignmentFlags::PAIRED))
+            // only reads that are paired can be adaptor trimmed
+            return false;
+
+        if ((flags & AlignmentFlags::UNMAP) ||
+            (flags & AlignmentFlags::MATE_UNMAP))
+            // only reads when both reads are mapped can be trimmed
+            return false;
+
+        if ((flags & AlignmentFlags::REVERSE) ==
+            (flags & AlignmentFlags::MATE_REVERSE))
+            // sanity check to ensure that read1 and read2 aren't on the same strand
+            return false;
+
+        if (flags & AlignmentFlags::REVERSE)
+        {
+            // we're on the negative strand, so our read runs right to left
+            return batch.alignment_stop[read_index] > batch.mate_alignment_start[read_index];
+        } else {
+            // we're on the positive strand, so our mate should be to our right (his start + insert size should be past our start)
+            return batch.alignment_start[read_index] <= batch.mate_alignment_start[read_index] + inferred_insert_size;
+        }
+    }
+
+    static constexpr uint32 CANNOT_COMPUTE_ADAPTOR_BOUNDARY = 0xffffffff;
+
+    CUDA_HOST_DEVICE uint32 getAdaptorBoundary(const uint32 read_index)
+    {
+        if (!hasWellDefinedFragmentSize(read_index))
+        {
+            return CANNOT_COMPUTE_ADAPTOR_BOUNDARY;
+        }
+
+        if (batch.flags[read_index] & AlignmentFlags::REVERSE)
+        {
+            return uint32(batch.mate_alignment_start[read_index] - 1);
+        } else {
+            const int insertSize = (batch.inferred_insert_size[read_index] < 0 ? -batch.inferred_insert_size[read_index] : batch.inferred_insert_size[read_index]);
+            return uint32(batch.alignment_start[read_index] + insertSize + 1);
+        }
+    }
+
+    CUDA_HOST_DEVICE int getReadCoordinateForReferenceCoordinate(const uint32 read_index, uint32 ref_coord)
+    {
+        const CRQ_index idx = batch.crq_index(read_index);
+
+        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
+        const uint32 cigar_stop = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
+
+        for(uint32 ev = cigar_start; ev < cigar_stop; ev++)
+        {
+            if (batch.alignment_start[read_index] + ctx.cigar.cigar_event_reference_coordinates[ev] == ref_coord)
+            {
+                return ctx.cigar.cigar_event_read_coordinates[ev];
+            }
+        }
+
+        return -1;
+    }
+
+    CUDA_HOST_DEVICE ushort2 hardClipByReferenceCoordinates(const uint32 read_index, int refStart, int refStop)
+    {
+        int start;
+        int stop;
+
+        if (refStart < 0)
+        {
+            start = 0;
+            stop = getReadCoordinateForReferenceCoordinate(read_index, uint32(refStop));
+        } else {
+            start = getReadCoordinateForReferenceCoordinate(read_index, uint32(refStart));
+            stop = ctx.cigar.read_window_clipped[read_index].y - ctx.cigar.read_window_clipped[read_index].x - 1;
+        }
+
+        return make_ushort2(start, stop);
+    }
+
+    CUDA_HOST_DEVICE void hardClipByReferenceCoordinates_LeftTail(const uint32 read_index, int refStop)
+    {
+        auto& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
+
+        ushort2 adapter = hardClipByReferenceCoordinates(read_index, -1, refStop);
+        read_window_clipped.x = max(read_window_clipped.x, adapter.y + 1);
+    }
+
+    CUDA_HOST_DEVICE void hardClipByReferenceCoordinates_RightTail(const uint32 read_index, int refStart)
+    {
+        auto& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
+
+        ushort2 adapter = hardClipByReferenceCoordinates(read_index, refStart, -1);
+        read_window_clipped.y = min(read_window_clipped.y, adapter.x - 1);
+    }
+
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
+    {
+        const auto& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
+        uint32 adaptorBoundary = getAdaptorBoundary(read_index);
+
+        if (adaptorBoundary == CANNOT_COMPUTE_ADAPTOR_BOUNDARY)
+            return;
+
+        // xxxnsubtil: i think this might be wrong, doesn't account for indels (do we need to?)
+        if (adaptorBoundary < batch.alignment_start[read_index] + read_window_clipped.x || adaptorBoundary > batch.alignment_start[read_index] + read_window_clipped.y)
+            return;
+
+        if (batch.flags[read_index] & AlignmentFlags::REVERSE)
+        {
+            hardClipByReferenceCoordinates_LeftTail(read_index, adaptorBoundary);
+        } else {
+            hardClipByReferenceCoordinates_RightTail(read_index, adaptorBoundary);
+        }
+    }
+};
+
 // remove soft-clip regions from the active read window
 struct remove_soft_clips : public bqsr_lambda
 {
@@ -595,8 +723,12 @@ void expand_cigars(bqsr_context *context, const alignment_batch& batch)
                      context->active_read_list.end(),
                      read_window_init(*context, batch.device));
 
-    // apply read clips
-    // hard-clip the soft clip regions
+    // remove sequencing adapters
+    thrust::for_each(context->active_read_list.begin(),
+                     context->active_read_list.end(),
+                     remove_adapters(*context, batch.device));
+
+    // remove soft clip regions
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),
                      remove_soft_clips(*context, batch.device));

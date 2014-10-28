@@ -86,20 +86,21 @@ namespace AlignmentDataMask
 {
     enum
     {
-        NAME                 = 0x001,
-        CHROMOSOME           = 0x002,
-        ALIGNMENT_START      = 0x004,
-        ALIGNMENT_STOP       = 0x008,
-        MATE_CHROMOSOME      = 0x010,
-        MATE_ALIGNMENT_START = 0x020,
-        CIGAR                = 0x040,
-        READS                = 0x080,
-        QUALITIES            = 0x100,
-        FLAGS                = 0x200,
-        MAPQ                 = 0x400,
+        NAME                 = 0x0001,
+        CHROMOSOME           = 0x0002,
+        ALIGNMENT_START      = 0x0004,
+        ALIGNMENT_STOP       = 0x0008,
+        MATE_CHROMOSOME      = 0x0010,
+        MATE_ALIGNMENT_START = 0x0020,
+        INFERRED_INSERT_SIZE = 0x0040,
+        CIGAR                = 0x0080,
+        READS                = 0x0100,
+        QUALITIES            = 0x0200,
+        FLAGS                = 0x0400,
+        MAPQ                 = 0x0800,
 
         // list of tags that we require
-        READ_GROUP           = 0x800,
+        READ_GROUP           = 0x1000,
     };
 }
 
@@ -140,6 +141,8 @@ struct alignment_batch_storage
     Vector<uint32> mate_chromosome;
     // (1-based and inclusive) mate's alignment start position
     Vector<uint32> mate_alignment_start;
+    // inferred insert size
+    Vector<int16> inferred_insert_size;
 
     // cigar ops
     Vector<cigar_op> cigars;
@@ -192,6 +195,7 @@ struct alignment_batch_device : public alignment_batch_storage<target_system_tag
         D_Vector<uint32>::const_view alignment_stop;
         D_Vector<uint32>::const_view mate_chromosome;
         D_Vector<uint32>::const_view mate_alignment_start;
+        D_Vector<int16>::const_view inferred_insert_size;
         D_Vector<cigar_op>::const_view cigars;
         D_Vector<uint32>::const_view cigar_start;
         D_Vector<uint32>::const_view cigar_len;
@@ -226,6 +230,7 @@ struct alignment_batch_device : public alignment_batch_storage<target_system_tag
                 alignment_stop,
                 mate_chromosome,
                 mate_alignment_start,
+                inferred_insert_size,
                 cigars,
                 cigar_start,
                 cigar_len,
@@ -317,6 +322,11 @@ struct alignment_batch_host : public alignment_batch_storage<host_tag>
             mate_alignment_start.reserve(batch_size);
         }
 
+        if (data_mask & AlignmentDataMask::INFERRED_INSERT_SIZE)
+        {
+            inferred_insert_size.reserve(batch_size);
+        }
+
         if (data_mask & AlignmentDataMask::CIGAR)
         {
             cigars.reserve(batch_size * 32);
@@ -405,6 +415,13 @@ struct alignment_batch
             device.mate_alignment_start = host.mate_alignment_start;
         } else {
             device.mate_alignment_start.clear();
+        }
+
+        if (data_mask & AlignmentDataMask::INFERRED_INSERT_SIZE)
+        {
+            device.inferred_insert_size = host.inferred_insert_size;
+        } else {
+            device.inferred_insert_size.clear();
         }
 
         if (data_mask & AlignmentDataMask::CIGAR)

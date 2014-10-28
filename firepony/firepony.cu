@@ -299,6 +299,8 @@ int main(int argc, char **argv)
         fprintf(stderr, "active BPs: %u out of %u (%f %%)\n", h_bplist.size() - zeros, h_bplist.size(), 100.0 * float(h_bplist.size() - zeros) / float(h_bplist.size()));
 #endif
 
+        context.end_batch(batch);
+
         cudaDeviceSynchronize();
         stats.read_filter.add(read_filter);
         stats.cigar_expansion.add(cigar_expansion);
@@ -308,8 +310,11 @@ int main(int argc, char **argv)
         stats.fractional_error.add(fractional_error);
         stats.covariates.add(covariates);
 
-        fprintf(stderr, ".");
-        fflush(stderr);
+        if (!command_line_options.debug)
+        {
+            fprintf(stderr, ".");
+            fflush(stderr);
+        }
     }
 
     fprintf(stderr, "\n");
@@ -372,7 +377,7 @@ void debug_read(bqsr_context *context, const alignment_batch& batch, int read_id
     const uint32 read_index = context->active_read_list[read_id];
     const CRQ_index idx = h_batch.crq_index(read_index);
 
-    fprintf(stderr, "== read order %d read %d\n", read_id, read_index);
+    fprintf(stderr, "== read %d\n", context->stats.total_reads + read_id);
 
     fprintf(stderr, "name = [%s]\n", h_batch.name[read_index].c_str());
 

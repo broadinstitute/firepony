@@ -163,9 +163,7 @@ struct bqsr_context
     }
 
     void start_batch(alignment_batch& batch);
-#if 0
-    void compact_active_read_list(void);
-#endif
+    void end_batch(alignment_batch& batch);
 };
 
 // encapsulates common state for our thrust functors to save a little typing

@@ -33,32 +33,9 @@ void bqsr_context::start_batch(alignment_batch& batch)
     thrust::fill(active_location_list.m_storage.begin(),
                  active_location_list.m_storage.end(),
                  0xffffffff);
+}
 
+void bqsr_context::end_batch(alignment_batch& batch)
+{
     stats.total_reads += batch.host.num_reads;
 }
-#if 0
-
-struct read_active_predicate
-{
-    CUDA_HOST_DEVICE bool operator() (const uint32 index)
-    {
-        return index != uint32(-1);
-    }
-};
-
-// remove reads that have been killed (index set to -1) from the active read list
-void bqsr_context::compact_active_read_list(void)
-{
-    uint32 num_active;
-
-    temp_u32 = active_read_list;
-    num_active = bqsr::copy_if(temp_u32.size(),
-                               temp_u32.begin(),
-                               active_read_list.begin(),
-                               read_active_predicate(),
-                               temp_storage);
-
-    active_read_list.resize(num_active);
-}
-
-#endif

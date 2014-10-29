@@ -248,50 +248,66 @@ public:
         // traverse the VCF range and mark corresponding read BPs as inactive
         for(uint32 feature = vcf_db_range.x; feature <= vcf_db_range.y; feature++)
         {
-            // compute the feature range in read coordinates
-            int start = db.reference_window_start[feature] - ref_sequence_offset + read_window_clipped.x;
-            int end = db.reference_window_start[feature] + db.alignment_window_len[feature] - ref_sequence_offset + read_window_clipped.x;
-
-            // adjust feature range for indels
-            // feature coordinates are expressed in terms of the reference sequence
-            // every insertion to the reference shifts the corresponding read coordinate forward
-            // every deletion shifts the read coordinate backward
-            int indel_offset = 0;
-
             const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
-            for(uint32 ev = cigar_start + read_window_clipped.x; ev < cigar_start + read_window_clipped.y; ev++)
+            const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
+
+            // compute the feature range as offset from alignment start
+            const int feature_start = db.reference_window_start[feature] - ref_sequence_offset;
+            const int feature_end = db.reference_window_start[feature] + db.alignment_window_len[feature] - ref_sequence_offset;
+
+            // convert start and end to read coordinates
+            uint32 read_start = 0xffffffff, read_end = 0xffffffff;
+            uint32 ev;
+
+            for(ev = cigar_start; ev < cigar_end; ev++)
             {
-                if (ctx.cigar.cigar_event_read_coordinates[ev] != uint16(-1) &&
-                        ctx.cigar.cigar_event_read_coordinates[ev] >= end)
+                const uint16 ref_coord = ctx.cigar.cigar_event_reference_coordinates[ev];
+
+                if (ref_coord != uint16(-1) && int(ref_coord) >= feature_start)
+                {
+                    // if the feature starts inside a deletion, move ev forward until we find a read base
+                    // (note that we preserve ev since the next loop relies on it being accurate --- moving ev back could land us in an insertion!)
+                    uint32 ev_read = ev;
+                    while(ev_read < cigar_end && ctx.cigar.cigar_event_read_coordinates[ev_read] == uint16(-1))
+                    {
+                        ev_read++;
+                    }
+
+                    read_start = ctx.cigar.cigar_event_read_coordinates[ev_read];
+                    read_end = read_start;
+
                     break;
-
-                if (ctx.cigar.cigar_events[ev] == cigar_event::I)
-                    indel_offset++;
-
-                if (ctx.cigar.cigar_events[ev] == cigar_event::D)
-                    indel_offset--;
+                }
             }
 
-            // xxxnsubtil: this assumes there are no indels inside the feature itself!
-            start += indel_offset;
-            end += indel_offset;
-
-            // if both start and end are behind the start of the read window...
-            if ((start < read_window_clipped.x && end < read_window_clipped.x) ||
-                    // or both are beyond the end of the read window...
-                    (start > read_window_clipped.y && end > read_window_clipped.y))
+            for( ; ev < cigar_end; ev++)
             {
-                // ... then there's nothing to do
+                const uint16 ref_coord = ctx.cigar.cigar_event_reference_coordinates[ev];
+
+                if (int(ref_coord) <= feature_end)
+                {
+                    if (ctx.cigar.cigar_event_read_coordinates[ev] != uint16(-1))
+                    {
+                        read_end = ctx.cigar.cigar_event_read_coordinates[ev];
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            if ((read_start < read_window_clipped.x && read_end < read_window_clipped.x) ||
+                (read_start > read_window_clipped.y && read_end > read_window_clipped.y))
+            {
                 continue;
             }
 
             // truncate any portions of the feature range that fall outside the clipped read region
-            start = max(start, read_window_clipped.x);
-            start = min(start, read_window_clipped.y);
-            end = max(end, read_window_clipped.x);
-            end = min(end, read_window_clipped.y);
+            read_start = max(read_start, read_window_clipped.x);
+            read_start = min(read_start, read_window_clipped.y);
+            read_end = max(read_end, read_window_clipped.x);
+            read_end = min(read_end, read_window_clipped.y);
 
-            for(uint32 dead_bp = uint32(start); dead_bp <= uint32(end); dead_bp++)
+            for(uint32 dead_bp = read_start; dead_bp <= read_end; dead_bp++)
                 ctx.active_location_list[idx.read_start + dead_bp] = 0;
         }
     }

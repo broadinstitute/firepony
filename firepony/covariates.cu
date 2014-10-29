@@ -54,6 +54,12 @@ struct covariate_gatherer : public bqsr_lambda
             return;
         }
 
+        if (read_bp_offset < ctx.cigar.read_window_clipped[read_index].x ||
+            read_bp_offset > ctx.cigar.read_window_clipped[read_index].y)
+        {
+            return;
+        }
+
         if (ctx.active_location_list[idx.read_start + read_bp_offset] == 0)
         {
             return;

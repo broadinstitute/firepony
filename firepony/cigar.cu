@@ -567,9 +567,9 @@ struct compute_error_vectors : public bqsr_lambda
                 // mark the read bp where a deletion begins
                 if (!negative_strand)
                 {
-                    ctx.cigar.is_deletion[idx.read_start + current_bp_idx - 1] = 1;
-                } else {
                     ctx.cigar.is_deletion[idx.read_start + current_bp_idx] = 1;
+                } else {
+                    ctx.cigar.is_deletion[idx.read_start + current_bp_idx + 1] = 1;
                 }
 
                 // if we are inside the clipped read window, count this error

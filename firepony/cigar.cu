@@ -505,6 +505,8 @@ struct compute_error_vectors : public bqsr_lambda
         const uint32 align_offset = batch.alignment_start[read_index];
         const uint32 reference_alignment_start = seq_base + align_offset;
 
+        const auto& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
+
         uint16 current_bp_idx = 0;
         uint16 num_errors = 0;
 
@@ -533,7 +535,10 @@ struct compute_error_vectors : public bqsr_lambda
                     if (reference_bp != read_bp)
                     {
                         ctx.cigar.is_snp[idx.read_start + current_bp_idx] = 1;
-                        num_errors++;
+
+                        // if we are inside the clipped read window, count this error
+                        if (current_bp_idx >= read_window_clipped.x && current_bp_idx <= read_window_clipped.y)
+                            num_errors++;
                     }
                 }
 
@@ -550,7 +555,11 @@ struct compute_error_vectors : public bqsr_lambda
                     ctx.cigar.is_insertion[idx.read_start + current_bp_idx + batch.cigars[event].len - 1] = 1;
                 }
 
-                num_errors++;
+                // if we are inside the clipped read window, count this error
+                // xxxnsubtil: unclear what happens if only part of the insertion is inside the clipped read window --- can this happen?
+                if (current_bp_idx >= read_window_clipped.x && current_bp_idx <= read_window_clipped.y)
+                    num_errors++;
+
                 break;
 
             case cigar_event::D:
@@ -563,7 +572,10 @@ struct compute_error_vectors : public bqsr_lambda
                     ctx.cigar.is_deletion[idx.read_start + current_bp_idx] = 1;
                 }
 
-                num_errors++;
+                // if we are inside the clipped read window, count this error
+                if (current_bp_idx >= read_window_clipped.x && current_bp_idx <= read_window_clipped.y)
+                    num_errors++;
+
                 break;
             }
         }
@@ -925,7 +937,7 @@ void debug_cigar(bqsr_context *context, const alignment_batch& batch, int read_i
                 reference_window_clipped.x, reference_window_clipped.y);
 
     uint16 err = ctx.num_errors[read_index];
-    fprintf(stderr, "    number of errors            = [ % 3d ]\n", err);
+    fprintf(stderr, "    errors in clipped region    = [ % 3d ]\n", err);
 
     fprintf(stderr, "\n");
 }

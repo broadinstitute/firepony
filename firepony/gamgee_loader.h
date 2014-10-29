@@ -30,6 +30,10 @@ private:
     gamgee::SamHeader gamgee_header;
     gamgee::SamIterator iterator;
 
+    // map read group identifiers in tag data to read group names from the header
+    // the read group name is either taken from the platform unit string if present, or else it's just the identifier itself
+    std::map<std::string, std::string> read_group_id_to_name;
+
 public:
     alignment_header header;
 

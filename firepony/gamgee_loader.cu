@@ -41,6 +41,21 @@ gamgee_alignment_file::gamgee_alignment_file(const char *fname)
 {
     gamgee_header = file.header();
 
+    // build the read group ID map
+    auto read_groups = gamgee_header.read_groups();
+    for(const auto& rg : read_groups)
+    {
+        std::string name;
+        if (rg.platform_unit.size() != 0)
+        {
+            name = rg.platform_unit;
+        } else {
+            name = rg.id;
+        }
+
+        read_group_id_to_name[rg.id] = name;
+    }
+
     for(uint32 i = 0; i < gamgee_header.n_sequences(); i++)
     {
         header.chromosome_lengths.push_back(gamgee_header.sequence_length(i));
@@ -226,8 +241,15 @@ bool gamgee_alignment_file::next_batch(alignment_batch *batch, uint32 data_mask,
                 // invalid read group
                 h_batch->read_group.push_back(uint32(-1));
             } else {
-                uint32 rg_id = header.read_groups_db.insert(tag.value());
-                h_batch->read_group.push_back(rg_id);
+                auto iter = read_group_id_to_name.find(tag.value());
+                if (iter == read_group_id_to_name.end())
+                {
+                    fprintf(stderr, "WARNING: found read with invalid read group identifier\n");
+                    h_batch->read_group.push_back(uint32(-1));
+                } else {
+                    uint32 rg_id = header.read_groups_db.insert(iter->second);
+                    h_batch->read_group.push_back(rg_id);
+                }
             }
         }
     }

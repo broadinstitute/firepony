@@ -167,7 +167,7 @@ struct compute_vcf_ranges : public bqsr_lambda
         const uint32 ref_sequence_base = ctx.reference.sequence_bp_start[ref_sequence_id];
         const uint32 ref_sequence_offset = ref_sequence_base + batch.alignment_start[read_index];
 
-        const uint2 alignment_window = make_uint2(ref_sequence_offset,
+        const uint2 alignment_window = make_uint2(ref_sequence_offset + uint32(reference_window_clipped.x),
                                                   ref_sequence_offset + uint32(reference_window_clipped.y));
 
         // do a binary search for a feature that starts inside our read

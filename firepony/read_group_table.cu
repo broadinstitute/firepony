@@ -275,10 +275,10 @@ void output_read_group_table(bqsr_context *context)
         printf("%s\t%c\t\t%.4f\t\t\t%.4f\t\t\t%d\t\t%.2f\n",
                 rg_name.c_str(),
                 cigar_event::ascii(covariate_table_quality::decode(rg_keys[i], covariate_table_quality::EventTracker)),
-                val.empirical_quality,
-                val.estimated_quality,
+                round_n(val.empirical_quality, 4),
+                round_n(val.estimated_quality, 4),
                 val.observations,
-                val.mismatches);
+                round_n(val.mismatches, 2));
     }
 
     printf("\n");

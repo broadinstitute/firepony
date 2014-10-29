@@ -98,3 +98,14 @@ void pack_to_1bit(D_PackedVector_1b& dest, D_VectorU8& src)
                      thrust::make_counting_iterator(0) + bqsr::divide_ri(src.size(), D_PackedVector_1b::SYMBOLS_PER_WORD),
                      pack_uint8_to_1bit_vector(dest, src));
 }
+
+// round a double to the Nth decimal place
+// this is meant to workaround broken printf() rounding in glibc
+double round_n(double val, int n)
+{
+    // xxxnsubtil: i suspect this might cause loss of precision if the initial exponent is large
+    val = val * pow(10.0, n);
+    val = round(val);
+    val = val / pow(10.0, n);
+    return val;
+}

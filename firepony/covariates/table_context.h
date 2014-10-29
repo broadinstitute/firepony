@@ -97,9 +97,9 @@ struct covariate_table_context
                     sequence,
                     "Context",
                     cigar_event::ascii(decode(table.keys[i], EventTracker)),
-                    float(decode(table.keys[i], QualityScore)),
+                    round_n(double(decode(table.keys[i], QualityScore)), 4),
                     table.values[i].observations,
-                    table.values[i].mismatches);
+                    round_n(table.values[i].mismatches, 2));
         }
     }
 };

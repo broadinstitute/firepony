@@ -30,6 +30,9 @@ void pack_prepare_storage_1bit(D_VectorU8& storage, uint32 num_elements);
 void pack_to_2bit(D_PackedVector_2b& dest, D_VectorU8& src);
 void pack_to_1bit(D_PackedVector_1b& dest, D_VectorU8& src);
 
+// round a double to the Nth decimal place
+double round_n(double val, int n);
+
 // timers
 struct cpu_timer
 {

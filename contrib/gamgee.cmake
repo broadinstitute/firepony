@@ -15,7 +15,7 @@ ExternalProject_Add(gamgee
     PREFIX ${gamgee_PREFIX}
     DEPENDS boost htslib
     GIT_REPOSITORY "https://github.com/broadinstitute/gamgee.git"
-    GIT_TAG "37213c0dd9c43476a0e29b0e688c6cb9d7738a8d"
+    GIT_TAG "a2a79b6688cb64a4b848bf767db22b7b1a217ee6"
     BUILD_IN_SOURCE 1
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ${Boost_B2} -s BOOST_ROOT=${Boost_INSTALL_PREFIX} -s BOOST_BUILD_PATH=${Boost_PREFIX} ${GAMGEE_TOOLCHAIN_FLAGS} variant=${GAMGEE_BUILD_TYPE}

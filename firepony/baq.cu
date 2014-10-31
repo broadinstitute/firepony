@@ -36,8 +36,6 @@
 #include "from_nvbio/dna.h"
 #include "from_nvbio/alphabet.h"
 
-#define BAQ_USE_LMEM
-
 #define MAX_PHRED_SCORE 93
 #define EM 0.33333333333
 #define EI 0.25
@@ -51,8 +49,9 @@
 #define GAP_OPEN_PROBABILITY (pow(10.0, (-40.0)/10.))
 #define GAP_EXTENSION_PROBABILITY 0.1
 
-#define MAX_READ_LEN 150
-#define MAT_SIZE ((MAX_READ_LEN + 1) * 6 * (2 * MAX_BAND_WIDTH + 1))
+// maximum read size for the lmem kernel
+#define LMEM_MAX_READ_LEN 151
+#define LMEM_MAT_SIZE ((LMEM_MAX_READ_LEN + 1) * 6 * (2 * MAX_BAND_WIDTH + 1))
 
 struct compute_hmm_windows : public bqsr_lambda
 {
@@ -96,7 +95,6 @@ struct compute_hmm_windows : public bqsr_lambda
     }
 };
 
-#ifdef BAQ_USE_LMEM
 // runs the entire BAQ algorithm in a single kernel, storing forward and backward matrices in local memory
 struct hmm_glocal_full_lmem : public bqsr_lambda
 {
@@ -247,11 +245,11 @@ struct hmm_glocal_full_lmem : public bqsr_lambda
     {
         int i, k;
 
-        double forwardMatrix[MAT_SIZE];
-        double backwardMatrix[MAT_SIZE];
+        double forwardMatrix[LMEM_MAT_SIZE];
+        double backwardMatrix[LMEM_MAT_SIZE];
 
-        memset(forwardMatrix, 0, sizeof(double) * MAT_SIZE);
-        memset(backwardMatrix, 0, sizeof(double) * MAT_SIZE);
+        memset(forwardMatrix, 0, sizeof(double) * LMEM_MAT_SIZE);
+        memset(backwardMatrix, 0, sizeof(double) * LMEM_MAT_SIZE);
 
         setup(hmm_index);
 
@@ -537,7 +535,7 @@ struct hmm_glocal_full_lmem : public bqsr_lambda
         }
     }
 };
-#else
+
 // encapsulates common state for the HMM algorithm
 struct hmm_common : public bqsr_lambda
 {
@@ -1021,7 +1019,6 @@ struct compute_hmm_matrix_size : public thrust::unary_function<uint32, uint32>, 
         return hmm_common::matrix_size(idx.read_len);
     }
 };
-#endif
 
 struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, uint32>, public bqsr_lambda
 {
@@ -1219,6 +1216,16 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     D_VectorU32& active_baq_read_list = context->temp_u32;
     D_VectorU32& baq_state = context->temp_u32_2;
 
+    // check if we can use the lmem kernel
+    const bool baq_use_lmem = (batch.host.max_read_size <= LMEM_MAX_READ_LEN);
+    static bool baq_lmem_warning_printed = false;
+
+    if (!baq_use_lmem && !baq_lmem_warning_printed)
+    {
+        fprintf(stderr, "WARNING: read size exceeds LMEM_MAX_READ_LEN, using fallback path for BAQ\n");
+        baq_lmem_warning_printed = true;
+    }
+
     gpu_timer baq_setup, baq_hmm, baq_postprocess;
 
     baq_setup.start();
@@ -1236,23 +1243,24 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
 
     active_baq_read_list.resize(num_active);
 
-#ifndef BAQ_USE_LMEM
-    // compute the index and size of the HMM matrices
-    baq.matrix_index.resize(num_active + 1);
-    // first offset is zero
-    thrust::fill_n(baq.matrix_index.begin(), 1, 0);
-    // do an inclusive scan to compute all offsets + the total size
-    bqsr::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
-                                                         compute_hmm_matrix_size(*context, batch.device)),
-                         num_active,
-                         baq.matrix_index.begin() + 1,
-                         thrust::plus<uint32>());
+    if (!baq_use_lmem)
+    {
+        // compute the index and size of the HMM matrices
+        baq.matrix_index.resize(num_active + 1);
+        // first offset is zero
+        thrust::fill_n(baq.matrix_index.begin(), 1, 0);
+        // do an inclusive scan to compute all offsets + the total size
+        bqsr::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
+                compute_hmm_matrix_size(*context, batch.device)),
+                num_active,
+                baq.matrix_index.begin() + 1,
+                thrust::plus<uint32>());
 
-    uint32 matrix_len = baq.matrix_index[num_active];
+        uint32 matrix_len = baq.matrix_index[num_active];
 
-    baq.forward.resize(matrix_len);
-    baq.backward.resize(matrix_len);
-#endif
+        baq.forward.resize(matrix_len);
+        baq.backward.resize(matrix_len);
+    }
 
     // compute the index and size of the HMM scaling factors
     baq.scaling_index.resize(num_active + 1);
@@ -1301,51 +1309,59 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
                      compute_hmm_windows(*context, batch.device));
 
     // initialize matrices and scaling factors
-#ifndef BAQ_USE_LMEM
-    thrust::fill_n(baq.forward.begin(), baq.forward.size(), 0.0);
-    thrust::fill_n(baq.backward.begin(), baq.backward.size(), 0.0);
-#endif
+    if (!baq_use_lmem)
+    {
+        thrust::fill_n(baq.forward.begin(), baq.forward.size(), 0.0);
+        thrust::fill_n(baq.backward.begin(), baq.backward.size(), 0.0);
+    }
+
     thrust::fill_n(baq.scaling.begin(), baq.scaling.size(), 0.0);
 
     baq_setup.stop();
 
     baq_hmm.start();
-#ifndef BAQ_USE_LMEM
-    // run the forward portion
-    thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
-                                                                  baq.matrix_index.begin(),
-                                                                  baq.scaling_index.begin())),
-                     thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
-                                                                  baq.matrix_index.end(),
-                                                                  baq.scaling_index.end())),
-                     hmm_glocal_forward(*context, batch.device, baq_state));
 
-    // run the backward portion
-    thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
-                                                                  baq.matrix_index.begin(),
-                                                                  baq.scaling_index.begin())),
-                     thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
-                                                                  baq.matrix_index.end(),
-                                                                  baq.scaling_index.end())),
-                     hmm_glocal_backward(*context, batch.device, baq_state));
+    if (baq_use_lmem)
+    {
+        // fast path: use local memory for the matrices
+        thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
+                                                                      baq.matrix_index.begin(),
+                                                                      baq.scaling_index.begin())),
+                         thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
+                                                                      baq.matrix_index.end(),
+                                                                      baq.scaling_index.end())),
+                         hmm_glocal_full_lmem(*context, batch.device, baq_state));
+    } else {
+        // slow path: store the matrices in global memory
 
-    // use the computed state to map qualities
-    thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
-                                                                  baq.matrix_index.begin(),
-                                                                  baq.scaling_index.begin())),
-                     thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
-                                                                  baq.matrix_index.end(),
-                                                                  baq.scaling_index.end())),
-                     hmm_glocal_map(*context, batch.device, baq_state));
-#else
-    thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
-                                                                  baq.matrix_index.begin(),
-                                                                  baq.scaling_index.begin())),
-                     thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
-                                                                  baq.matrix_index.end(),
-                                                                  baq.scaling_index.end())),
-                     hmm_glocal_full_lmem(*context, batch.device, baq_state));
-#endif
+        // run the forward portion
+        thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
+                                                                      baq.matrix_index.begin(),
+                                                                      baq.scaling_index.begin())),
+                         thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
+                                                                      baq.matrix_index.end(),
+                                                                      baq.scaling_index.end())),
+                         hmm_glocal_forward(*context, batch.device, baq_state));
+
+        // run the backward portion
+        thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
+                                                                      baq.matrix_index.begin(),
+                                                                      baq.scaling_index.begin())),
+                         thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
+                                                                      baq.matrix_index.end(),
+                                                                      baq.scaling_index.end())),
+                         hmm_glocal_backward(*context, batch.device, baq_state));
+
+        // use the computed state to map qualities
+        thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
+                                                                      baq.matrix_index.begin(),
+                                                                      baq.scaling_index.begin())),
+                         thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
+                                                                      baq.matrix_index.end(),
+                                                                      baq.scaling_index.end())),
+                         hmm_glocal_map(*context, batch.device, baq_state));
+    }
+
     baq_hmm.stop();
 
     baq_postprocess.start();

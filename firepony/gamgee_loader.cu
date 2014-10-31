@@ -209,6 +209,11 @@ bool gamgee_alignment_file::next_batch(alignment_batch *batch, uint32 data_mask,
             {
                 h_batch->reads[h_batch->read_start[read_id] + i] = uint32(read[i]);
             }
+
+            if (h_batch->max_read_size < read.size())
+            {
+                h_batch->max_read_size = read.size();
+            }
         }
 
         if (data_mask & AlignmentDataMask::QUALITIES)

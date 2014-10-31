@@ -130,6 +130,7 @@ struct alignment_batch_storage
     template <uint32 bits> using PackedVector = bqsr::packed_vector<system_tag, bits>;
 
     uint32 num_reads;
+    uint32 max_read_size;
 
     // chromosome index of the read
     Vector<uint32> chromosome;
@@ -189,6 +190,7 @@ struct alignment_batch_device : public alignment_batch_storage<target_system_tag
     struct const_view
     {
         uint32 num_reads;
+        uint32 max_read_size;
 
         D_Vector<uint32>::const_view chromosome;
         D_Vector<uint32>::const_view alignment_start;
@@ -224,6 +226,7 @@ struct alignment_batch_device : public alignment_batch_storage<target_system_tag
     {
         const_view v = {
                 num_reads,
+                max_read_size,
 
                 chromosome,
                 alignment_start,
@@ -267,6 +270,7 @@ struct alignment_batch_host : public alignment_batch_storage<host_tag>
     void reset(uint32 data_mask, uint32 batch_size)
     {
         num_reads = 0;
+        max_read_size = 0;
 
         name.clear();
         chromosome.clear();
@@ -381,6 +385,7 @@ struct alignment_batch
     void download(void)
     {
         device.num_reads = host.num_reads;
+        device.max_read_size = host.max_read_size;
 
         if (data_mask & AlignmentDataMask::CHROMOSOME)
         {

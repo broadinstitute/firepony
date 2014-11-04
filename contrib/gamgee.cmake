@@ -1,28 +1,18 @@
-if (APPLE AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-    set(GAMGEE_TOOLCHAIN_FLAGS "toolset=clang cxxflags=-stdlib=libc++ linkflags=libc++")
-else()
-    set(GAMGEE_TOOLCHAIN_FLAGS "toolset=gcc")
-endif()
-
-if (CMAKE_BUILD_TYPE MATCHES "Debug")
-  set(GAMGEE_BUILD_TYPE "debug")
-else()
-  set(GAMGEE_BUILD_TYPE "release")
-endif()
-
 set(gamgee_PREFIX ${CMAKE_BINARY_DIR}/contrib/gamgee-prefix)
+set(gamgee_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/contrib/gamgee-install)
+
 ExternalProject_Add(gamgee
     PREFIX ${gamgee_PREFIX}
-    DEPENDS boost htslib
+    DEPENDS boost
     GIT_REPOSITORY "https://github.com/broadinstitute/gamgee.git"
-    GIT_TAG "a2a79b6688cb64a4b848bf767db22b7b1a217ee6"
-    BUILD_IN_SOURCE 1
-    CONFIGURE_COMMAND ""
-    BUILD_COMMAND ${Boost_B2} -s BOOST_ROOT=${Boost_INSTALL_PREFIX} -s BOOST_BUILD_PATH=${Boost_PREFIX} ${GAMGEE_TOOLCHAIN_FLAGS} variant=${GAMGEE_BUILD_TYPE}
-    INSTALL_COMMAND ""
+    GIT_TAG "3631525493724f7a05f82be389167dda27c9eedc"
+    INSTALL_DIR ${gamgee_PREFIX}/install
+    CMAKE_ARGS -DBOOST_ROOT=${Boost_INSTALL_PREFIX}
+               -DBoost_NO_SYSTEM_PATHS=ON
+               -DINSTALL_DEPENDENCIES=ON
+               -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+               -DCMAKE_INSTALL_PREFIX=${gamgee_INSTALL_PREFIX}
     )
 
-include_directories(${gamgee_PREFIX}/src/gamgee ${gamgee_PREFIX}/src/gamgee/lib/htslib)
-# xxxnsubtil: compiler version is hardcoded, need to fix
-set(gamgee_LIB_PATH "${gamgee_PREFIX}/src/gamgee/bin/gcc-4.9/${GAMGEE_BUILD_TYPE}/link-static/")
-set(gamgee_LIB ${gamgee_LIB_PATH}/libgamgee.a ${htslib_LIB})
+include_directories(${gamgee_INSTALL_PREFIX}/include)
+set(gamgee_LIB ${gamgee_INSTALL_PREFIX}/lib/libgamgee.a ${gamgee_INSTALL_PREFIX}/lib/libhts.a)

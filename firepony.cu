@@ -16,25 +16,26 @@
  *
  */
 
-#include "from_nvbio/dna.h"
+//#include "firepony/from_nvbio/dna.h"
 
 #include <map>
 
-#include "bqsr_types.h"
+#include "device/alignment_data.h"
+#include "device/baq.h"
+#include "device/bqsr_context.h"
+#include "device/bqsr_types.h"
+#include "device/cigar.h"
+#include "device/covariates.h"
+#include "device/fractional_errors.h"
+#include "device/options.h"
+#include "device/read_filters.h"
+#include "device/read_group_table.h"
+#include "device/sequence_data.h"
+#include "device/snp_filter.h"
+#include "device/string_database.h"
+#include "device/util.h"
+#include "device/variant_data.h"
 #include "gamgee_loader.h"
-#include "alignment_data.h"
-#include "sequence_data.h"
-#include "variant_data.h"
-#include "util.h"
-#include "snp_filter.h"
-#include "bqsr_context.h"
-#include "read_filters.h"
-#include "cigar.h"
-#include "covariates.h"
-#include "baq.h"
-#include "fractional_errors.h"
-#include "read_group_table.h"
-#include "options.h"
 
 using namespace firepony;
 

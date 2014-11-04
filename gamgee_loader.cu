@@ -27,14 +27,13 @@
 #include <string>
 
 #include "gamgee_loader.h"
-#include "util.h"
-#include "alignment_data.h"
-#include "sequence_data.h"
-#include "variant_data.h"
-#include "mmap.h"
-#include "serialization.h"
-
-#include "from_nvbio/dna.h"
+#include "device/util.h"
+#include "device/alignment_data.h"
+#include "device/sequence_data.h"
+#include "device/variant_data.h"
+#include "device/mmap.h"
+#include "device/serialization.h"
+#include "device/from_nvbio/dna.h"
 
 namespace firepony {
 

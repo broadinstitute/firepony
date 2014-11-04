@@ -19,9 +19,9 @@
 #pragma once
 
 #include <gamgee/sam_reader.h>
-#include "alignment_data.h"
-#include "sequence_data.h"
-#include "variant_data.h"
+#include "device/alignment_data.h"
+#include "device/sequence_data.h"
+#include "device/variant_data.h"
 
 namespace firepony {
 

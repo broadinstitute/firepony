@@ -3,10 +3,6 @@ cmake_minimum_required(VERSION 2.8)
 
 include(ExternalProject)
 
-option(CPU
-       "Build for the CPU"
-       OFF)
-
 option(USE_SYSTEM_BOOST
        "Use the system-wide installed version of Boost"
        ON)
@@ -18,10 +14,6 @@ endif()
 
 # grab gcc flags
 include("gcc.cmake")
-
-if (CPU)
-add_definitions(-DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_OMP -DRUN_ON_CPU=1)
-endif()
 
 # locate required packages
 # CUDA 7.0 is required to build
@@ -60,5 +52,17 @@ include("contrib/gamgee.cmake")
 include("contrib/zlib.cmake")
 include("contrib/cub.cmake")
 
-add_subdirectory(firepony)
+add_subdirectory(device)
 
+set(firepony_common_sources
+    gamgee_loader.cu
+    gamgee_loader.h)
+
+cuda_add_library(firepony-common ${firepony_common_sources})
+add_dependencies(firepony-common gamgee zlib)
+
+cuda_add_executable(firepony firepony.cu)
+target_link_libraries(firepony firepony-common firepony-device ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+
+cuda_add_executable(firepony-loader firepony-loader.cu)
+target_link_libraries(firepony-loader firepony-common firepony-device ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})

@@ -65,10 +65,10 @@ cuda_add_library(firepony-common ${firepony_sources})
 add_dependencies(firepony-common gamgee zlib)
 
 cuda_add_executable(firepony firepony.cu)
-target_link_libraries(firepony firepony-common rt ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+target_link_libraries(firepony firepony-common ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
 add_dependencies(firepony gamgee zlib)
 
 cuda_add_executable(firepony-loader firepony-loader.cu)
-target_link_libraries(firepony-loader firepony-common rt ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+target_link_libraries(firepony-loader firepony-common ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
 add_dependencies(firepony-loader gamgee zlib cub)
 

@@ -33,6 +33,11 @@ if (OPENMP_FOUND)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
+find_library(RT_LIBRARY rt)
+if (RT_LIBRARY)
+    set(SYSTEM_LINK_LIBRARIES ${SYSTEM_LINK_LIBRARIES} ${RT_LIBRARY})
+endif()
+
 # set cuda debug flags
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
     set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -g -lineinfo -G -DTHRUST_DEBUG")
@@ -49,3 +54,4 @@ include("contrib/zlib.cmake")
 include("contrib/cub.cmake")
 
 add_subdirectory(firepony)
+

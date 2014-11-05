@@ -216,13 +216,13 @@ int main(int argc, char **argv)
     cpu_timer wall_clock;
     cpu_timer io;
 
-    gpu_timer read_filter;
-    gpu_timer bp_filter;
-    gpu_timer snp_filter;
-    gpu_timer cigar_expansion;
-    gpu_timer baq;
-    gpu_timer fractional_error;
-    gpu_timer covariates;
+    device_timer read_filter;
+    device_timer bp_filter;
+    device_timer snp_filter;
+    device_timer cigar_expansion;
+    device_timer baq;
+    device_timer fractional_error;
+    device_timer covariates;
 
     wall_clock.start();
 
@@ -327,7 +327,7 @@ int main(int argc, char **argv)
 
     fprintf(stderr, "\n");
 
-    gpu_timer postprocessing;
+    device_timer postprocessing;
     cpu_timer output;
 
     postprocessing.start();

@@ -60,19 +60,19 @@ struct cpu_timer
 };
 
 #ifdef RUN_ON_CPU
-typedef struct cpu_timer gpu_timer;
+typedef struct cpu_timer device_timer;
 #else
-struct gpu_timer
+struct device_timer
 {
     cudaEvent_t start_event, stop_event;
 
-    gpu_timer()
+    device_timer()
     {
         cudaEventCreate(&start_event, cudaEventDefault);
         cudaEventCreate(&stop_event, cudaEventDefault);
     }
 
-    ~gpu_timer()
+    ~device_timer()
     {
         cudaEventDestroy(start_event);
         cudaEventDestroy(stop_event);

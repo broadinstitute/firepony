@@ -1228,7 +1228,7 @@ void baq_reads(context *context, const alignment_batch& batch)
         baq_lmem_warning_printed = true;
     }
 
-    gpu_timer baq_setup, baq_hmm, baq_postprocess;
+    device_timer baq_setup, baq_hmm, baq_postprocess;
 
     baq_setup.start();
 

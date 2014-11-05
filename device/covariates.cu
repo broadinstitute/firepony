@@ -128,7 +128,7 @@ static void build_covariates_table(D_CovariateTable& table, context *context, co
     D_Vector<covariate_value> temp_values;
     D_Vector<covariate_key> temp_keys;
 
-    gpu_timer covariates_gather, covariates_filter, covariates_sort, covariates_pack;
+    device_timer covariates_gather, covariates_filter, covariates_sort, covariates_pack;
 
     covariates_gather.start();
 

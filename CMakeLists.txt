@@ -7,6 +7,10 @@ option(CPU
        "Build for the CPU"
        OFF)
 
+option(USE_SYSTEM_BOOST
+       "Use the system-wide installed version of Boost"
+       ON)
+
 # default to debug builds
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
@@ -48,7 +52,10 @@ endif()
 include_directories(${CMAKE_SOURCE_DIR})
 
 # build dependencies
-include("contrib/boost.cmake")
+if (NOT USE_SYSTEM_BOOST)
+    include("contrib/boost.cmake")
+endif()
+
 include("contrib/gamgee.cmake")
 include("contrib/zlib.cmake")
 include("contrib/cub.cmake")

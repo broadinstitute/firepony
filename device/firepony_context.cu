@@ -21,7 +21,7 @@
 
 namespace firepony {
 
-void context::start_batch(alignment_batch& batch)
+void firepony_context::start_batch(const alignment_batch& batch)
 {
     // initialize the read order with 0..N
     active_read_list.resize(batch.host.num_reads);
@@ -37,9 +37,10 @@ void context::start_batch(alignment_batch& batch)
                  0xffffffff);
 }
 
-void context::end_batch(alignment_batch& batch)
+void firepony_context::end_batch(const alignment_batch& batch)
 {
     stats.total_reads += batch.host.num_reads;
 }
 
 } // namespace firepony
+

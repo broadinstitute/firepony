@@ -71,8 +71,8 @@ struct baq_context
     }
 };
 
-void baq_reads(context *context, const alignment_batch& batch);
-void debug_baq(context *context, const alignment_batch& batch, int read_index);
+void baq_reads(firepony_context& context, const alignment_batch& batch);
+void debug_baq(firepony_context& context, const alignment_batch& batch, int read_index);
 
 } // namespace firepony
 

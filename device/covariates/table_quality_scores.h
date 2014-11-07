@@ -50,7 +50,7 @@ struct covariate_table_quality
         return chain::decode(key, id);
     }
 
-    static void dump_table(context *context, D_CovariateTable& d_table)
+    static void dump_table(firepony_context& context, D_CovariateTable& d_table)
     {
         H_CovariateTable table;
         table.copyfrom(d_table);
@@ -61,7 +61,7 @@ struct covariate_table_quality
         for(uint32 i = 0; i < table.size(); i++)
         {
             uint32 rg_id = decode(table.keys[i], ReadGroup);
-            const std::string& rg_name = context->bam_header.read_groups_db.lookup(rg_id);
+            const std::string& rg_name = context.bam_header.read_groups_db.lookup(rg_id);
 
             printf("%s\t%d\t\t%c\t\t%.4f\t\t\t%d\t\t%.2f\n",
                     rg_name.c_str(),

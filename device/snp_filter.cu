@@ -30,10 +30,7 @@ namespace firepony {
 // for each read, fills in a list of uint16 values with the offset of each BP in the reference relative to the start of the alignment
 struct compute_read_offset_list : public lambda
 {
-    compute_read_offset_list(context::view ctx,
-                             const alignment_batch_device::const_view batch)
-        : lambda(ctx, batch)
-    { }
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -90,13 +87,13 @@ struct compute_read_offset_list : public lambda
 };
 
 // for each read, compute the offset of each read BP relative to the base alignment position of the read
-void build_read_offset_list(context *context,
+void build_read_offset_list(firepony_context& context,
                             const alignment_batch& batch)
 {
-    context->read_offset_list.resize(batch.device.reads.size());
-    thrust::for_each(context->active_read_list.begin(),
-                     context->active_read_list.end(),
-                     compute_read_offset_list(*context, batch.device));
+    context.read_offset_list.resize(batch.device.reads.size());
+    thrust::for_each(context.active_read_list.begin(),
+                     context.active_read_list.end(),
+                     compute_read_offset_list(context, batch.device));
 }
 
 // functor used to compute the alignment window list
@@ -104,10 +101,7 @@ void build_read_offset_list(context *context,
 // xxxnsubtil: this is very similar to cigar_coordinates_expand, should merge
 struct compute_alignment_window : public lambda
 {
-    compute_alignment_window(context::view ctx,
-                             const alignment_batch_device::const_view batch)
-        : lambda(ctx, batch)
-    { }
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -140,23 +134,20 @@ struct compute_alignment_window : public lambda
 };
 
 // for each read, compute the end of the alignment window in the reference
-void build_alignment_windows(context *ctx, const alignment_batch& batch)
+void build_alignment_windows(firepony_context& context, const alignment_batch& batch)
 {
     // set up the alignment window buffer
-    ctx->alignment_windows.resize(batch.device.num_reads);
-    ctx->sequence_alignment_windows.resize(batch.device.num_reads);
+    context.alignment_windows.resize(batch.device.num_reads);
+    context.sequence_alignment_windows.resize(batch.device.num_reads);
     // compute alignment windows
-    thrust::for_each(ctx->active_read_list.begin(),
-                     ctx->active_read_list.end(),
-                     compute_alignment_window(*ctx, batch.device));
+    thrust::for_each(context.active_read_list.begin(),
+                     context.active_read_list.end(),
+                     compute_alignment_window(context, batch.device));
 }
 
 struct compute_vcf_ranges : public lambda
 {
-    compute_vcf_ranges(context::view ctx,
-                       const alignment_batch_device::const_view batch)
-        : lambda(ctx, batch)
-    { }
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -227,10 +218,7 @@ struct vcf_active_predicate
 
 struct filter_bps : public lambda
 {
-    filter_bps(context::view ctx,
-               const alignment_batch_device::const_view batch)
-        : lambda(ctx, batch)
-    { }
+    using lambda::lambda;
 
 public:
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
@@ -317,26 +305,26 @@ public:
 
 // filter out known SNPs from the active BP list
 // for each BP in batch, set the corresponding bit in active_loc_list to zero if it matches a known SNP
-void filter_known_snps(context *context, const alignment_batch& batch)
+void filter_known_snps(firepony_context& context, const alignment_batch& batch)
 {
-    snp_filter_context& snp = context->snp_filter;
+    snp_filter_context& snp = context.snp_filter;
 
     // compute the VCF ranges for each read
     snp.active_vcf_ranges.resize(batch.device.num_reads);
-    thrust::for_each(context->active_read_list.begin(),
-                     context->active_read_list.end(),
-                     compute_vcf_ranges(*context, batch.device));
+    thrust::for_each(context.active_read_list.begin(),
+                     context.active_read_list.end(),
+                     compute_vcf_ranges(context, batch.device));
 
     // build a list of reads with active VCF ranges
-    snp.active_read_ids.resize(context->active_read_list.size());
-    context->temp_u32 = context->active_read_list;
+    snp.active_read_ids.resize(context.active_read_list.size());
+    context.temp_u32 = context.active_read_list;
 
     uint32 num_active;
-    num_active = copy_if(context->temp_u32.begin(),
-                         context->temp_u32.size(),
+    num_active = copy_if(context.temp_u32.begin(),
+                         context.temp_u32.size(),
                          snp.active_read_ids.begin(),
                          vcf_active_predicate(snp.active_vcf_ranges),
-                         context->temp_storage);
+                         context.temp_storage);
 
     snp.active_read_ids.resize(num_active);
 
@@ -344,7 +332,8 @@ void filter_known_snps(context *context, const alignment_batch& batch)
     // this will create zeros in the active location list for each BP that matches a known variant
     thrust::for_each(snp.active_read_ids.begin(),
                      snp.active_read_ids.end(),
-                     filter_bps(*context, batch.device));
+                     filter_bps(context, batch.device));
 }
 
-}
+} // namespace firepony
+

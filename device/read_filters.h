@@ -23,8 +23,8 @@
 
 namespace firepony {
 
-void filter_reads(context *context, const alignment_batch& batch);
-void filter_bases(context *context, const alignment_batch& batch);
+void filter_reads(firepony_context& context, const alignment_batch& batch);
+void filter_bases(firepony_context& context, const alignment_batch& batch);
 
 } // namespace firepony
 

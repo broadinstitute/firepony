@@ -64,9 +64,9 @@ struct pipeline_statistics // host-only
     { }
 };
 
-struct context
+struct firepony_context
 {
-    alignment_header& bam_header;
+    const alignment_header& bam_header;
     const variant_database& variant_db;
     const sequence_data& reference;
 
@@ -104,12 +104,12 @@ struct context
     // --- everything below this line is host-only and not available on the device
     pipeline_statistics stats;
 
-    context(alignment_header& bam_header,
-            const variant_database& variant_db,
-            const sequence_data& reference)
+    firepony_context(const alignment_header& bam_header,
+                     const sequence_data& reference,
+                     const variant_database& variant_db)
         : bam_header(bam_header),
-          variant_db(variant_db),
-          reference(reference)
+          reference(reference),
+          variant_db(variant_db)
     { }
 
     struct view
@@ -164,17 +164,17 @@ struct context
         return v;
     }
 
-    void start_batch(alignment_batch& batch);
-    void end_batch(alignment_batch& batch);
+    void start_batch(const alignment_batch& batch);
+    void end_batch(const alignment_batch& batch);
 };
 
 // encapsulates common state for our thrust functors to save a little typing
 struct lambda
 {
-    context::view ctx;
+    firepony_context::view ctx;
     const alignment_batch_device::const_view batch;
 
-    lambda(context::view ctx,
+    lambda(firepony_context::view ctx,
            const alignment_batch_device::const_view batch)
         : ctx(ctx),
           batch(batch)
@@ -183,9 +183,9 @@ struct lambda
 
 struct lambda_context
 {
-    context::view ctx;
+    firepony_context::view ctx;
 
-    lambda_context(context::view ctx)
+    lambda_context(firepony_context::view ctx)
         : ctx(ctx)
     { }
 };

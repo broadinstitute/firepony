@@ -54,7 +54,7 @@ struct covariate_table_cycle_illumina
         return chain::decode(key, id);
     }
 
-    static void dump_table(context *context, D_CovariateTable& d_table)
+    static void dump_table(firepony_context& context, D_CovariateTable& d_table)
     {
         H_CovariateTable table;
         table.copyfrom(d_table);
@@ -62,7 +62,7 @@ struct covariate_table_cycle_illumina
         for(uint32 i = 0; i < table.size(); i++)
         {
             uint32 rg_id = decode(table.keys[i], ReadGroup);
-            const std::string& rg_name = context->bam_header.read_groups_db.lookup(rg_id);
+            const std::string& rg_name = context.bam_header.read_groups_db.lookup(rg_id);
 
             // decode the group separately
             uint32 raw_group = decode(table.keys[i], Cycle);

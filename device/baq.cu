@@ -102,9 +102,9 @@ struct hmm_glocal_full_lmem : public lambda
 {
     D_VectorU32::view baq_state;
 
-    hmm_glocal_full_lmem(context::view ctx,
-                    const alignment_batch_device::const_view batch,
-                    D_VectorU32::view baq_state)
+    hmm_glocal_full_lmem(firepony_context::view ctx,
+                         const alignment_batch_device::const_view batch,
+                         D_VectorU32::view baq_state)
         : lambda(ctx, batch), baq_state(baq_state)
     { }
 
@@ -543,7 +543,7 @@ struct hmm_common : public lambda
 {
     D_VectorU32::view baq_state;
 
-    hmm_common(context::view ctx,
+    hmm_common(firepony_context::view ctx,
                const alignment_batch_device::const_view batch,
                D_VectorU32::view baq_state)
         : lambda(ctx, batch), baq_state(baq_state)
@@ -1078,7 +1078,7 @@ struct cap_baq_qualities : public lambda
 {
     D_VectorU32::view baq_state;
 
-    cap_baq_qualities(context::view ctx,
+    cap_baq_qualities(firepony_context::view ctx,
                       const alignment_batch_device::const_view batch,
                       D_VectorU32::view baq_state)
         : lambda(ctx, batch), baq_state(baq_state)
@@ -1212,11 +1212,11 @@ struct recode_baq_qualities : public lambda
     }
 };
 
-void baq_reads(context *context, const alignment_batch& batch)
+void baq_reads(firepony_context& context, const alignment_batch& batch)
 {
-    struct baq_context& baq = context->baq;
-    D_VectorU32& active_baq_read_list = context->temp_u32;
-    D_VectorU32& baq_state = context->temp_u32_2;
+    struct baq_context& baq = context.baq;
+    D_VectorU32& active_baq_read_list = context.temp_u32;
+    D_VectorU32& baq_state = context.temp_u32_2;
 
     // check if we can use the lmem kernel
     const bool baq_use_lmem = (batch.host.max_read_size <= LMEM_MAX_READ_LEN);
@@ -1235,13 +1235,13 @@ void baq_reads(context *context, const alignment_batch& batch)
     uint32 num_active;
 
     // collect the reads that we need to compute BAQ for
-    active_baq_read_list.resize(context->active_read_list.size());
+    active_baq_read_list.resize(context.active_read_list.size());
 
-    num_active = copy_if(context->active_read_list.begin(),
-                         context->active_read_list.size(),
+    num_active = copy_if(context.active_read_list.begin(),
+                         context.active_read_list.size(),
                          active_baq_read_list.begin(),
-                         read_needs_baq(*context, batch.device),
-                         context->temp_storage);
+                         read_needs_baq(context, batch.device),
+                         context.temp_storage);
 
     active_baq_read_list.resize(num_active);
 
@@ -1253,7 +1253,7 @@ void baq_reads(context *context, const alignment_batch& batch)
         thrust::fill_n(baq.matrix_index.begin(), 1, 0);
         // do an inclusive scan to compute all offsets + the total size
         inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
-                       compute_hmm_matrix_size(*context, batch.device)),
+                       compute_hmm_matrix_size(context, batch.device)),
                        num_active,
                        baq.matrix_index.begin() + 1,
                        thrust::plus<uint32>());
@@ -1269,7 +1269,7 @@ void baq_reads(context *context, const alignment_batch& batch)
     // first offset is zero
     thrust::fill_n(baq.scaling_index.begin(), 1, 0);
     inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
-                                                   compute_hmm_scaling_factor_size(*context, batch.device)),
+                                                   compute_hmm_scaling_factor_size(context, batch.device)),
                    num_active,
                    baq.scaling_index.begin() + 1,
                    thrust::plus<uint32>());
@@ -1280,8 +1280,8 @@ void baq_reads(context *context, const alignment_batch& batch)
 //    fprintf(stderr, "reads: %u\n", batch.num_reads);
 //    fprintf(stderr, "forward len = %u bytes = %lu\n", matrix_len, matrix_len * sizeof(double));
 //    fprintf(stderr, "expected len = %lu expected bytes = %lu\n",
-//            hmm_common::matrix_size(100) * context->active_read_list.size(),
-//            hmm_common::matrix_size(100) * context->active_read_list.size() * sizeof(double));
+//            hmm_common::matrix_size(100) * context.active_read_list.size(),
+//            hmm_common::matrix_size(100) * context.active_read_list.size() * sizeof(double));
 //    fprintf(stderr, "per read matrix size = %u bytes = %lu\n", hmm_common::matrix_size(100), hmm_common::matrix_size(100) * sizeof(double));
 //    fprintf(stderr, "matrix index = [ ");
 //    for(uint32 i = 0; i < 20; i++)
@@ -1306,9 +1306,9 @@ void baq_reads(context *context, const alignment_batch& batch)
 
     // compute the alignment frames
     // note: this is used both for real BAQ and flat BAQ, so we use the full active read list
-    thrust::for_each(context->active_read_list.begin(),
-                     context->active_read_list.end(),
-                     compute_hmm_windows(*context, batch.device));
+    thrust::for_each(context.active_read_list.begin(),
+                     context.active_read_list.end(),
+                     compute_hmm_windows(context, batch.device));
 
     // initialize matrices and scaling factors
     if (!baq_use_lmem)
@@ -1332,7 +1332,7 @@ void baq_reads(context *context, const alignment_batch& batch)
                          thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
                                                                       baq.matrix_index.end(),
                                                                       baq.scaling_index.end())),
-                         hmm_glocal_full_lmem(*context, batch.device, baq_state));
+                         hmm_glocal_full_lmem(context, batch.device, baq_state));
     } else {
         // slow path: store the matrices in global memory
 
@@ -1343,7 +1343,7 @@ void baq_reads(context *context, const alignment_batch& batch)
                          thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
                                                                       baq.matrix_index.end(),
                                                                       baq.scaling_index.end())),
-                         hmm_glocal_forward(*context, batch.device, baq_state));
+                         hmm_glocal_forward(context, batch.device, baq_state));
 
         // run the backward portion
         thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
@@ -1352,7 +1352,7 @@ void baq_reads(context *context, const alignment_batch& batch)
                          thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
                                                                       baq.matrix_index.end(),
                                                                       baq.scaling_index.end())),
-                         hmm_glocal_backward(*context, batch.device, baq_state));
+                         hmm_glocal_backward(context, batch.device, baq_state));
 
         // use the computed state to map qualities
         thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
@@ -1361,7 +1361,7 @@ void baq_reads(context *context, const alignment_batch& batch)
                          thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
                                                                       baq.matrix_index.end(),
                                                                       baq.scaling_index.end())),
-                         hmm_glocal_map(*context, batch.device, baq_state));
+                         hmm_glocal_map(context, batch.device, baq_state));
     }
 
     baq_hmm.stop();
@@ -1369,30 +1369,30 @@ void baq_reads(context *context, const alignment_batch& batch)
     baq_postprocess.start();
 
     // for any reads that we did *not* compute a BAQ, mark the base pairs as having no BAQ uncertainty
-    thrust::for_each(context->active_read_list.begin(),
-                     context->active_read_list.end(),
-                     read_flat_baq(*context, batch.device));
+    thrust::for_each(context.active_read_list.begin(),
+                     context.active_read_list.end(),
+                     read_flat_baq(context, batch.device));
 
     // transform quality scores
     thrust::for_each(active_baq_read_list.begin(),
                      active_baq_read_list.end(),
-                     cap_baq_qualities(*context, batch.device, baq_state));
+                     cap_baq_qualities(context, batch.device, baq_state));
 
     thrust::for_each(active_baq_read_list.begin(),
                      active_baq_read_list.end(),
-                     recode_baq_qualities(*context, batch.device));
+                     recode_baq_qualities(context, batch.device));
 
     baq_postprocess.stop();
 
-    context->stats.baq_reads += num_active;
+    context.stats.baq_reads += num_active;
 
     cudaDeviceSynchronize();
-    context->stats.baq_setup.add(baq_setup);
-    context->stats.baq_hmm.add(baq_hmm);
-    context->stats.baq_postprocess.add(baq_postprocess);
+    context.stats.baq_setup.add(baq_setup);
+    context.stats.baq_hmm.add(baq_hmm);
+    context.stats.baq_postprocess.add(baq_postprocess);
 }
 
-void debug_baq(context *context, const alignment_batch& batch, int read_index)
+void debug_baq(firepony_context& context, const alignment_batch& batch, int read_index)
 {
     const alignment_batch_host& h_batch = batch.host;
 
@@ -1400,20 +1400,20 @@ void debug_baq(context *context, const alignment_batch& batch, int read_index)
 
     const CRQ_index idx = h_batch.crq_index(read_index);
 
-    ushort2 read_window = context->cigar.read_window_clipped[read_index];
-    uint2 reference_window = context->baq.reference_windows[read_index];
+    ushort2 read_window = context.cigar.read_window_clipped[read_index];
+    uint2 reference_window = context.baq.reference_windows[read_index];
 
     fprintf(stderr, "    read window                 = [ %u %u ]\n", read_window.x, read_window.y);
     fprintf(stderr, "    absolute reference window   = [ %u %u ]\n", reference_window.x, reference_window.y);
     //fprintf(stderr, "    sequence base: %u\n", genome.sequence_offsets[batch.alignment_sequence_IDs[read_index]]);
     fprintf(stderr, "    relative reference window   = [ %lu %lu ]\n",
-            reference_window.x - context->reference.host.sequence_bp_start[h_batch.chromosome[read_index]],
-            reference_window.y - context->reference.host.sequence_bp_start[h_batch.chromosome[read_index]]);
+            reference_window.x - context.reference.host.sequence_bp_start[h_batch.chromosome[read_index]],
+            reference_window.y - context.reference.host.sequence_bp_start[h_batch.chromosome[read_index]]);
 
     fprintf(stderr, "    BAQ quals                   = [ ");
     for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
     {
-        uint8 q = context->baq.qualities[i];
+        uint8 q = context.baq.qualities[i];
         if (q == uint8(-1))
         {
             fprintf(stderr, "  - ");

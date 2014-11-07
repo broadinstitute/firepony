@@ -54,8 +54,8 @@ struct read_group_table_context
     }
 };
 
-void build_read_group_table(context *context);
-void output_read_group_table(context *context);
+void build_read_group_table(firepony_context& context);
+void output_read_group_table(firepony_context& context);
 
 } // namespace firepony
 

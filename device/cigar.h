@@ -124,8 +124,8 @@ struct cigar_context
     }
 };
 
-void expand_cigars(context *context, const alignment_batch& batch);
-void debug_cigar(context *context, const alignment_batch& batch, int read_index);
+void expand_cigars(firepony_context& context, const alignment_batch& batch);
+void debug_cigar(firepony_context& context, const alignment_batch& batch, int read_index);
 
 } // namespace firepony
 

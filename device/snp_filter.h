@@ -52,13 +52,14 @@ struct snp_filter_context
     }
 };
 
-void build_read_offset_list(context *context,
+void build_read_offset_list(firepony_context& context,
                             const alignment_batch& batch);
 
-void build_alignment_windows(context *ctx,
+void build_alignment_windows(firepony_context& context,
                              const alignment_batch& batch);
 
-void filter_known_snps(context *context,
+void filter_known_snps(firepony_context& context,
                        const alignment_batch& batch);
 
 } // namespace firepony
+

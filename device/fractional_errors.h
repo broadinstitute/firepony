@@ -47,8 +47,8 @@ struct fractional_error_context
     }
 };
 
-void build_fractional_error_arrays(context *ctx, const alignment_batch& batch);
-void debug_fractional_error_arrays(context *context, const alignment_batch& batch, int read_index);
+void build_fractional_error_arrays(firepony_context& context, const alignment_batch& batch);
+void debug_fractional_error_arrays(firepony_context& context, const alignment_batch& batch, int read_index);
 
 } // namespace firepony
 

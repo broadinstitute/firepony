@@ -208,10 +208,10 @@ struct covariate_compute_empirical_quality : public lambda_context
     }
 };
 
-void build_read_group_table(context *context)
+void build_read_group_table(firepony_context& context)
 {
-    const auto& cv = context->covariates;
-    auto& rg = context->read_group_table;
+    const auto& cv = context.covariates;
+    auto& rg = context.read_group_table;
 
     auto& rg_keys = rg.read_group_keys;
     auto& rg_values = rg.read_group_values;
@@ -227,11 +227,11 @@ void build_read_group_table(context *context)
     rg_values.resize(cv.quality.size());
     thrust::for_each(thrust::make_counting_iterator(0u),
                      thrust::make_counting_iterator(0u) + cv.quality.size(),
-                     generate_read_group_table(*context));
+                     generate_read_group_table(context));
 
-    D_Vector<covariate_key>& temp_keys = context->temp_u32;
+    D_Vector<covariate_key>& temp_keys = context.temp_u32;
     D_Vector<covariate_empirical_value> temp_values;
-    D_VectorU8& temp_storage = context->temp_storage;
+    D_VectorU8& temp_storage = context.temp_storage;
 
     temp_keys.resize(rg_keys.size());
     temp_values.resize(rg_keys.size());
@@ -259,12 +259,12 @@ void build_read_group_table(context *context)
     // compute empirical qualities
     thrust::for_each(thrust::make_counting_iterator(0u),
                      thrust::make_counting_iterator(0u) + new_size,
-                     covariate_compute_empirical_quality(*context));
+                     covariate_compute_empirical_quality(context));
 }
 
-void output_read_group_table(context *context)
+void output_read_group_table(firepony_context& context)
 {
-    auto& rg = context->read_group_table;
+    auto& rg = context.read_group_table;
     auto& rg_keys = rg.read_group_keys;
     auto& rg_values = rg.read_group_values;
 
@@ -275,7 +275,7 @@ void output_read_group_table(context *context)
     for(uint32 i = 0; i < rg_keys.size(); i++)
     {
         uint32 rg_id = covariate_table_quality::decode(rg_keys[i], covariate_table_quality::ReadGroup);
-        const std::string& rg_name = context->bam_header.read_groups_db.lookup(rg_id);
+        const std::string& rg_name = context.bam_header.read_groups_db.lookup(rg_id);
 
         covariate_empirical_value val = rg_values[i];
 

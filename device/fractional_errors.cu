@@ -28,7 +28,7 @@ struct compute_fractional_errors : public lambda
     D_PackedVector_1b::const_view error_vector;
     D_VectorF64::view output_vector;
 
-    compute_fractional_errors(context::view ctx,
+    compute_fractional_errors(firepony_context::view ctx,
                               const alignment_batch_device::const_view batch,
                               const D_PackedVector_1b::const_view error_vector,
                               D_VectorF64::view output_vector)
@@ -99,30 +99,30 @@ struct compute_fractional_errors : public lambda
     }
 };
 
-void build_fractional_error_arrays(context *ctx, const alignment_batch& batch)
+void build_fractional_error_arrays(firepony_context& context, const alignment_batch& batch)
 {
-    auto& frac = ctx->fractional_error;
+    auto& frac = context.fractional_error;
 
-    frac.snp_errors.resize(ctx->baq.qualities.size());
-    frac.insertion_errors.resize(ctx->baq.qualities.size());
-    frac.deletion_errors.resize(ctx->baq.qualities.size());
+    frac.snp_errors.resize(context.baq.qualities.size());
+    frac.insertion_errors.resize(context.baq.qualities.size());
+    frac.deletion_errors.resize(context.baq.qualities.size());
 
     thrust::fill(frac.snp_errors.begin(), frac.snp_errors.end(), 0.0);
     thrust::fill(frac.insertion_errors.begin(), frac.insertion_errors.end(), 0.0);
     thrust::fill(frac.deletion_errors.begin(), frac.deletion_errors.end(), 0.0);
 
-    thrust::for_each(ctx->active_read_list.begin(),
-                     ctx->active_read_list.end(),
-                     compute_fractional_errors(*ctx, batch.device, ctx->cigar.is_snp, frac.snp_errors));
-    thrust::for_each(ctx->active_read_list.begin(),
-                     ctx->active_read_list.end(),
-                     compute_fractional_errors(*ctx, batch.device, ctx->cigar.is_insertion, frac.insertion_errors));
-    thrust::for_each(ctx->active_read_list.begin(),
-                     ctx->active_read_list.end(),
-                     compute_fractional_errors(*ctx, batch.device, ctx->cigar.is_deletion, frac.deletion_errors));
+    thrust::for_each(context.active_read_list.begin(),
+                     context.active_read_list.end(),
+                     compute_fractional_errors(context, batch.device, context.cigar.is_snp, frac.snp_errors));
+    thrust::for_each(context.active_read_list.begin(),
+                     context.active_read_list.end(),
+                     compute_fractional_errors(context, batch.device, context.cigar.is_insertion, frac.insertion_errors));
+    thrust::for_each(context.active_read_list.begin(),
+                     context.active_read_list.end(),
+                     compute_fractional_errors(context, batch.device, context.cigar.is_deletion, frac.deletion_errors));
 }
 
-void debug_fractional_error_arrays(context *context, const alignment_batch& batch, int read_index)
+void debug_fractional_error_arrays(firepony_context& context, const alignment_batch& batch, int read_index)
 {
     const alignment_batch_host& h_batch = batch.host;
 
@@ -133,7 +133,7 @@ void debug_fractional_error_arrays(context *context, const alignment_batch& batc
     fprintf(stderr, "    snp                        = [ ");
     for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
     {
-        double err = context->fractional_error.snp_errors[i];
+        double err = context.fractional_error.snp_errors[i];
         fprintf(stderr, " %.1f", err);
     }
     fprintf(stderr, " ]\n");
@@ -141,7 +141,7 @@ void debug_fractional_error_arrays(context *context, const alignment_batch& batc
     fprintf(stderr, "    ins                        = [ ");
     for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
     {
-        double err = context->fractional_error.insertion_errors[i];
+        double err = context.fractional_error.insertion_errors[i];
         fprintf(stderr, " %.1f", err);
     }
     fprintf(stderr, " ]\n");
@@ -149,7 +149,7 @@ void debug_fractional_error_arrays(context *context, const alignment_batch& batc
     fprintf(stderr, "    del                        = [ ");
     for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
     {
-        double err = context->fractional_error.deletion_errors[i];
+        double err = context.fractional_error.deletion_errors[i];
         fprintf(stderr, " %.1f", err);
     }
     fprintf(stderr, " ]\n");

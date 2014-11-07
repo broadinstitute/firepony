@@ -53,8 +53,8 @@ struct covariates_context
     }
 };
 
-void gather_covariates(context *context, const alignment_batch& batch);
-void output_covariates(context *context);
+void gather_covariates(firepony_context& context, const alignment_batch& batch);
+void output_covariates(firepony_context& context);
 
 } // namespace firepony
 

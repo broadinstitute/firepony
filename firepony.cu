@@ -37,7 +37,7 @@
 
 using namespace firepony;
 
-void debug_read(context *context, const alignment_batch& batch, int read_index);
+void debug_read(firepony_context *context, const alignment_batch& batch, int read_index);
 
 #include <thread>
 
@@ -210,7 +210,7 @@ int main(int argc, char **argv)
     io_thread bam_thread(command_line_options.input, data_mask);
     bam_thread.start();
 
-    context context(bam_thread.file.header, vcf, reference);
+    firepony_context context(bam_thread.file.header, reference, vcf);
 
     auto& stats = context.stats;
     cpu_timer wall_clock;
@@ -240,10 +240,10 @@ int main(int argc, char **argv)
         read_filter.start();
 
         // build read offset and alignment window list (required by read filters)
-        build_read_offset_list(&context, batch);
-        build_alignment_windows(&context, batch);
+        build_read_offset_list(context, batch);
+        build_alignment_windows(context, batch);
         // apply read filters
-        filter_reads(&context, batch);
+        filter_reads(context, batch);
 
         read_filter.stop();
 
@@ -254,31 +254,31 @@ int main(int argc, char **argv)
         // generate cigar events and coordinates
         // this will generate -1 read indices for events belonging to inactive reads, so it must happen after read filtering
         cigar_expansion.start();
-        expand_cigars(&context, batch);
+        expand_cigars(context, batch);
         cigar_expansion.stop();
 
         // apply per-BP filters
         bp_filter.start();
-        filter_bases(&context, batch);
+        filter_bases(context, batch);
         bp_filter.stop();
 
         // filter known SNPs from active_loc_list
         snp_filter.start();
-        filter_known_snps(&context, batch);
+        filter_known_snps(context, batch);
         snp_filter.stop();
 
         // compute the base alignment quality for each read
         baq.start();
-        baq_reads(&context, batch);
+        baq_reads(context, batch);
         baq.stop();
 
         fractional_error.start();
-        build_fractional_error_arrays(&context, batch);
+        build_fractional_error_arrays(context, batch);
         fractional_error.stop();
 
         // build covariate tables
         covariates.start();
-        gather_covariates(&context, batch);
+        gather_covariates(context, batch);
         covariates.stop();
 
         if (command_line_options.debug)
@@ -331,12 +331,12 @@ int main(int argc, char **argv)
     cpu_timer output;
 
     postprocessing.start();
-    build_read_group_table(&context);
+    build_read_group_table(context);
     postprocessing.stop();
 
     output.start();
-    output_read_group_table(&context);
-    output_covariates(&context);
+    output_read_group_table(context);
+    output_covariates(context);
     output.stop();
 
     cudaDeviceSynchronize();
@@ -378,7 +378,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void debug_read(context *context, const alignment_batch& batch, int read_id)
+void debug_read(firepony_context *context, const alignment_batch& batch, int read_id)
 {
     const alignment_batch_host& h_batch = batch.host;
 
@@ -402,9 +402,9 @@ void debug_read(context *context, const alignment_batch& batch, int read_id)
     }
     fprintf(stderr, "]\n");
 
-    debug_cigar(context, batch, read_index);
-    debug_baq(context, batch, read_index);
-    debug_fractional_error_arrays(context, batch, read_index);
+    debug_cigar(*context, batch, read_index);
+    debug_baq(*context, batch, read_index);
+    debug_fractional_error_arrays(*context, batch, read_index);
 
     const uint2 alignment_window = context->alignment_windows[read_index];
     fprintf(stderr, "  sequence name [%s]\n  sequence base [%lu]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",

@@ -25,7 +25,7 @@ namespace firepony {
 template <typename PreviousCovariate = covariate_null>
 struct covariate_EventTracker : public covariate<PreviousCovariate, 2>
 {
-    static CUDA_HOST_DEVICE covariate_key_set encode(context::view ctx,
+    static CUDA_HOST_DEVICE covariate_key_set encode(firepony_context::view ctx,
                                                      const alignment_batch_device::const_view batch,
                                                      uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
                                                      covariate_key_set input_key = {0, 0, 0})

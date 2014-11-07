@@ -94,7 +94,7 @@ struct flag_valid_keys : public lambda
 {
     D_VectorU8::view flags;
 
-    flag_valid_keys(context::view ctx,
+    flag_valid_keys(firepony_context::view ctx,
                     const alignment_batch_device::const_view batch,
                     D_VectorU8::view flags)
         : lambda(ctx, batch), flags(flags)
@@ -118,12 +118,12 @@ struct flag_valid_keys : public lambda
 
 // processes a batch of reads and updates covariate table data for a given table
 template <typename covariate_table>
-static void build_covariates_table(D_CovariateTable& table, context *context, const alignment_batch& batch)
+static void build_covariates_table(D_CovariateTable& table, firepony_context& context, const alignment_batch& batch)
 {
-    covariates_context& cv = context->covariates;
+    covariates_context& cv = context.covariates;
     auto& scratch_table = cv.scratch_table_space;
 
-    D_VectorU8& flags = context->temp_u8;
+    D_VectorU8& flags = context.temp_u8;
 
     D_Vector<covariate_value> temp_values;
     D_Vector<covariate_key> temp_keys;
@@ -133,9 +133,9 @@ static void build_covariates_table(D_CovariateTable& table, context *context, co
     covariates_gather.start();
 
     // set up a scratch table space with enough room for 3 keys per cigar event
-    scratch_table.resize(context->cigar.cigar_events.size() * 3);
-    table.resize(context->cigar.cigar_events.size() * 3);
-    flags.resize(context->cigar.cigar_events.size() * 3);
+    scratch_table.resize(context.cigar.cigar_events.size() * 3);
+    table.resize(context.cigar.cigar_events.size() * 3);
+    flags.resize(context.cigar.cigar_events.size() * 3);
 
     // mark all keys as invalid
     thrust::fill(scratch_table.keys.begin(),
@@ -144,8 +144,8 @@ static void build_covariates_table(D_CovariateTable& table, context *context, co
 
     // generate keys into the scratch table
     thrust::for_each(thrust::make_counting_iterator(0u),
-                     thrust::make_counting_iterator(0u) + context->cigar.cigar_event_read_coordinates.size(),
-                     covariate_gatherer<covariate_table>(*context, batch.device));
+                     thrust::make_counting_iterator(0u) + context.cigar.cigar_event_read_coordinates.size(),
+                     covariate_gatherer<covariate_table>(context, batch.device));
 
     covariates_gather.stop();
 
@@ -154,7 +154,7 @@ static void build_covariates_table(D_CovariateTable& table, context *context, co
     // flag valid keys
     thrust::for_each(thrust::make_counting_iterator(0u),
                      thrust::make_counting_iterator(0u) + cv.scratch_table_space.keys.size(),
-                     flag_valid_keys<covariate_table>(*context, batch.device, flags));
+                     flag_valid_keys<covariate_table>(context, batch.device, flags));
 
     // count valid keys
     uint32 valid_keys = thrust::reduce(flags.begin(), flags.end(), uint32(0));
@@ -169,13 +169,13 @@ static void build_covariates_table(D_CovariateTable& table, context *context, co
                      flags.size(),
                      table.keys.begin() + off,
                      flags.begin(),
-                     context->temp_storage);
+                     context.temp_storage);
 
         copy_flagged(scratch_table.values.begin(),
                      flags.size(),
                      table.values.begin() + off,
                      flags.begin(),
-                     context->temp_storage);
+                     context.temp_storage);
     }
 
     covariates_filter.stop();
@@ -184,7 +184,7 @@ static void build_covariates_table(D_CovariateTable& table, context *context, co
     {
         // sort and reduce the table by key
         covariates_sort.start();
-        table.sort(temp_keys, temp_values, context->temp_storage, covariate_table::chain::bits_used);
+        table.sort(temp_keys, temp_values, context.temp_storage, covariate_table::chain::bits_used);
         covariates_sort.stop();
 
         covariates_pack.start();
@@ -193,12 +193,12 @@ static void build_covariates_table(D_CovariateTable& table, context *context, co
     }
 
     cudaDeviceSynchronize();
-    context->stats.covariates_gather.add(covariates_gather);
-    context->stats.covariates_filter.add(covariates_filter);
+    context.stats.covariates_gather.add(covariates_gather);
+    context.stats.covariates_filter.add(covariates_filter);
     if (valid_keys)
     {
-        context->stats.covariates_sort.add(covariates_sort);
-        context->stats.covariates_pack.add(covariates_pack);
+        context.stats.covariates_sort.add(covariates_sort);
+        context.stats.covariates_pack.add(covariates_pack);
     }
 }
 
@@ -234,30 +234,30 @@ struct compute_high_quality_windows : public lambda
     }
 };
 
-void gather_covariates(context *context, const alignment_batch& batch)
+void gather_covariates(firepony_context& context, const alignment_batch& batch)
 {
-    auto& cv = context->covariates;
+    auto& cv = context.covariates;
 
     // compute the "high quality" windows (i.e., clip off low quality ends from each read)
     cv.high_quality_window.resize(batch.device.num_reads);
-    thrust::for_each(context->active_read_list.begin(),
-                     context->active_read_list.end(),
-                     compute_high_quality_windows(*context, batch.device));
+    thrust::for_each(context.active_read_list.begin(),
+                     context.active_read_list.end(),
+                     compute_high_quality_windows(context, batch.device));
 
     build_covariates_table<covariate_table_quality>(cv.quality, context, batch);
     build_covariates_table<covariate_table_cycle_illumina>(cv.cycle, context, batch);
     build_covariates_table<covariate_table_context>(cv.context, context, batch);
 }
 
-void output_covariates(context *context)
+void output_covariates(firepony_context& context)
 {
-    covariate_table_quality::dump_table(context, context->covariates.quality);
+    covariate_table_quality::dump_table(context, context.covariates.quality);
 
     printf("#:GATKTable:8:2386:%%s:%%s:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n");
     printf("#:GATKTable:RecalTable2:\n");
     printf("ReadGroup\tQualityScore\tCovariateValue\tCovariateName\tEventType\tEmpiricalQuality\tObservations\tErrors\n");
-    covariate_table_context::dump_table(context, context->covariates.context);
-    covariate_table_cycle_illumina::dump_table(context, context->covariates.cycle);
+    covariate_table_context::dump_table(context, context.covariates.context);
+    covariate_table_cycle_illumina::dump_table(context, context.covariates.cycle);
     printf("\n");
 }
 

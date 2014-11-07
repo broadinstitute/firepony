@@ -41,36 +41,33 @@ namespace VariantDataMask
     };
 };
 
-template <typename system_tag>
+template <target_system system>
 struct variant_database_storage
 {
-    template <typename T> using Vector = firepony::vector<system_tag, T>;
-    template <uint32 bits> using PackedVector = firepony::packed_vector<system_tag, bits>;
-
     uint32 data_mask;
     uint32 num_variants;
 
-    Vector<uint32> chromosome;
-    Vector<uint32> chromosome_window_start; // start position relative to the sequence
-    Vector<uint32> reference_window_start;  // global genome start position
-    Vector<uint32> alignment_window_len;    // length of the alignment window
+    vector<system, uint32> chromosome;
+    vector<system, uint32> chromosome_window_start; // start position relative to the sequence
+    vector<system, uint32> reference_window_start;  // global genome start position
+    vector<system, uint32> alignment_window_len;    // length of the alignment window
 
-    Vector<uint32> id;
-    Vector<float> qual;
-    Vector<uint32> n_samples;
-    Vector<uint32> n_alleles;
+    vector<system, uint32> id;
+    vector<system, float> qual;
+    vector<system, uint32> n_samples;
+    vector<system, uint32> n_alleles;
 
     // note: we assume that each DB entry will only have one alternate_sequence
     // for VCF entries with multiple alternates, we generate one DB entry
     // for each alternate_sequence
     // also note that we don't support alternate IDs here, only sequences
-    PackedVector<4> reference_sequence;
-    Vector<uint32> reference_sequence_start;
-    Vector<uint32> reference_sequence_len;
+    packed_vector<system, 4> reference_sequence;
+    vector<system, uint32> reference_sequence_start;
+    vector<system, uint32> reference_sequence_len;
 
-    PackedVector<4> alternate_sequence;
-    Vector<uint32> alternate_sequence_start;
-    Vector<uint32> alternate_sequence_len;
+    packed_vector<system, 4> alternate_sequence;
+    vector<system, uint32> alternate_sequence_start;
+    vector<system, uint32> alternate_sequence_len;
 
     CUDA_HOST variant_database_storage()
         : num_variants(0)
@@ -81,25 +78,23 @@ struct variant_database_storage
         uint32 data_mask;
         uint32 num_variants;
 
-        typename Vector<uint32>::const_view chromosome;
-        typename Vector<uint32>::const_view chromosome_window_start;
-        typename Vector<uint32>::const_view reference_window_start;
-        typename Vector<uint32>::const_view alignment_window_len;
+        typename vector<system, uint32>::const_view chromosome;
+        typename vector<system, uint32>::const_view chromosome_window_start;
+        typename vector<system, uint32>::const_view reference_window_start;
+        typename vector<system, uint32>::const_view alignment_window_len;
 
-        typename Vector<uint32>::const_view id;
-        typename Vector<float>::const_view qual;
-        typename Vector<uint32>::const_view n_samples;
-        typename Vector<uint32>::const_view n_alleles;
+        typename vector<system, uint32>::const_view id;
+        typename vector<system, float>::const_view qual;
+        typename vector<system, uint32>::const_view n_samples;
+        typename vector<system, uint32>::const_view n_alleles;
 
-        typename PackedVector<4>::const_view reference_sequence;
-        typename Vector<uint32>::const_view reference_sequence_start;
-        typename Vector<uint32>::const_view reference_sequence_len;
+        typename packed_vector<system, 4>::const_view reference_sequence;
+        typename vector<system, uint32>::const_view reference_sequence_start;
+        typename vector<system, uint32>::const_view reference_sequence_len;
 
-        typename PackedVector<4>::const_view alternate_sequence;
-        typename Vector<uint32>::const_view alternate_sequence_start;
-        typename Vector<uint32>::const_view alternate_sequence_len;
-
-        typename Vector<uint2>::const_view chromosome_reference_window;
+        typename packed_vector<system, 4>::const_view alternate_sequence;
+        typename vector<system, uint32>::const_view alternate_sequence_start;
+        typename vector<system, uint32>::const_view alternate_sequence_len;
     };
 
     CUDA_HOST operator const_view() const
@@ -129,16 +124,14 @@ struct variant_database_storage
     }
 };
 
-typedef variant_database_storage<host_tag> variant_database_host_storage;
-
 struct variant_database_host
 {
     uint32 data_mask;
 
     string_database id_db;
 
-    variant_database_host_storage::const_view view;
-    variant_database_host_storage host_malloc_container;
+    variant_database_storage<host>::const_view view;
+    variant_database_storage<host> host_malloc_container;
     shared_memory_file host_mmap_container;
 
     size_t serialized_size(void)

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "device_types.h"
+#include "../types.h"
 
 namespace firepony {
 
@@ -30,11 +30,11 @@ struct covariate_value
     float mismatches;
 };
 
-template <typename system_tag>
+template <target_system system>
 struct covariate_table_storage
 {
-    vector<system_tag, covariate_key> keys;
-    vector<system_tag, covariate_value> values;
+    vector<system, covariate_key> keys;
+    vector<system, covariate_value> values;
 
     covariate_table_storage()
     {
@@ -54,31 +54,33 @@ struct covariate_table_storage
         return keys.size();
     }
 
-    template <typename other_system_tag>
-    void copyfrom(covariate_table_storage<other_system_tag>& other)
+    template <target_system other_system>
+    void copyfrom(covariate_table_storage<other_system>& other)
     {
-        keys = other.keys;
-        values = other.values;
+        keys.resize(other.keys.size());
+        values.resize(other.values.size());
+
+        thrust::copy(other.keys.begin(), other.keys.end(), keys.begin());
+        thrust::copy(other.values.begin(), other.values.end(), values.begin());
     }
 };
 
 // host-side covariate tables are just simple storage
-typedef covariate_table_storage<host_tag> H_CovariateTable;
+typedef covariate_table_storage<host> h_covariate_table;
 
 // device covariate tables implement merging primitives and views
-struct D_CovariateTable : public covariate_table_storage<target_system_tag>
+template <target_system system>
+struct d_covariate_table : public covariate_table_storage<system>
 {
-    void sort(D_Vector<covariate_key>& temp_keys, D_Vector<covariate_value>& temp_values, D_VectorU8& temp_storage, uint32 num_key_bits);
-    void pack(D_Vector<covariate_key>& temp_keys, D_Vector<covariate_value>& temp_values);
+    void sort(d_vector<system, covariate_key>& temp_keys, d_vector<system, covariate_value>& temp_values, d_vector_u8<system>& temp_storage, uint32 num_key_bits);
+    void pack(d_vector<system, covariate_key>& temp_keys, d_vector<system, covariate_value>& temp_values);
 
     struct view
     {
-        D_VectorU32::view keys;
-        vector<target_system_tag, covariate_value>::view values;
+        typename d_vector<system, uint32>::view keys;
+        typename d_vector<system, covariate_value>::view values;
 
-        // note: we don't use implicit cast operators here
-        // we want to derive from this view to implement D_CovariatePool::view
-        view(D_CovariateTable& table)
+        view(d_covariate_table& table)
             : keys(table.keys),
               values(table.values)
         { }

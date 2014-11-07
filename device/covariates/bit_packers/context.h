@@ -22,11 +22,11 @@
 namespace firepony {
 
 // context covariate
-template <uint32 NUM_BASES_MISMATCH, uint32 NUM_BASES_INDEL, typename PreviousCovariate = covariate_null>
-struct covariate_Context : public covariate<PreviousCovariate, 4 + constexpr_max(NUM_BASES_MISMATCH, NUM_BASES_INDEL) * 2 + 1, true>
+template <target_system system, uint32 NUM_BASES_MISMATCH, uint32 NUM_BASES_INDEL, typename PreviousCovariate = covariate_null<system> >
+struct covariate_Context : public covariate<system, PreviousCovariate, 4 + constexpr_max(NUM_BASES_MISMATCH, NUM_BASES_INDEL) * 2 + 1, true>
 {
     // bit calculation for the context: 4 length bits, 2 bits per base pair, 1 sentinel bit for invalid values
-    typedef covariate<PreviousCovariate, 4 + constexpr_max(NUM_BASES_MISMATCH, NUM_BASES_INDEL) * 2 + 1, true> base;
+    typedef covariate<system, PreviousCovariate, 4 + constexpr_max(NUM_BASES_MISMATCH, NUM_BASES_INDEL) * 2 + 1, true> base;
 
     typedef enum {
         Mismatch,
@@ -90,8 +90,8 @@ struct covariate_Context : public covariate<PreviousCovariate, 4 + constexpr_max
 
     // context encoding (MSB to LSB): BB[bp_offset] BB[bp_offset-1] BB[bp_offset-2] ... SSSS
     // B = base pair bit, S = size bit
-    static CUDA_HOST_DEVICE covariate_key_set encode(firepony_context::view ctx,
-                                                     const alignment_batch_device::const_view batch,
+    static CUDA_HOST_DEVICE covariate_key_set encode(typename firepony_context<system>::view ctx,
+                                                     const typename alignment_batch_device<system>::const_view batch,
                                                      uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
                                                      covariate_key_set input_key = {0, 0, 0})
     {

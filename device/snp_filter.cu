@@ -28,9 +28,10 @@ namespace firepony {
 
 // functor used to compute the read offset list
 // for each read, fills in a list of uint16 values with the offset of each BP in the reference relative to the start of the alignment
-struct compute_read_offset_list : public lambda
+template <target_system system>
+struct compute_read_offset_list : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -87,21 +88,24 @@ struct compute_read_offset_list : public lambda
 };
 
 // for each read, compute the offset of each read BP relative to the base alignment position of the read
-void build_read_offset_list(firepony_context& context,
-                            const alignment_batch& batch)
+template <target_system system>
+void build_read_offset_list(firepony_context<system>& context,
+                            const alignment_batch<system>& batch)
 {
     context.read_offset_list.resize(batch.device.reads.size());
-    thrust::for_each(context.active_read_list.begin(),
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     compute_read_offset_list(context, batch.device));
+                     compute_read_offset_list<system>(context, batch.device));
 }
+INSTANTIATE(build_read_offset_list);
 
 // functor used to compute the alignment window list
 // for each read, compute the end of the alignment window in the reference and the sequence
 // xxxnsubtil: this is very similar to cigar_coordinates_expand, should merge
-struct compute_alignment_window : public lambda
+template <target_system system>
+struct compute_alignment_window : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -134,20 +138,23 @@ struct compute_alignment_window : public lambda
 };
 
 // for each read, compute the end of the alignment window in the reference
-void build_alignment_windows(firepony_context& context, const alignment_batch& batch)
+template <target_system system>
+void build_alignment_windows(firepony_context<system>& context, const alignment_batch<system>& batch)
 {
     // set up the alignment window buffer
     context.alignment_windows.resize(batch.device.num_reads);
     context.sequence_alignment_windows.resize(batch.device.num_reads);
     // compute alignment windows
-    thrust::for_each(context.active_read_list.begin(),
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     compute_alignment_window(context, batch.device));
+                     compute_alignment_window<system>(context, batch.device));
 }
+INSTANTIATE(build_alignment_windows);
 
-struct compute_vcf_ranges : public lambda
+template <target_system system>
+struct compute_vcf_ranges : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -202,11 +209,12 @@ struct compute_vcf_ranges : public lambda
     }
 };
 
+template <target_system system>
 struct vcf_active_predicate
 {
-    D_VectorU32_2::view vcf_active;
+    typename d_vector_u32_2<system>::view vcf_active;
 
-    vcf_active_predicate(D_VectorU32_2::view vcf_active)
+    vcf_active_predicate(typename d_vector_u32_2<system>::view vcf_active)
         : vcf_active(vcf_active)
     { }
 
@@ -216,9 +224,10 @@ struct vcf_active_predicate
     }
 };
 
-struct filter_bps : public lambda
+template <target_system system>
+struct filter_bps : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
 public:
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
@@ -305,35 +314,37 @@ public:
 
 // filter out known SNPs from the active BP list
 // for each BP in batch, set the corresponding bit in active_loc_list to zero if it matches a known SNP
-void filter_known_snps(firepony_context& context, const alignment_batch& batch)
+template <target_system system>
+void filter_known_snps(firepony_context<system>& context, const alignment_batch<system>& batch)
 {
-    snp_filter_context& snp = context.snp_filter;
+    auto& snp = context.snp_filter;
 
     // compute the VCF ranges for each read
     snp.active_vcf_ranges.resize(batch.device.num_reads);
-    thrust::for_each(context.active_read_list.begin(),
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     compute_vcf_ranges(context, batch.device));
+                     compute_vcf_ranges<system>(context, batch.device));
 
     // build a list of reads with active VCF ranges
     snp.active_read_ids.resize(context.active_read_list.size());
     context.temp_u32 = context.active_read_list;
 
     uint32 num_active;
-    num_active = copy_if(context.temp_u32.begin(),
-                         context.temp_u32.size(),
-                         snp.active_read_ids.begin(),
-                         vcf_active_predicate(snp.active_vcf_ranges),
-                         context.temp_storage);
+    num_active = parallel<system>::copy_if(context.temp_u32.begin(),
+                                           context.temp_u32.size(),
+                                           snp.active_read_ids.begin(),
+                                           vcf_active_predicate<system>(snp.active_vcf_ranges),
+                                           context.temp_storage);
 
     snp.active_read_ids.resize(num_active);
 
     // finally apply the VCF filter
     // this will create zeros in the active location list for each BP that matches a known variant
-    thrust::for_each(snp.active_read_ids.begin(),
+    parallel<system>::for_each(snp.active_read_ids.begin(),
                      snp.active_read_ids.end(),
-                     filter_bps(context, batch.device));
+                     filter_bps<system>(context, batch.device));
 }
+INSTANTIATE(filter_known_snps);
 
 } // namespace firepony
 

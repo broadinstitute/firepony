@@ -28,9 +28,10 @@
 
 namespace firepony {
 
-struct generate_read_group_table : public lambda_context
+template <target_system system>
+struct generate_read_group_table : public lambda_context<system>
 {
-    using lambda_context::lambda_context;
+    LAMBDA_CONTEXT_INHERIT;
 
     CUDA_HOST_DEVICE double qualToErrorProb(uint8 qual)
     {
@@ -46,13 +47,13 @@ struct generate_read_group_table : public lambda_context
     {
         const auto& key_in = ctx.covariates.quality.keys[index];
         const auto& value_in = ctx.covariates.quality.values[index];
-        const auto qual = covariate_table_quality::decode(key_in, covariate_table_quality::QualityScore);
+        const auto qual = covariate_table_quality<system>::decode(key_in, covariate_table_quality<system>::QualityScore);
 
         auto& key_out = ctx.read_group_table.read_group_keys[index];
         auto& value_out = ctx.read_group_table.read_group_values[index];
 
         // remove the quality from the key
-        key_out = key_in & ~covariate_table_quality::chain::key_mask(covariate_table_quality::QualityScore);
+        key_out = key_in & ~covariate_table_quality<system>::chain::key_mask(covariate_table_quality<system>::QualityScore);
 
         value_out.observations = value_in.observations;
         value_out.mismatches = value_in.mismatches;
@@ -73,9 +74,10 @@ struct covariate_empirical_value_sum
     }
 };
 
-struct covariate_compute_empirical_quality : public lambda_context
+template <target_system system>
+struct covariate_compute_empirical_quality : public lambda_context<system>
 {
-    using lambda_context::lambda_context;
+    LAMBDA_CONTEXT_INHERIT;
 
     static constexpr int SMOOTHING_CONSTANT = 1;
     static constexpr int MAX_RECALIBRATED_Q_SCORE = 93;
@@ -208,7 +210,8 @@ struct covariate_compute_empirical_quality : public lambda_context
     }
 };
 
-void build_read_group_table(firepony_context& context)
+template <target_system system>
+void build_read_group_table(firepony_context<system>& context)
 {
     const auto& cv = context.covariates;
     auto& rg = context.read_group_table;
@@ -225,28 +228,27 @@ void build_read_group_table(firepony_context& context)
     // convert the quality table into the read group table
     rg_keys.resize(cv.quality.size());
     rg_values.resize(cv.quality.size());
-    thrust::for_each(thrust::make_counting_iterator(0u),
+    parallel<system>::for_each(thrust::make_counting_iterator(0u),
                      thrust::make_counting_iterator(0u) + cv.quality.size(),
-                     generate_read_group_table(context));
+                     generate_read_group_table<system>(context));
 
-    D_Vector<covariate_key>& temp_keys = context.temp_u32;
-    D_Vector<covariate_empirical_value> temp_values;
-    D_VectorU8& temp_storage = context.temp_storage;
+    auto& temp_keys = context.temp_u32;
+    firepony::vector<system, covariate_empirical_value> temp_values;
+    auto& temp_storage = context.temp_storage;
 
     temp_keys.resize(rg_keys.size());
     temp_values.resize(rg_keys.size());
 
-    sort_by_key(rg_keys, rg_values, temp_keys, temp_values, temp_storage, covariate_table_quality::chain::bits_used);
+    parallel<system>::sort_by_key(rg_keys, rg_values, temp_keys, temp_values, temp_storage, covariate_table_quality<system>::chain::bits_used);
 
     // reduce the read group table by key
-    thrust::pair<D_Vector<covariate_key>::iterator, D_Vector<covariate_empirical_value>::iterator> out;
-    out = thrust::reduce_by_key(rg_keys.begin(),
-                                rg_keys.end(),
-                                rg_values.begin(),
-                                temp_keys.begin(),
-                                temp_values.begin(),
-                                thrust::equal_to<covariate_key>(),
-                                covariate_empirical_value_sum());
+    auto out = thrust::reduce_by_key(rg_keys.begin(),
+                                     rg_keys.end(),
+                                     rg_values.begin(),
+                                     temp_keys.begin(),
+                                     temp_values.begin(),
+                                     thrust::equal_to<covariate_key>(),
+                                     covariate_empirical_value_sum());
 
     uint32 new_size = out.first - temp_keys.begin();
 
@@ -257,12 +259,14 @@ void build_read_group_table(firepony_context& context)
     rg_values = temp_values;
 
     // compute empirical qualities
-    thrust::for_each(thrust::make_counting_iterator(0u),
+    parallel<system>::for_each(thrust::make_counting_iterator(0u),
                      thrust::make_counting_iterator(0u) + new_size,
-                     covariate_compute_empirical_quality(context));
+                     covariate_compute_empirical_quality<system>(context));
 }
+INSTANTIATE(build_read_group_table);
 
-void output_read_group_table(firepony_context& context)
+template <target_system system>
+void output_read_group_table(firepony_context<system>& context)
 {
     auto& rg = context.read_group_table;
     auto& rg_keys = rg.read_group_keys;
@@ -274,7 +278,7 @@ void output_read_group_table(firepony_context& context)
 
     for(uint32 i = 0; i < rg_keys.size(); i++)
     {
-        uint32 rg_id = covariate_table_quality::decode(rg_keys[i], covariate_table_quality::ReadGroup);
+        uint32 rg_id = covariate_table_quality<system>::decode(rg_keys[i], covariate_table_quality<system>::ReadGroup);
         const std::string& rg_name = context.bam_header.host.read_groups_db.lookup(rg_id);
 
         covariate_empirical_value val = rg_values[i];
@@ -282,7 +286,7 @@ void output_read_group_table(firepony_context& context)
         // ReadGroup, EventType, EmpiricalQuality, EstimatedQReported, Observations, Errors
         printf("%s\t%c\t\t%.4f\t\t\t%.4f\t\t\t%d\t\t%.2f\n",
                 rg_name.c_str(),
-                cigar_event::ascii(covariate_table_quality::decode(rg_keys[i], covariate_table_quality::EventTracker)),
+                cigar_event::ascii(covariate_table_quality<system>::decode(rg_keys[i], covariate_table_quality<system>::EventTracker)),
                 round_n(val.empirical_quality, 4),
                 round_n(val.estimated_quality, 4),
                 val.observations,
@@ -291,5 +295,7 @@ void output_read_group_table(firepony_context& context)
 
     printf("\n");
 }
+INSTANTIATE(output_read_group_table);
 
 } // namespace firepony
+

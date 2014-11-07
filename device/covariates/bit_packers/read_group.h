@@ -21,18 +21,18 @@
 
 namespace firepony {
 
-template<typename PreviousCovariate = covariate_null>
-struct covariate_ReadGroup : public covariate<PreviousCovariate, 8>
+template<target_system system, typename PreviousCovariate = covariate_null<system> >
+struct covariate_ReadGroup : public covariate<system, PreviousCovariate, 8>
 {
-    static CUDA_HOST_DEVICE covariate_key_set encode(firepony_context::view ctx,
-                                                     const alignment_batch_device::const_view batch,
+    static CUDA_HOST_DEVICE covariate_key_set encode(typename firepony_context<system>::view ctx,
+                                                     const typename alignment_batch_device<system>::const_view batch,
                                                      uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
                                                      covariate_key_set input_key = {0, 0, 0})
     {
         uint32 read_group = batch.read_group[read_index];
-        return covariate<PreviousCovariate, 8>::build_key(input_key,
-                                                          { read_group, read_group, read_group },
-                                                          ctx, batch, read_index, bp_offset, cigar_event_index);
+        return covariate<system, PreviousCovariate, 8>::build_key(input_key,
+                                                                  { read_group, read_group, read_group },
+                                                                  ctx, batch, read_index, bp_offset, cigar_event_index);
     }
 };
 

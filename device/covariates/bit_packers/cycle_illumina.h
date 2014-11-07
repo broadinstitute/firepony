@@ -21,10 +21,10 @@
 
 namespace firepony {
 
-template <typename PreviousCovariate = covariate_null>
-struct covariate_Cycle_Illumina : public covariate<PreviousCovariate, 10, true>
+template <target_system system, typename PreviousCovariate = covariate_null<system> >
+struct covariate_Cycle_Illumina : public covariate<system, PreviousCovariate, 10, true>
 {
-    typedef covariate<PreviousCovariate, 10, true> base;
+    typedef covariate<system, PreviousCovariate, 10, true> base;
 
     enum {
         CUSHION_FOR_INDELS = 4
@@ -44,8 +44,8 @@ struct covariate_Cycle_Illumina : public covariate<PreviousCovariate, 10, true>
         return result;
     }
 
-    static CUDA_HOST_DEVICE covariate_key_set encode(firepony_context::view ctx,
-                                                     const alignment_batch_device::const_view batch,
+    static CUDA_HOST_DEVICE covariate_key_set encode(typename firepony_context<system>::view ctx,
+                                                     const typename alignment_batch_device<system>::const_view batch,
                                                      uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
                                                      covariate_key_set input_key = {0, 0, 0})
     {

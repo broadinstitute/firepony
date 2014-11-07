@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "device_types.h"
+#include "../types.h"
 #include "alignment_data_device.h"
 #include "sequence_data_device.h"
 #include "variant_data_device.h"
@@ -26,20 +26,18 @@
 
 namespace firepony {
 
+template <target_system system>
 struct snp_filter_context
 {
-    // the window in the reference for each sequence in the database
-    D_VectorU32_2 sequence_windows;
-
     // active reads for the VCF search
-    D_VectorU32 active_read_ids;
+    d_vector_u32<system> active_read_ids;
     // active VCF range for each read
-    D_VectorU32_2 active_vcf_ranges;
+    d_vector_u32_2<system> active_vcf_ranges;
 
     struct view
     {
-        D_VectorU32::view active_read_ids;
-        D_VectorU32_2::view active_vcf_ranges;
+        typename d_vector_u32<system>::view active_read_ids;
+        typename d_vector_u32_2<system>::view active_vcf_ranges;
     };
 
     operator view()
@@ -52,14 +50,9 @@ struct snp_filter_context
     }
 };
 
-void build_read_offset_list(firepony_context& context,
-                            const alignment_batch& batch);
-
-void build_alignment_windows(firepony_context& context,
-                             const alignment_batch& batch);
-
-void filter_known_snps(firepony_context& context,
-                       const alignment_batch& batch);
+template <target_system system> void build_read_offset_list(firepony_context<system>& context, const alignment_batch<system>& batch);
+template <target_system system> void build_alignment_windows(firepony_context<system>& context, const alignment_batch<system>& batch);
+template <target_system system> void filter_known_snps(struct firepony_context<system>& context, const alignment_batch<system>& batch);
 
 } // namespace firepony
 

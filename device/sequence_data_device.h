@@ -24,42 +24,43 @@
 
 namespace firepony {
 
-struct sequence_data_device : public sequence_data_storage<target_system_tag>
+template <target_system system>
+struct sequence_data_device : public sequence_data_storage<system>
 {
     size_t download(const sequence_data_host& host)
     {
         size_t num_bytes = 0;
-#define TRACK_VECTOR_SIZE(f) num_bytes += sizeof(host.view.f[0]) * f.size();
-#define TRACK_PACKED_VECTOR_SIZE(f) num_bytes += sizeof(uint32) * f.m_storage.size();
+#define TRACK_VECTOR_SIZE(f) num_bytes += sizeof(host.view.f[0]) * this->f.size();
+#define TRACK_PACKED_VECTOR_SIZE(f) num_bytes += sizeof(uint32) * this->f.m_storage.size();
 
-        num_sequences = host.view.num_sequences;
-        data_mask = host.view.data_mask;
+        this->num_sequences = host.view.num_sequences;
+        this->data_mask = host.view.data_mask;
 
-        if (data_mask & SequenceDataMask::BASES)
+        if (this->data_mask & SequenceDataMask::BASES)
         {
-            bases.copy_from_view(host.view.bases);
-            sequence_bp_start.copy_from_view(host.view.sequence_bp_start);
-            sequence_bp_len.copy_from_view(host.view.sequence_bp_len);
+            this->bases.copy_from_view(host.view.bases);
+            this->sequence_bp_start.copy_from_view(host.view.sequence_bp_start);
+            this->sequence_bp_len.copy_from_view(host.view.sequence_bp_len);
 
             TRACK_PACKED_VECTOR_SIZE(bases);
             TRACK_VECTOR_SIZE(sequence_bp_start);
             TRACK_VECTOR_SIZE(sequence_bp_len);
         }
 
-        if (data_mask & SequenceDataMask::QUALITIES)
+        if (this->data_mask & SequenceDataMask::QUALITIES)
         {
-            qualities.copy_from_view(host.view.qualities);
-            sequence_qual_start.copy_from_view(host.view.sequence_qual_start);
-            sequence_qual_len.copy_from_view(host.view.sequence_qual_len);
+            this->qualities.copy_from_view(host.view.qualities);
+            this->sequence_qual_start.copy_from_view(host.view.sequence_qual_start);
+            this->sequence_qual_len.copy_from_view(host.view.sequence_qual_len);
 
             TRACK_VECTOR_SIZE(qualities);
             TRACK_VECTOR_SIZE(sequence_qual_start);
             TRACK_VECTOR_SIZE(sequence_qual_len);
         }
 
-        if (data_mask & SequenceDataMask::NAMES)
+        if (this->data_mask & SequenceDataMask::NAMES)
         {
-            sequence_id.copy_from_view(host.view.sequence_id);
+            this->sequence_id.copy_from_view(host.view.sequence_id);
             TRACK_VECTOR_SIZE(sequence_id);
         }
 
@@ -70,10 +71,11 @@ struct sequence_data_device : public sequence_data_storage<target_system_tag>
 
 };
 
+template <target_system system>
 struct sequence_data
 {
     const sequence_data_host& host;
-    sequence_data_device device;
+    sequence_data_device<system> device;
 
     sequence_data(const sequence_data_host& host)
         : host(host)

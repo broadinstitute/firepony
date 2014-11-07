@@ -19,25 +19,29 @@
 #include "firepony_context.h"
 #include "util.h"
 #include "baq.h"
+#include "primitives/parallel.h"
 
 namespace firepony {
 
 // implements GATK's BaseRecalibrator.calculateFractionalErrorArray
-struct compute_fractional_errors : public lambda
+template <target_system system>
+struct compute_fractional_errors : public lambda<system>
 {
-    D_PackedVector_1b::const_view error_vector;
-    D_VectorF64::view output_vector;
+    LAMBDA_INHERIT_MEMBERS;
 
-    compute_fractional_errors(firepony_context::view ctx,
-                              const alignment_batch_device::const_view batch,
-                              const D_PackedVector_1b::const_view error_vector,
-                              D_VectorF64::view output_vector)
-        : lambda(ctx, batch), error_vector(error_vector), output_vector(output_vector)
+    typename d_packed_vector_1b<system>::const_view error_vector;
+    typename d_vector<system, double>::view output_vector;
+
+    compute_fractional_errors(typename firepony_context<system>::view ctx,
+                              const typename alignment_batch_device<system>::const_view batch,
+                              const typename d_packed_vector_1b<system>::const_view error_vector,
+                              typename d_vector<system, double>::view output_vector)
+        : lambda<system>(ctx, batch), error_vector(error_vector), output_vector(output_vector)
     { }
 
     CUDA_HOST_DEVICE void calculateAndStoreErrorsInBlock(const int iii,
                                                          const int blockStartIndex,
-                                                         const D_PackedVector_1b::const_view errorArray,
+                                                         const typename d_packed_vector_1b<system>::const_view errorArray,
                                                          double *fractionalErrors)
     {
         int totalErrors = 0;
@@ -99,7 +103,8 @@ struct compute_fractional_errors : public lambda
     }
 };
 
-void build_fractional_error_arrays(firepony_context& context, const alignment_batch& batch)
+template <target_system system>
+void build_fractional_error_arrays(firepony_context<system>& context, const alignment_batch<system>& batch)
 {
     auto& frac = context.fractional_error;
 
@@ -111,18 +116,20 @@ void build_fractional_error_arrays(firepony_context& context, const alignment_ba
     thrust::fill(frac.insertion_errors.begin(), frac.insertion_errors.end(), 0.0);
     thrust::fill(frac.deletion_errors.begin(), frac.deletion_errors.end(), 0.0);
 
-    thrust::for_each(context.active_read_list.begin(),
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     compute_fractional_errors(context, batch.device, context.cigar.is_snp, frac.snp_errors));
-    thrust::for_each(context.active_read_list.begin(),
+                     compute_fractional_errors<system>(context, batch.device, context.cigar.is_snp, frac.snp_errors));
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     compute_fractional_errors(context, batch.device, context.cigar.is_insertion, frac.insertion_errors));
-    thrust::for_each(context.active_read_list.begin(),
+                     compute_fractional_errors<system>(context, batch.device, context.cigar.is_insertion, frac.insertion_errors));
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     compute_fractional_errors(context, batch.device, context.cigar.is_deletion, frac.deletion_errors));
+                     compute_fractional_errors<system>(context, batch.device, context.cigar.is_deletion, frac.deletion_errors));
 }
+INSTANTIATE(build_fractional_error_arrays);
 
-void debug_fractional_error_arrays(firepony_context& context, const alignment_batch& batch, int read_index)
+template <target_system system>
+void debug_fractional_error_arrays(firepony_context<system>& context, const alignment_batch<system>& batch, int read_index)
 {
     const alignment_batch_host& h_batch = *batch.host;
 
@@ -156,5 +163,7 @@ void debug_fractional_error_arrays(firepony_context& context, const alignment_ba
 
     fprintf(stderr, "\n");
 }
+INSTANTIATE(debug_fractional_error_arrays);
 
 } // namespace firepony
+

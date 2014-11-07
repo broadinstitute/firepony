@@ -18,21 +18,22 @@
 
 #pragma once
 
-#include "device_types.h"
+#include "../types.h"
 
 namespace firepony {
 
+template <target_system system>
 struct fractional_error_context
 {
-    D_VectorF64 snp_errors;
-    D_VectorF64 insertion_errors;
-    D_VectorF64 deletion_errors;
+    vector<system, double> snp_errors;
+    vector<system, double> insertion_errors;
+    vector<system, double> deletion_errors;
 
     struct view
     {
-        D_VectorF64::view snp_errors;
-        D_VectorF64::view insertion_errors;
-        D_VectorF64::view deletion_errors;
+        typename vector<system, double>::view snp_errors;
+        typename vector<system, double>::view insertion_errors;
+        typename vector<system, double>::view deletion_errors;
     };
 
     operator view()
@@ -47,8 +48,8 @@ struct fractional_error_context
     }
 };
 
-void build_fractional_error_arrays(firepony_context& context, const alignment_batch& batch);
-void debug_fractional_error_arrays(firepony_context& context, const alignment_batch& batch, int read_index);
+template <target_system system> void build_fractional_error_arrays(firepony_context<system>& context, const alignment_batch<system>& batch);
+template <target_system system> void debug_fractional_error_arrays(firepony_context<system>& context, const alignment_batch<system>& batch, int read_index);
 
 } // namespace firepony
 

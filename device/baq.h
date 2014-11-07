@@ -25,35 +25,36 @@ namespace firepony {
 
 #define NO_BAQ_UNCERTAINTY 64
 
+template <target_system system>
 struct baq_context
 {
     // reference windows for HMM
-    D_VectorU32_2 reference_windows;
+    d_vector_u32_2<system> reference_windows;
 
     // BAQ'ed qualities for each read, same size as each read
-    D_VectorU8 qualities;
+    d_vector_u8<system> qualities;
 
     // forward and backward HMM matrices
     // each read requires read_len * 6 * (bandWidth + 1)
-    D_VectorF64 forward;
-    D_VectorF64 backward;
+    d_vector<system, double> forward;
+    d_vector<system, double> backward;
     // index vector for forward/backward matrices
-    D_VectorU32 matrix_index;
+    d_vector<system, uint32> matrix_index;
 
     // scaling factors
-    D_VectorF64 scaling;
+    d_vector<system, double> scaling;
     // index vector for scaling factors
-    D_VectorU32 scaling_index;
+    d_vector<system, uint32> scaling_index;
 
     struct view
     {
-        D_VectorU32_2::view reference_windows;
-        D_VectorU8::view qualities;
-        D_VectorF64::view forward;
-        D_VectorF64::view backward;
-        D_VectorU32::view matrix_index;
-        D_VectorF64::view scaling;
-        D_VectorU32::view scaling_index;
+        typename d_vector_u32_2<system>::view reference_windows;
+        typename d_vector_u8<system>::view qualities;
+        typename d_vector<system, double>::view forward;
+        typename d_vector<system, double>::view backward;
+        typename d_vector<system, uint32>::view matrix_index;
+        typename d_vector<system, double>::view scaling;
+        typename d_vector<system, uint32>::view scaling_index;
     };
 
     operator view()
@@ -72,8 +73,7 @@ struct baq_context
     }
 };
 
-void baq_reads(firepony_context& context, const alignment_batch& batch);
-void debug_baq(firepony_context& context, const alignment_batch& batch, int read_index);
+template <target_system system> void baq_reads(firepony_context<system>& context, const alignment_batch<system>& batch);
+template <target_system system> void debug_baq(firepony_context<system>& context, const alignment_batch<system>& batch, int read_index);
 
 } // namespace firepony
-

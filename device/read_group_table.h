@@ -32,15 +32,16 @@ struct covariate_empirical_value
     double empirical_quality;
 };
 
+template <target_system system>
 struct read_group_table_context
 {
-    D_Vector<covariate_key> read_group_keys;
-    D_Vector<covariate_empirical_value> read_group_values;
+    firepony::vector<system, covariate_key> read_group_keys;
+    firepony::vector<system, covariate_empirical_value> read_group_values;
 
     struct view
     {
-        D_Vector<covariate_key>::view read_group_keys;
-        D_Vector<covariate_empirical_value>::view read_group_values;
+        typename firepony::vector<system, covariate_key>::view read_group_keys;
+        typename firepony::vector<system, covariate_empirical_value>::view read_group_values;
     };
 
     operator view()
@@ -54,8 +55,8 @@ struct read_group_table_context
     }
 };
 
-void build_read_group_table(firepony_context& context);
-void output_read_group_table(firepony_context& context);
+template <target_system system> void build_read_group_table(firepony_context<system>& context);
+template <target_system system> void output_read_group_table(firepony_context<system>& context);
 
 } // namespace firepony
 

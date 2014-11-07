@@ -295,7 +295,7 @@ bool gamgee_load_sequences(sequence_data_host *output, const char *filename, uin
         }
     }
 
-    sequence_data_host_storage& h = output->host_malloc_container;
+    auto& h = output->host_malloc_container;
     h.data_mask = data_mask;
 
     for (gamgee::Fastq& record : gamgee::FastqReader(std::string(filename)))

@@ -27,7 +27,7 @@ namespace firepony {
 // lifted directly from nvbio
 // xxxnsubtil: could use some cleanup
 
-template <typename SystemTag, uint32 SYMBOL_SIZE_T, bool BIG_ENDIAN_T = false, typename IndexType = uint32>
+template <target_system system, uint32 SYMBOL_SIZE_T, bool BIG_ENDIAN_T = false, typename IndexType = uint32>
 struct packed_vector
 {
     enum {
@@ -37,15 +37,14 @@ struct packed_vector
         SYMBOLS_PER_WORD    = WORD_SIZE / SYMBOL_SIZE,
     };
 
-    typedef packed_vector<SystemTag, SYMBOL_SIZE_T, BIG_ENDIAN_T, IndexType>                type;
+    typedef packed_vector<system, SYMBOL_SIZE_T, BIG_ENDIAN_T, IndexType>                type;
 
-    typedef SystemTag           system_tag;
     typedef IndexType           index_type;
 
-    typedef typename vector<system_tag, uint32>::pointer                                  pointer;
-    typedef typename vector<system_tag, uint32>::const_pointer                            const_pointer;
-    typedef packed_stream<SYMBOL_SIZE, uint8, IS_BIG_ENDIAN,       pointer, index_type>   stream_type;
-    typedef packed_stream<SYMBOL_SIZE, uint8, IS_BIG_ENDIAN, const_pointer, index_type>   const_stream_type;
+    typedef typename vector<system, uint32>::pointer                                            pointer;
+    typedef typename vector<system, uint32>::const_pointer                                      const_pointer;
+    typedef packed_stream<SYMBOL_SIZE, uint8, IS_BIG_ENDIAN,       pointer, index_type>         stream_type;
+    typedef packed_stream<SYMBOL_SIZE, uint8, IS_BIG_ENDIAN, const_pointer, index_type>         const_stream_type;
     typedef typename stream_type::iterator                                                      iterator;
     typedef typename const_stream_type::iterator                                                const_iterator;
     typedef uint8                                                                               value_type;
@@ -59,7 +58,7 @@ struct packed_vector
         : m_storage(divide_ri(size, SYMBOLS_PER_WORD)), m_size(size)
     { }
 
-    template <typename OtherSystemTag>
+    template <target_system OtherSystemTag>
     packed_vector(const packed_vector<OtherSystemTag, SYMBOL_SIZE, IS_BIG_ENDIAN, IndexType>& other)
         : m_storage(other.m_storage), m_size(other.m_size)
     { }
@@ -155,15 +154,15 @@ struct packed_vector
     }
 
     // assignment from a host view
-    void copy_from_view(const typename packed_vector<host_tag, SYMBOL_SIZE>::const_view& other)
+    void copy_from_view(const typename packed_vector<host, SYMBOL_SIZE>::const_view& other)
     {
         m_storage.resize(divide_ri(other.size(), SYMBOLS_PER_WORD));
         m_storage.assign((uint32 *)other.stream(), ((uint32 *)other.stream()) + divide_ri(other.size(), SYMBOLS_PER_WORD));
         m_size = other.size();
     }
 
-    vector<system_tag, uint32> m_storage;
-    index_type                       m_size;
+    vector<system, uint32> m_storage;
+    index_type             m_size;
 };
 
 } // namespace firepony

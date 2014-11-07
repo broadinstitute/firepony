@@ -23,25 +23,27 @@
 
 #include <gamgee/sam.h>
 
+#include "../types.h"
 #include "../alignment_data.h"
-#include "device_types.h"
 #include "primitives/cuda.h"
 
 namespace firepony {
 
-struct alignment_header_device : public alignment_header_storage<target_system_tag>
+template <target_system system>
+struct alignment_header_device : public alignment_header_storage<system>
 {
     void download(const alignment_header_host& host)
     {
-        chromosome_lengths = host.chromosome_lengths;
+        this->chromosome_lengths = host.chromosome_lengths;
     }
 };
 
+template <target_system system>
 struct alignment_header
 {
     // the host-side data comes from outside impl, so it's a reference
     const alignment_header_host& host;
-    alignment_header_device device;
+    alignment_header_device<system> device;
 
     alignment_header(const alignment_header_host& host)
         : host(host)
@@ -53,16 +55,19 @@ struct alignment_header
     }
 };
 
-struct alignment_batch_device : public alignment_batch_storage<target_system_tag>
+template <target_system system>
+struct alignment_batch_device : public alignment_batch_storage<system>
 {
+    typedef alignment_batch_storage<system> base;
+
     CUDA_DEVICE const CRQ_index crq_index(uint32 read_id) const
     {
-        return CRQ_index(cigar_start[read_id],
-                         cigar_len[read_id],
-                         read_start[read_id],
-                         read_len[read_id],
-                         qual_start[read_id],
-                         qual_len[read_id]);
+        return CRQ_index(this->cigar_start[read_id],
+                         this->cigar_len[read_id],
+                         this->read_start[read_id],
+                         this->read_len[read_id],
+                         this->qual_start[read_id],
+                         this->qual_len[read_id]);
     }
 
     struct const_view
@@ -70,24 +75,24 @@ struct alignment_batch_device : public alignment_batch_storage<target_system_tag
         uint32 num_reads;
         uint32 max_read_size;
 
-        D_Vector<uint32>::const_view chromosome;
-        D_Vector<uint32>::const_view alignment_start;
-        D_Vector<uint32>::const_view alignment_stop;
-        D_Vector<uint32>::const_view mate_chromosome;
-        D_Vector<uint32>::const_view mate_alignment_start;
-        D_Vector<int16>::const_view inferred_insert_size;
-        D_Vector<cigar_op>::const_view cigars;
-        D_Vector<uint32>::const_view cigar_start;
-        D_Vector<uint32>::const_view cigar_len;
-        D_PackedVector<4>::const_view reads;
-        D_Vector<uint32>::const_view read_start;
-        D_Vector<uint32>::const_view read_len;
-        D_Vector<uint8>::const_view qualities;
-        D_Vector<uint32>::const_view qual_start;
-        D_Vector<uint32>::const_view qual_len;
-        D_Vector<uint16>::const_view flags;
-        D_Vector<uint8>::const_view mapq;
-        D_Vector<uint32>::const_view read_group;
+        typename vector<system, uint32>::const_view chromosome;
+        typename vector<system, uint32>::const_view alignment_start;
+        typename vector<system, uint32>::const_view alignment_stop;
+        typename vector<system, uint32>::const_view mate_chromosome;
+        typename vector<system, uint32>::const_view mate_alignment_start;
+        typename vector<system, int16>::const_view inferred_insert_size;
+        typename vector<system, cigar_op>::const_view cigars;
+        typename vector<system, uint32>::const_view cigar_start;
+        typename vector<system, uint32>::const_view cigar_len;
+        typename packed_vector<system, 4>::const_view reads;
+        typename vector<system, uint32>::const_view read_start;
+        typename vector<system, uint32>::const_view read_len;
+        typename vector<system, uint8>::const_view qualities;
+        typename vector<system, uint32>::const_view qual_start;
+        typename vector<system, uint32>::const_view qual_len;
+        typename vector<system, uint16>::const_view flags;
+        typename vector<system, uint8>::const_view mapq;
+        typename vector<system, uint32>::const_view read_group;
 
         CUDA_HOST_DEVICE const CRQ_index crq_index(uint32 read_id) const
         {
@@ -103,27 +108,27 @@ struct alignment_batch_device : public alignment_batch_storage<target_system_tag
     operator const_view() const
     {
         const_view v = {
-                num_reads,
-                max_read_size,
+                base::num_reads,
+                base::max_read_size,
 
-                chromosome,
-                alignment_start,
-                alignment_stop,
-                mate_chromosome,
-                mate_alignment_start,
-                inferred_insert_size,
-                cigars,
-                cigar_start,
-                cigar_len,
-                reads,
-                read_start,
-                read_len,
-                qualities,
-                qual_start,
-                qual_len,
-                flags,
-                mapq,
-                read_group,
+                base::chromosome,
+                base::alignment_start,
+                base::alignment_stop,
+                base::mate_chromosome,
+                base::mate_alignment_start,
+                base::inferred_insert_size,
+                base::cigars,
+                base::cigar_start,
+                base::cigar_len,
+                base::reads,
+                base::read_start,
+                base::read_len,
+                base::qualities,
+                base::qual_start,
+                base::qual_len,
+                base::flags,
+                base::mapq,
+                base::read_group,
         };
 
         return v;
@@ -131,113 +136,114 @@ struct alignment_batch_device : public alignment_batch_storage<target_system_tag
 
     void download(const alignment_batch_host& host)
     {
-        num_reads = host.num_reads;
-        max_read_size = host.max_read_size;
-        data_mask = host.data_mask;
+        this->num_reads = host.num_reads;
+        this->max_read_size = host.max_read_size;
+        this->data_mask = host.data_mask;
 
-        if (data_mask & AlignmentDataMask::CHROMOSOME)
+        if (this->data_mask & AlignmentDataMask::CHROMOSOME)
         {
-            chromosome = host.chromosome;
+            this->chromosome = host.chromosome;
         } else {
-            chromosome.clear();
+            this->chromosome.clear();
         }
 
-        if (data_mask & AlignmentDataMask::ALIGNMENT_START)
+        if (this->data_mask & AlignmentDataMask::ALIGNMENT_START)
         {
-            alignment_start = host.alignment_start;
+            this->alignment_start = host.alignment_start;
         } else {
-            alignment_start.clear();
+            this->alignment_start.clear();
         }
 
-        if (data_mask & AlignmentDataMask::ALIGNMENT_STOP)
+        if (this->data_mask & AlignmentDataMask::ALIGNMENT_STOP)
         {
-            alignment_stop = host.alignment_stop;
+            this->alignment_stop = host.alignment_stop;
         } else {
-            alignment_stop.clear();
+            this->alignment_stop.clear();
         }
 
-        if (data_mask & AlignmentDataMask::MATE_CHROMOSOME)
+        if (this->data_mask & AlignmentDataMask::MATE_CHROMOSOME)
         {
-            mate_chromosome = host.mate_chromosome;
+            this->mate_chromosome = host.mate_chromosome;
         } else {
-            mate_chromosome.clear();
+            this->mate_chromosome.clear();
         }
 
-        if (data_mask & AlignmentDataMask::MATE_ALIGNMENT_START)
+        if (this->data_mask & AlignmentDataMask::MATE_ALIGNMENT_START)
         {
-            mate_alignment_start = host.mate_alignment_start;
+            this->mate_alignment_start = host.mate_alignment_start;
         } else {
-            mate_alignment_start.clear();
+            this->mate_alignment_start.clear();
         }
 
-        if (data_mask & AlignmentDataMask::INFERRED_INSERT_SIZE)
+        if (this->data_mask & AlignmentDataMask::INFERRED_INSERT_SIZE)
         {
-            inferred_insert_size = host.inferred_insert_size;
+            this->inferred_insert_size = host.inferred_insert_size;
         } else {
-            inferred_insert_size.clear();
+            this->inferred_insert_size.clear();
         }
 
-        if (data_mask & AlignmentDataMask::CIGAR)
+        if (this->data_mask & AlignmentDataMask::CIGAR)
         {
-            cigars = host.cigars;
-            cigar_start = host.cigar_start;
-            cigar_len = host.cigar_len;
+            this->cigars = host.cigars;
+            this->cigar_start = host.cigar_start;
+            this->cigar_len = host.cigar_len;
         } else {
-            cigars.clear();
-            cigar_start.clear();
-            cigar_len.clear();
+            this->cigars.clear();
+            this->cigar_start.clear();
+            this->cigar_len.clear();
         }
 
-        if (data_mask & AlignmentDataMask::READS)
+        if (this->data_mask & AlignmentDataMask::READS)
         {
-            reads = host.reads;
-            read_start = host.read_start;
-            read_len = host.read_len;
+            this->reads = host.reads;
+            this->read_start = host.read_start;
+            this->read_len = host.read_len;
         } else {
-            reads.clear();
-            read_start.clear();
-            read_len.clear();
+            this->reads.clear();
+            this->read_start.clear();
+            this->read_len.clear();
         }
 
-        if (data_mask & AlignmentDataMask::QUALITIES)
+        if (this->data_mask & AlignmentDataMask::QUALITIES)
         {
-            qualities = host.qualities;
-            qual_start = host.qual_start;
-            qual_len = host.qual_len;
+            this->qualities = host.qualities;
+            this->qual_start = host.qual_start;
+            this->qual_len = host.qual_len;
         } else {
-            qualities.clear();
-            qual_start.clear();
-            qual_len.clear();
+            this->qualities.clear();
+            this->qual_start.clear();
+            this->qual_len.clear();
         }
 
-        if (data_mask & AlignmentDataMask::FLAGS)
+        if (this->data_mask & AlignmentDataMask::FLAGS)
         {
-            flags = host.flags;
+            this->flags = host.flags;
         } else {
-            flags.clear();
+            this->flags.clear();
         }
 
-        if (data_mask & AlignmentDataMask::MAPQ)
+        if (this->data_mask & AlignmentDataMask::MAPQ)
         {
-            mapq = host.mapq;
+            this->mapq = host.mapq;
         } else {
-            mapq.clear();
+            this->mapq.clear();
         }
 
-        if (data_mask & AlignmentDataMask::READ_GROUP)
+        if (this->data_mask & AlignmentDataMask::READ_GROUP)
         {
-            read_group = host.read_group;
+            this->read_group = host.read_group;
         } else {
-            read_group.clear();
+            this->read_group.clear();
         }
     }
 };
 
+template <target_system system>
 struct alignment_batch
 {
     // host data comes from outside impl and can change
     const alignment_batch_host *host;
-    alignment_batch_device device;
+    alignment_batch_device<system> device;
 
     alignment_batch()
         : host(NULL)

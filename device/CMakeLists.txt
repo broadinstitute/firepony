@@ -8,7 +8,6 @@ covariates.h
 covariates_table.cu
 covariates_table.h
 covariates.cu
-device_types.h
 firepony_context.cu
 firepony_context.h
 fractional_errors.cu
@@ -46,6 +45,7 @@ from_nvbio/bufferedtextfile.h
 from_nvbio/dna.h
 
 primitives/algorithms.h
+primitives/backends.h
 primitives/cuda.h
 primitives/packed_stream_packer.h
 primitives/packed_stream.h

@@ -28,10 +28,10 @@
 namespace firepony {
 
 // filter if any of the flags are set
-template<uint32 flags>
-struct filter_if_any_set : public lambda
+template <target_system system, uint32 flags>
+struct filter_if_any_set : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
@@ -45,9 +45,10 @@ struct filter_if_any_set : public lambda
 };
 
 // implements the GATK filters MappingQualityUnavailable and MappingQualityZero
-struct filter_mapq : public lambda
+template <target_system system>
+struct filter_mapq : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
@@ -62,9 +63,10 @@ struct filter_mapq : public lambda
 };
 
 // partially implements the GATK MalformedReadFilter
-struct filter_malformed_reads : public lambda
+template <target_system system>
+struct filter_malformed_reads : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
@@ -139,9 +141,10 @@ struct filter_malformed_reads : public lambda
 };
 
 // implements another part of the GATK MalformedReadFilter
-struct filter_malformed_cigars : public lambda
+template <target_system system>
+struct filter_malformed_cigars : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
@@ -242,10 +245,11 @@ struct filter_malformed_cigars : public lambda
 };
 
 // apply read filters to the batch
-void filter_reads(firepony_context& context, const alignment_batch& batch)
+template <target_system system>
+void filter_reads(firepony_context<system>& context, const alignment_batch<system>& batch)
 {
-    D_VectorU32& active_read_list = context.active_read_list;
-    D_VectorU32& temp_u32 = context.temp_u32;
+    auto& active_read_list = context.active_read_list;
+    auto& temp_u32 = context.temp_u32;
     uint32 num_active;
     uint32 start_count;
 
@@ -254,16 +258,17 @@ void filter_reads(firepony_context& context, const alignment_batch& batch)
     // - FailsVendorQualityCheckFilter
     // - NotPrimaryAlignmentFilter
     // - UnmappedReadFilter
-    filter_if_any_set<AlignmentFlags::DUPLICATE |
+    filter_if_any_set<system,
+                      AlignmentFlags::DUPLICATE |
                       AlignmentFlags::QC_FAIL |
                       AlignmentFlags::UNMAP |
                       AlignmentFlags::SECONDARY> flags_filter(context, batch.device);
 
     // corresponds to the GATK filters MappingQualityUnavailable and MappingQualityZero
-    filter_mapq mapq_filter(context, batch.device);
+    filter_mapq<system> mapq_filter(context, batch.device);
     // corresponds to the GATK filter MalformedReadFilter
-    filter_malformed_reads malformed_read_filter(context, batch.device);
-    filter_malformed_cigars malformed_cigar_filter(context, batch.device);
+    filter_malformed_reads<system> malformed_read_filter(context, batch.device);
+    filter_malformed_cigars<system> malformed_cigar_filter(context, batch.device);
 
     start_count = active_read_list.size();
     num_active = active_read_list.size();
@@ -272,32 +277,32 @@ void filter_reads(firepony_context& context, const alignment_batch& batch)
     context.temp_u32.resize(active_read_list.size());
 
     // apply the mapq filter, copying from active_read_list into temp_u32
-    num_active = copy_if(active_read_list.begin(),
-                         num_active,
-                         temp_u32.begin(),
-                         mapq_filter,
-                         context.temp_storage);
+    num_active = parallel<system>::copy_if(active_read_list.begin(),
+                                           num_active,
+                                           temp_u32.begin(),
+                                           mapq_filter,
+                                           context.temp_storage);
 
     // apply the flags filters, copying from temp_u32 into active_read_list
-    num_active = copy_if(temp_u32.begin(),
-                         num_active,
-                         active_read_list.begin(),
-                         flags_filter,
-                         context.temp_storage);
+    num_active = parallel<system>::copy_if(temp_u32.begin(),
+                                           num_active,
+                                           active_read_list.begin(),
+                                           flags_filter,
+                                           context.temp_storage);
 
     // apply the malformed read filters, copying from active_read_list into temp_u32
-    num_active = copy_if(active_read_list.begin(),
-                         num_active,
-                         temp_u32.begin(),
-                         malformed_read_filter,
-                         context.temp_storage);
+    num_active = parallel<system>::copy_if(active_read_list.begin(),
+                                           num_active,
+                                           temp_u32.begin(),
+                                           malformed_read_filter,
+                                           context.temp_storage);
 
     // apply the malformed cigar filters, copying from temp_u32 into active_read_list
-    num_active = copy_if(temp_u32.begin(),
-                         num_active,
-                         active_read_list.begin(),
-                         malformed_cigar_filter,
-                         context.temp_storage);
+    num_active = parallel<system>::copy_if(temp_u32.begin(),
+                                           num_active,
+                                           active_read_list.begin(),
+                                           malformed_cigar_filter,
+                                           context.temp_storage);
 
     // resize active_read_list
     active_read_list.resize(num_active);
@@ -305,11 +310,13 @@ void filter_reads(firepony_context& context, const alignment_batch& batch)
     // track how many reads we filtered
     context.stats.filtered_reads += start_count - num_active;
 }
+INSTANTIATE(filter_reads);
 
 // filter non-regular bases (anything other than A, C, G, T)
-struct filter_non_regular_bases : public lambda
+template <target_system system>
+struct filter_non_regular_bases : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -336,9 +343,10 @@ struct filter_non_regular_bases : public lambda
 #define MIN_USABLE_Q_SCORE 6
 
 // filter bases with quality < MIN_USABLE_Q_SCORE
-struct filter_low_quality_bases : public lambda
+template <target_system system>
+struct filter_low_quality_bases : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -357,15 +365,18 @@ struct filter_low_quality_bases : public lambda
 
 // apply per-BP filters to the batch
 // (known SNPs are filtered elsewhere)
-void filter_bases(firepony_context& context, const alignment_batch& batch)
+template <target_system system>
+void filter_bases(firepony_context<system>& context, const alignment_batch<system>& batch)
 {
-    thrust::for_each(context.active_read_list.begin(),
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     filter_non_regular_bases(context, batch.device));
+                     filter_non_regular_bases<system>(context, batch.device));
 
-    thrust::for_each(context.active_read_list.begin(),
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     filter_low_quality_bases(context, batch.device));
+                     filter_low_quality_bases<system>(context, batch.device));
 }
+INSTANTIATE(filter_bases);
 
 } // namespace firepony
+

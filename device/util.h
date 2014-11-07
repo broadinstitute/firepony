@@ -25,12 +25,12 @@
 namespace firepony {
 
 // prepare temp_storage to store num_elements to be packed into a bit vector
-void pack_prepare_storage_2bit(D_VectorU8& storage, uint32 num_elements);
-void pack_prepare_storage_1bit(D_VectorU8& storage, uint32 num_elements);
+template <target_system system> void pack_prepare_storage_2bit(d_vector_u8<system>& storage, uint32 num_elements);
+template <target_system system> void pack_prepare_storage_1bit(d_vector_u8<system>& storage, uint32 num_elements);
 
 // packs a vector of uint8 into a bit vector
-void pack_to_2bit(D_PackedVector_2b& dest, D_VectorU8& src);
-void pack_to_1bit(D_PackedVector_1b& dest, D_VectorU8& src);
+template <target_system system> void pack_to_2bit(d_packed_vector_2b<system>& dest, d_vector_u8<system>& src);
+template <target_system system> void pack_to_1bit(d_packed_vector_1b<system>& dest, d_vector_u8<system>& src);
 
 // round a double to the Nth decimal place
 double round_n(double val, int n);

@@ -18,15 +18,14 @@
 
 #pragma once
 
+#include "backends.h"
+
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 #include <thrust/iterator/iterator_traits.h>
 #include <thrust/iterator/reverse_iterator.h>
 
 namespace firepony {
-
-typedef thrust::host_system_tag host_tag;
-typedef thrust::device_system_tag device_tag;
 
 template <typename T, typename IndexType = uint64>
 struct vector_view
@@ -208,14 +207,11 @@ private:
     iterator m_vec;
 };
 
-template <typename system_tag, typename T>
-struct vector { };
-
-template <typename T>
-struct vector<host_tag, T> : public thrust::host_vector<T>
+template <target_system system, typename T>
+struct vector : public backend_vector_type<system, T>::vector_type
 {
-    typedef thrust::host_vector<T>      base;
-    using base::base;   // inherit constructors from thrust::host_vector
+    typedef typename backend_vector_type<system, T>::vector_type   base;
+    using base::base;   // inherit constructors from the base vector
 
     typedef vector_view<T> view;
     typedef vector_view<const T> const_view;
@@ -233,52 +229,24 @@ struct vector<host_tag, T> : public thrust::host_vector<T>
     }
 
     // assignment from a host vector view
-    void copy_from_view(const typename vector<host_tag, T>::const_view& other)
+    void copy_from_view(const typename vector<host, T>::const_view& other)
     {
         base::assign(other.begin(), other.end());
     }
 };
 
-template <typename T>
-struct vector<device_tag, T> : public thrust::device_vector<T>
+// prevent std::string vectors from being created on the device
+template<target_system system>
+struct vector<system, std::string>
 {
-    typedef thrust::device_vector<T>      base;
-    using base::base;   // inherit constructors from thrust::device_vector
-
-    typedef vector_view<T> view;
-    typedef vector_view<const T> const_view;
-
-    operator view()
-    {
-        return view(base::size() ? thrust::raw_pointer_cast(base::data()) : nullptr,
-                    base::size());
-    }
-
-    operator const_view() const
-    {
-        return const_view(base::size() ? thrust::raw_pointer_cast(base::data()) : nullptr,
-                          base::size());
-    }
-
-    // assignment from a host vector view
-    void copy_from_view(const typename vector<host_tag, T>::const_view& other)
-    {
-        base::assign(other.begin(), other.end());
-    }
+    vector() = delete;
 };
 
-// xxxnsubtil: document this
 template<>
-struct vector<host_tag, std::string> : public std::vector<std::string>
+struct vector<host, std::string> : public std::vector<std::string>
 {
     typedef std::vector<std::string> base;
     using base::base;
-};
-
-template<>
-struct vector<device_tag, std::string>
-{
-    vector() = delete;
 };
 
 } // namespace firepony

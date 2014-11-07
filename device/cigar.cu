@@ -42,9 +42,10 @@ struct cigar_op_len : public thrust::unary_function<const cigar_op&, uint32>
 };
 
 // expand cigar ops into temp storage
-struct cigar_op_expand : public lambda
+template <target_system system>
+struct cigar_op_expand : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 op_index)
     {
@@ -83,30 +84,29 @@ struct cigar_op_expand : public lambda
 };
 
 // compact the cigar events from temporary storage into a 2-bit packed vector
-struct cigar_op_compact : public lambda
+template <target_system system>
+struct cigar_op_compact : public lambda<system>
 {
-    cigar_op_compact(firepony_context::view ctx,
-                     const alignment_batch_device::const_view batch)
-        : lambda(ctx, batch)
-    { }
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 word_index)
     {
-        D_PackedVector_2b::view& events = ctx.cigar.cigar_events;
-        const uint8 *input = &ctx.temp_storage[word_index * D_PackedVector_2b::SYMBOLS_PER_WORD];
+        auto& events = ctx.cigar.cigar_events;
+        const uint8 *input = &ctx.temp_storage[word_index * d_packed_vector_2b<system>::SYMBOLS_PER_WORD];
 
-        for(uint32 i = 0; i < D_PackedVector_2b::SYMBOLS_PER_WORD; i++)
+        for(uint32 i = 0; i < d_packed_vector_2b<system>::SYMBOLS_PER_WORD; i++)
         {
-            events[word_index * D_PackedVector_2b::SYMBOLS_PER_WORD + i] = input[i];
+            events[word_index * d_packed_vector_2b<system>::SYMBOLS_PER_WORD + i] = input[i];
         }
     }
 };
 
 // initialize read windows
 // note: this does not initialize the reference window, as it needs to be computed once all clipping has been done
-struct read_window_init : public lambda
+template <target_system system>
+struct read_window_init : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -116,9 +116,10 @@ struct read_window_init : public lambda
 };
 
 // clips sequencing adapters from the reads
-struct remove_adapters : public lambda
+template <target_system system>
+struct remove_adapters : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE bool hasWellDefinedFragmentSize(const uint32 read_index)
     {
@@ -244,9 +245,10 @@ struct remove_adapters : public lambda
 };
 
 // remove soft-clip regions from the active read window
-struct remove_soft_clips : public lambda
+template <target_system system>
+struct remove_soft_clips : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -307,9 +309,10 @@ struct remove_soft_clips : public lambda
 };
 
 // compute clipped read window without leading/trailing insertions
-struct compute_no_insertions_window : public lambda
+template <target_system system>
+struct compute_no_insertions_window : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -351,9 +354,10 @@ struct compute_no_insertions_window : public lambda
     }
 };
 
-struct compute_reference_window : public lambda
+template <target_system system>
+struct compute_reference_window : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -415,9 +419,10 @@ struct compute_reference_window : public lambda
 
 // expand cigar coordinates for a read
 // xxxnsubtil: this is very similar to compute_alignment_window, should merge
-struct cigar_coordinates_expand : public lambda
+template <target_system system>
+struct cigar_coordinates_expand : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -492,9 +497,10 @@ struct cigar_coordinates_expand : public lambda
     }
 };
 
-struct compute_error_vectors : public lambda
+template <target_system system>
+struct compute_error_vectors : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -588,12 +594,10 @@ struct compute_error_vectors : public lambda
 
 #ifdef CUDA_DEBUG
 // debug aid: sanity check that the expanded cigar events match what we expect
-struct sanity_check_cigar_events : public lambda
+template <target_system system>
+struct sanity_check_cigar_events : public lambda<system>
 {
-    sanity_check_cigar_events(firepony_context::view ctx,
-                              const alignment_batch_device::const_view batch)
-        : lambda(ctx, batch)
-    { }
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -664,9 +668,10 @@ struct sanity_check_cigar_events : public lambda
 };
 #endif
 
-void expand_cigars(firepony_context& context, const alignment_batch& batch)
+template <target_system system>
+void expand_cigars(firepony_context<system>& context, const alignment_batch<system>& batch)
 {
-    cigar_context& ctx = context.cigar;
+    auto& ctx = context.cigar;
 
     // compute the offsets of each expanded cigar op
     // xxxnsubtil: we ignore the active read list here, so we do unnecessary work
@@ -676,10 +681,10 @@ void expand_cigars(firepony_context& context, const alignment_batch& batch)
     // mark the first offset as 0
     thrust::fill_n(ctx.cigar_offsets.begin(), 1, 0);
     // do an inclusive scan to compute all offsets + the total size
-    inclusive_scan(thrust::make_transform_iterator(batch.device.cigars.begin(), cigar_op_len()),
-                   batch.device.cigars.size(),
-                   ctx.cigar_offsets.begin() + 1,
-                   thrust::plus<uint32>());
+    parallel<system>::inclusive_scan(thrust::make_transform_iterator(batch.device.cigars.begin(), cigar_op_len()),
+                                     batch.device.cigars.size(),
+                                     ctx.cigar_offsets.begin() + 1,
+                                     thrust::plus<uint32>());
 
     // read back the last element, which contains the size of the buffer required
     uint32 expanded_cigar_len = ctx.cigar_offsets[batch.device.cigars.size()];
@@ -713,63 +718,65 @@ void expand_cigars(firepony_context& context, const alignment_batch& batch)
     thrust::fill(ctx.cigar_event_read_index.begin(), ctx.cigar_event_read_index.end(), uint32(-1));
 
     // expand the cigar ops into temp storage (xxxnsubtil: same as above, active read list is ignored)
-    thrust::for_each(thrust::make_counting_iterator(0),
+    parallel<system>::for_each(thrust::make_counting_iterator(0),
                      thrust::make_counting_iterator(0) + batch.device.cigars.size(),
-                     cigar_op_expand(context, batch.device));
+                     cigar_op_expand<system>(context, batch.device));
 
     // pack the cigar into a 2-bit vector
     pack_to_2bit(ctx.cigar_events, context.temp_storage);
 
 #ifdef CUDA_DEBUG
-    thrust::for_each(firepony_context.active_read_list.begin(),
+    parallel<system>::for_each(firepony_context.active_read_list.begin(),
                      firepony_context.active_read_list.end(),
-                     sanity_check_cigar_events(firepony_context, batch.device));
+                     sanity_check_cigar_events<system>(firepony_context, batch.device));
 #endif
 
     // now expand the coordinates per read
     // this avoids having to deal with boundary conditions within reads
-    thrust::for_each(context.active_read_list.begin(),
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     cigar_coordinates_expand(context, batch.device));
+                     cigar_coordinates_expand<system>(context, batch.device));
 
     // initialize read windows
-    thrust::for_each(context.active_read_list.begin(),
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     read_window_init(context, batch.device));
+                     read_window_init<system>(context, batch.device));
 
     // remove sequencing adapters
-    thrust::for_each(context.active_read_list.begin(),
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     remove_adapters(context, batch.device));
+                     remove_adapters<system>(context, batch.device));
 
     // remove soft clip regions
-    thrust::for_each(context.active_read_list.begin(),
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     remove_soft_clips(context, batch.device));
+                     remove_soft_clips<system>(context, batch.device));
 
     // compute the no insertions window based on the clipping window
-    thrust::for_each(context.active_read_list.begin(),
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     compute_no_insertions_window(context, batch.device));
+                     compute_no_insertions_window<system>(context, batch.device));
 
     // finally, compute the reference window (using the no insertions window)
-    thrust::for_each(context.active_read_list.begin(),
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     compute_reference_window(context, batch.device));
+                     compute_reference_window<system>(context, batch.device));
 
     // compute the error bit vectors
     // this also counts the number of errors in each read
-    thrust::for_each(context.active_read_list.begin(),
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     compute_error_vectors(context, batch.device));
+                     compute_error_vectors<system>(context, batch.device));
 }
+INSTANTIATE(expand_cigars);
 
-void debug_cigar(firepony_context& context, const alignment_batch& batch, int read_index)
+template <target_system system>
+void debug_cigar(firepony_context<system>& context, const alignment_batch<system>& batch, int read_index)
 {
-    const alignment_batch_host& h_batch = *batch.host;
+    const auto& h_batch = *batch.host;
 
     const CRQ_index idx = h_batch.crq_index(read_index);
-    const cigar_context& ctx = context.cigar;
+    const auto& ctx = context.cigar;
 
     fprintf(stderr, "  cigar info:\n");
 
@@ -943,5 +950,7 @@ void debug_cigar(firepony_context& context, const alignment_batch& batch, int re
 
     fprintf(stderr, "\n");
 }
+INSTANTIATE(debug_cigar);
 
 } // namespace firepony
+

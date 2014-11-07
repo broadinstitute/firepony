@@ -26,13 +26,14 @@
 namespace firepony {
 
 // the cycle portion of GATK's RecalTable2
+template <target_system system>
 struct covariate_table_cycle_illumina
 {
     // the type that represents the chain of covariates
-    typedef covariate_ReadGroup<
-             covariate_QualityScore<
-              covariate_Cycle_Illumina<
-               covariate_EventTracker<> > > > chain;
+    typedef covariate_ReadGroup<system,
+             covariate_QualityScore<system,
+              covariate_Cycle_Illumina<system,
+               covariate_EventTracker<system> > > > chain;
 
     // the index of each covariate in the chain
     // (used when decoding a key)
@@ -54,9 +55,9 @@ struct covariate_table_cycle_illumina
         return chain::decode(key, id);
     }
 
-    static void dump_table(firepony_context& context, D_CovariateTable& d_table)
+    static void dump_table(firepony_context<system>& context, d_covariate_table<system>& d_table)
     {
-        H_CovariateTable table;
+        h_covariate_table table;
         table.copyfrom(d_table);
 
         for(uint32 i = 0; i < table.size(); i++)

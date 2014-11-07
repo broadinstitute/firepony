@@ -25,9 +25,13 @@
 #include "device/sequence_data_device.h"
 #include "device/variant_data_device.h"
 
+#include "types.h"
+#include "command_line.h"
+#include "gamgee_loader.h"
+#include "io_thread.h"
+
 #include "device/baq.h"
 #include "device/firepony_context.h"
-#include "device/device_types.h"
 #include "device/cigar.h"
 #include "device/covariates.h"
 #include "device/fractional_errors.h"
@@ -37,13 +41,10 @@
 #include "device/string_database.h"
 #include "device/util.h"
 
-#include "command_line.h"
-#include "gamgee_loader.h"
-#include "io_thread.h"
-
 using namespace firepony;
 
-void debug_read(firepony_context *context, const alignment_batch& batch, int read_index);
+template <target_system system>
+void debug_read(firepony_context<system> *context, const alignment_batch<system>& batch, int read_index);
 
 void init_cuda(void)
 {
@@ -65,6 +66,8 @@ void init_cuda(void)
 
 int main(int argc, char **argv)
 {
+    constexpr auto target_system = firepony::cuda;
+
     sequence_data_host h_reference;
     variant_database_host h_dbsnp;
     size_t num_bytes;
@@ -73,7 +76,7 @@ int main(int argc, char **argv)
     parse_command_line(argc, argv);
 
 #ifndef RUN_ON_CPU
-    init_cuda();
+//    init_cuda();
 #endif
 
     // load the reference genome
@@ -87,7 +90,7 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    firepony::sequence_data reference(h_reference);
+    firepony::sequence_data<target_system> reference(h_reference);
     num_bytes = reference.download();
     fprintf(stderr, "downloaded %lu MB of reference data\n", num_bytes / (1024 * 1024));
 
@@ -103,7 +106,7 @@ int main(int argc, char **argv)
 
     fprintf(stderr, "%u variants\n", h_dbsnp.view.num_variants);
 
-    variant_database dbsnp(h_dbsnp);
+    variant_database<target_system> dbsnp(h_dbsnp);
     num_bytes = dbsnp.download();
     fprintf(stderr, "downloaded %lu MB of variant data\n", num_bytes / (1024 * 1024));
 
@@ -126,10 +129,10 @@ int main(int argc, char **argv)
     bam_thread.start();
 
     // xxxnsubtil: fix later
-    alignment_header header(bam_thread.file.header);
+    alignment_header<target_system> header(bam_thread.file.header);
     header.download();
     
-    firepony_context context(header, reference, dbsnp);
+    firepony_context<target_system> context(header, reference, dbsnp);
 
     auto& stats = context.stats;
     cpu_timer wall_clock;
@@ -145,7 +148,7 @@ int main(int argc, char **argv)
 
     wall_clock.start();
 
-    alignment_batch batch;
+    alignment_batch<target_system> batch;
 
     while(!bam_thread.done())
     {
@@ -298,7 +301,8 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void debug_read(firepony_context *context, const alignment_batch& batch, int read_id)
+template <target_system system>
+void debug_read(firepony_context<system> *context, const alignment_batch<system>& batch, int read_id)
 {
     const alignment_batch_host& h_batch = *batch.host;
 

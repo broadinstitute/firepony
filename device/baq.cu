@@ -55,9 +55,10 @@ namespace firepony {
 #define LMEM_MAX_READ_LEN 151
 #define LMEM_MAT_SIZE ((LMEM_MAX_READ_LEN + 1) * 6 * (2 * MAX_BAND_WIDTH + 1))
 
-struct compute_hmm_windows : public lambda
+template <target_system system>
+struct compute_hmm_windows : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -98,14 +99,15 @@ struct compute_hmm_windows : public lambda
 };
 
 // runs the entire BAQ algorithm in a single kernel, storing forward and backward matrices in local memory
-struct hmm_glocal_full_lmem : public lambda
+template <target_system system>
+struct hmm_glocal_lmem : public lambda<system>
 {
-    D_VectorU32::view baq_state;
+    typename d_vector<system, uint32>::view baq_state;
 
-    hmm_glocal_full_lmem(firepony_context::view ctx,
-                         const alignment_batch_device::const_view batch,
-                         D_VectorU32::view baq_state)
-        : lambda(ctx, batch), baq_state(baq_state)
+    hmm_glocal_lmem(typename firepony_context<system>::view ctx,
+                    const typename alignment_batch_device<system>::const_view batch,
+                    typename d_vector<system, uint32>::view baq_state)
+        : lambda<system>(ctx, batch), baq_state(baq_state)
     { }
 
     int bandWidth, bandWidth2;
@@ -119,8 +121,8 @@ struct hmm_glocal_full_lmem : public lambda
 
     double m[9];
 
-    D_StreamDNA16 referenceBases;
-    D_StreamDNA16 queryBases;
+    d_stream_dna16<system> referenceBases;
+    d_stream_dna16<system> queryBases;
     const uint8 *inputQualities;
 
     uint8 *outputQualities;
@@ -129,6 +131,9 @@ struct hmm_glocal_full_lmem : public lambda
     template<typename Tuple>
     CUDA_HOST_DEVICE void setup(const Tuple& hmm_index)
     {
+        auto& ctx = this->ctx;
+        auto& batch = this->batch;
+
         const uint32 read_index    = thrust::get<0>(hmm_index);
         const uint32 scaling_index = thrust::get<2>(hmm_index);
 
@@ -538,15 +543,15 @@ struct hmm_glocal_full_lmem : public lambda
     }
 };
 
-// encapsulates common state for the HMM algorithm
-struct hmm_common : public lambda
+template <target_system system>
+struct hmm_glocal : public lambda<system>
 {
-    D_VectorU32::view baq_state;
+    typename vector<system, uint32>::view baq_state;
 
-    hmm_common(firepony_context::view ctx,
-               const alignment_batch_device::const_view batch,
-               D_VectorU32::view baq_state)
-        : lambda(ctx, batch), baq_state(baq_state)
+    hmm_glocal(typename firepony_context<system>::view ctx,
+               const typename alignment_batch_device<system>::const_view batch,
+               typename vector<system, uint32>::view baq_state)
+        : lambda<system>(ctx, batch), baq_state(baq_state)
     { }
 
     int bandWidth, bandWidth2;
@@ -562,8 +567,8 @@ struct hmm_common : public lambda
 
     double m[9];
 
-    D_StreamDNA16 referenceBases;
-    D_StreamDNA16 queryBases;
+    d_stream_dna16<system> referenceBases;
+    d_stream_dna16<system> queryBases;
     const uint8 *inputQualities;
 
     uint8 *outputQualities;
@@ -572,6 +577,9 @@ struct hmm_common : public lambda
     template<typename Tuple>
     CUDA_HOST_DEVICE void setup(const Tuple& hmm_index)
     {
+        auto& ctx = this->ctx;
+        auto& batch = this->batch;
+
         const uint32 read_index    = thrust::get<0>(hmm_index);
         const uint32 matrix_index  = thrust::get<1>(hmm_index);
         const uint32 scaling_index = thrust::get<2>(hmm_index);
@@ -687,18 +695,13 @@ struct hmm_common : public lambda
         double e = (ref == read ? 1 - qual : qual * EM);
         return e;
     }
-};
-
-struct hmm_glocal_forward : public hmm_common
-{
-    using hmm_common::hmm_common;
 
     template<typename Tuple>
     CUDA_HOST_DEVICE void operator() (const Tuple& hmm_index)
     {
         int i, k;
 
-        hmm_common::setup(hmm_index);
+        setup(hmm_index);
 
 //        const uint32 read_index    = thrust::get<0>(hmm_index);
 //        fprintf(stderr, "read %d: hmm_glocal(l_ref=%d qstart=%d, l_query=%d)\n", read_index, referenceLength, queryStart, queryLen);
@@ -838,19 +841,6 @@ struct hmm_glocal_forward : public hmm_common
 
             scalingFactors[queryLen+1] = sum; // the last scaling factor
         }
-    }
-};
-
-struct hmm_glocal_backward : public hmm_common
-{
-    using hmm_common::hmm_common;
-
-    template<typename Tuple>
-    CUDA_HOST_DEVICE void operator() (const Tuple& hmm_index)
-    {
-        int i, k;
-
-        hmm_common::setup(hmm_index);
 
         /*** backward ***/
         // b[l_query] (b[l_query+1][0]=1 and thus \tilde{b}[][]=1/s[l_query+1]; this is where s[l_query+1] comes from)
@@ -935,19 +925,6 @@ struct hmm_glocal_backward : public hmm_common
             backwardMatrix[off(0, set_u(bandWidth, 0, 0))] = sum / scalingFactors[0];
 //            pb = backwardMatrix[off(0, set_u(bandWidth, 0, 0))]; // if everything works as is expected, pb == 1.0
         }
-    }
-};
-
-struct hmm_glocal_map : public hmm_common
-{
-    using hmm_common::hmm_common;
-
-    template<typename Tuple>
-    CUDA_HOST_DEVICE void operator() (const Tuple& hmm_index)
-    {
-        int i, k;
-
-        hmm_common::setup(hmm_index);
 
         /*** MAP ***/
         for (i = 1; i <= queryLen; ++i)
@@ -1011,20 +988,22 @@ struct hmm_glocal_map : public hmm_common
 
 // functor to compute the size required for the forward/backward HMM matrix
 // note that this computes the size required for *one* matrix only; we allocate the matrices on two separate vectors and use the same index for both
-struct compute_hmm_matrix_size : public thrust::unary_function<uint32, uint32>, public lambda
+template <target_system system>
+struct compute_hmm_matrix_size : public thrust::unary_function<uint32, uint32>, public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE uint32 operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
-        return hmm_common::matrix_size(idx.read_len);
+        return hmm_glocal<system>::matrix_size(idx.read_len);
     }
 };
 
-struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, uint32>, public lambda
+template <target_system system>
+struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, uint32>, public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE uint32 operator() (const uint32 read_index)
     {
@@ -1033,9 +1012,10 @@ struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, u
     }
 };
 
-struct read_needs_baq : public lambda
+template <target_system system>
+struct read_needs_baq : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
@@ -1046,9 +1026,10 @@ struct read_needs_baq : public lambda
     }
 };
 
-struct read_flat_baq : public lambda
+template <target_system system>
+struct read_flat_baq : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -1074,14 +1055,15 @@ struct read_flat_baq : public lambda
 };
 
 // bottom half of BAQ.calcBAQFromHMM in GATK
-struct cap_baq_qualities : public lambda
+template <target_system system>
+struct cap_baq_qualities : public lambda<system>
 {
-    D_VectorU32::view baq_state;
+    typename vector<system, uint32>::view baq_state;
 
-    cap_baq_qualities(firepony_context::view ctx,
-                      const alignment_batch_device::const_view batch,
-                      D_VectorU32::view baq_state)
-        : lambda(ctx, batch), baq_state(baq_state)
+    cap_baq_qualities(typename firepony_context<system>::view ctx,
+                      const typename alignment_batch_device<system>::const_view batch,
+                      typename vector<system, uint32>::view baq_state)
+        : lambda<system>(ctx, batch), baq_state(baq_state)
     { }
 
     CUDA_HOST_DEVICE bool stateIsIndel(uint32 state)
@@ -1113,6 +1095,9 @@ struct cap_baq_qualities : public lambda
     // xxxnsubtil: this could use some cleanup
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
+        auto& ctx = this->ctx;
+        auto& batch = this->batch;
+
         const CRQ_index idx = batch.crq_index(read_index);
 
         const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
@@ -1189,9 +1174,10 @@ struct cap_baq_qualities : public lambda
 };
 
 // transforms BAQ scores the same way as GATK's encodeBQTag
-struct recode_baq_qualities : public lambda
+template <target_system system>
+struct recode_baq_qualities : public lambda<system>
 {
-    using lambda::lambda;
+    LAMBDA_INHERIT;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -1212,11 +1198,12 @@ struct recode_baq_qualities : public lambda
     }
 };
 
-void baq_reads(firepony_context& context, const alignment_batch& batch)
+template <target_system system>
+void baq_reads(firepony_context<system>& context, const alignment_batch<system>& batch)
 {
-    struct baq_context& baq = context.baq;
-    D_VectorU32& active_baq_read_list = context.temp_u32;
-    D_VectorU32& baq_state = context.temp_u32_2;
+    struct baq_context<system>& baq = context.baq;
+    vector<system, uint32>& active_baq_read_list = context.temp_u32;
+    vector<system, uint32>& baq_state = context.temp_u32_2;
 
     // check if we can use the lmem kernel
     const bool baq_use_lmem = (batch.host->max_read_size <= LMEM_MAX_READ_LEN);
@@ -1237,11 +1224,11 @@ void baq_reads(firepony_context& context, const alignment_batch& batch)
     // collect the reads that we need to compute BAQ for
     active_baq_read_list.resize(context.active_read_list.size());
 
-    num_active = copy_if(context.active_read_list.begin(),
-                         context.active_read_list.size(),
-                         active_baq_read_list.begin(),
-                         read_needs_baq(context, batch.device),
-                         context.temp_storage);
+    num_active = parallel<system>::copy_if(context.active_read_list.begin(),
+                                           context.active_read_list.size(),
+                                           active_baq_read_list.begin(),
+                                           read_needs_baq<system>(context, batch.device),
+                                           context.temp_storage);
 
     active_baq_read_list.resize(num_active);
 
@@ -1252,11 +1239,11 @@ void baq_reads(firepony_context& context, const alignment_batch& batch)
         // first offset is zero
         thrust::fill_n(baq.matrix_index.begin(), 1, 0);
         // do an inclusive scan to compute all offsets + the total size
-        inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
-                       compute_hmm_matrix_size(context, batch.device)),
-                       num_active,
-                       baq.matrix_index.begin() + 1,
-                       thrust::plus<uint32>());
+        parallel<system>::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
+                                                                         compute_hmm_matrix_size<system>(context, batch.device)),
+                                         num_active,
+                                         baq.matrix_index.begin() + 1,
+                                         thrust::plus<uint32>());
 
         uint32 matrix_len = baq.matrix_index[num_active];
 
@@ -1268,11 +1255,11 @@ void baq_reads(firepony_context& context, const alignment_batch& batch)
     baq.scaling_index.resize(num_active + 1);
     // first offset is zero
     thrust::fill_n(baq.scaling_index.begin(), 1, 0);
-    inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
-                                                   compute_hmm_scaling_factor_size(context, batch.device)),
-                   num_active,
-                   baq.scaling_index.begin() + 1,
-                   thrust::plus<uint32>());
+    parallel<system>::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
+                                                                     compute_hmm_scaling_factor_size<system>(context, batch.device)),
+                                     num_active,
+                                     baq.scaling_index.begin() + 1,
+                                     thrust::plus<uint32>());
 
     uint32 scaling_len = baq.scaling_index[num_active];
     baq.scaling.resize(scaling_len);
@@ -1306,9 +1293,9 @@ void baq_reads(firepony_context& context, const alignment_batch& batch)
 
     // compute the alignment frames
     // note: this is used both for real BAQ and flat BAQ, so we use the full active read list
-    thrust::for_each(context.active_read_list.begin(),
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     compute_hmm_windows(context, batch.device));
+                     compute_hmm_windows<system>(context, batch.device));
 
     // initialize matrices and scaling factors
     if (!baq_use_lmem)
@@ -1326,42 +1313,22 @@ void baq_reads(firepony_context& context, const alignment_batch& batch)
     if (baq_use_lmem)
     {
         // fast path: use local memory for the matrices
-        thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
+        parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
                                                                       baq.matrix_index.begin(),
                                                                       baq.scaling_index.begin())),
                          thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
                                                                       baq.matrix_index.end(),
                                                                       baq.scaling_index.end())),
-                         hmm_glocal_full_lmem(context, batch.device, baq_state));
+                         hmm_glocal_lmem<system>(context, batch.device, baq_state));
     } else {
         // slow path: store the matrices in global memory
-
-        // run the forward portion
-        thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
+        parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
                                                                       baq.matrix_index.begin(),
                                                                       baq.scaling_index.begin())),
                          thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
                                                                       baq.matrix_index.end(),
                                                                       baq.scaling_index.end())),
-                         hmm_glocal_forward(context, batch.device, baq_state));
-
-        // run the backward portion
-        thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
-                                                                      baq.matrix_index.begin(),
-                                                                      baq.scaling_index.begin())),
-                         thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
-                                                                      baq.matrix_index.end(),
-                                                                      baq.scaling_index.end())),
-                         hmm_glocal_backward(context, batch.device, baq_state));
-
-        // use the computed state to map qualities
-        thrust::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
-                                                                      baq.matrix_index.begin(),
-                                                                      baq.scaling_index.begin())),
-                         thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
-                                                                      baq.matrix_index.end(),
-                                                                      baq.scaling_index.end())),
-                         hmm_glocal_map(context, batch.device, baq_state));
+                         hmm_glocal<system>(context, batch.device, baq_state));
     }
 
     baq_hmm.stop();
@@ -1369,18 +1336,18 @@ void baq_reads(firepony_context& context, const alignment_batch& batch)
     baq_postprocess.start();
 
     // for any reads that we did *not* compute a BAQ, mark the base pairs as having no BAQ uncertainty
-    thrust::for_each(context.active_read_list.begin(),
+    parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),
-                     read_flat_baq(context, batch.device));
+                     read_flat_baq<system>(context, batch.device));
 
     // transform quality scores
-    thrust::for_each(active_baq_read_list.begin(),
+    parallel<system>::for_each(active_baq_read_list.begin(),
                      active_baq_read_list.end(),
-                     cap_baq_qualities(context, batch.device, baq_state));
+                     cap_baq_qualities<system>(context, batch.device, baq_state));
 
-    thrust::for_each(active_baq_read_list.begin(),
+    parallel<system>::for_each(active_baq_read_list.begin(),
                      active_baq_read_list.end(),
-                     recode_baq_qualities(context, batch.device));
+                     recode_baq_qualities<system>(context, batch.device));
 
     baq_postprocess.stop();
 
@@ -1391,8 +1358,10 @@ void baq_reads(firepony_context& context, const alignment_batch& batch)
     context.stats.baq_hmm.add(baq_hmm);
     context.stats.baq_postprocess.add(baq_postprocess);
 }
+INSTANTIATE(baq_reads);
 
-void debug_baq(firepony_context& context, const alignment_batch& batch, int read_index)
+template <target_system system>
+void debug_baq(firepony_context<system>& context, const alignment_batch<system>& batch, int read_index)
 {
     const alignment_batch_host& h_batch = *batch.host;
 
@@ -1425,5 +1394,7 @@ void debug_baq(firepony_context& context, const alignment_batch& batch, int read
 
     fprintf(stderr, "\n");
 }
+INSTANTIATE(debug_baq);
 
 } // namespace firepony
+

@@ -18,27 +18,28 @@
 
 #pragma once
 
-#include "device_types.h"
+#include "../types.h"
 #include "covariates_table.h"
 
 namespace firepony {
 
+template <target_system system>
 struct covariates_context
 {
     // read window after clipping low quality ends
-    D_VectorU16_2 high_quality_window;
+    d_vector_u16_2<system> high_quality_window;
 
-    D_CovariateTable scratch_table_space;
+    d_covariate_table<system> scratch_table_space;
 
-    D_CovariateTable quality;
-    D_CovariateTable cycle;
-    D_CovariateTable context;
+    d_covariate_table<system> quality;
+    d_covariate_table<system> cycle;
+    d_covariate_table<system> context;
 
     struct view
     {
-        D_VectorU16_2::view high_quality_window;
-        D_CovariateTable::view scratch_table_space;
-        D_CovariateTable::view quality;
+        typename d_vector_u16_2<system>::view high_quality_window;
+        typename d_covariate_table<system>::view scratch_table_space;
+        typename d_covariate_table<system>::view quality;
     };
 
     operator view()
@@ -53,8 +54,8 @@ struct covariates_context
     }
 };
 
-void gather_covariates(firepony_context& context, const alignment_batch& batch);
-void output_covariates(firepony_context& context);
+template <target_system system> void gather_covariates(firepony_context<system>& context, const alignment_batch<system>& batch);
+template <target_system system> void output_covariates(firepony_context<system>& context);
 
 } // namespace firepony
 

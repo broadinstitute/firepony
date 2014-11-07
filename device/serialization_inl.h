@@ -57,7 +57,7 @@ inline void *decode(std::vector<T> *out, void *in)
 }
 
 template <typename T>
-inline void *decode(vector<host_tag, T> *out, void *in)
+inline void *decode(vector<host, T> *out, void *in)
 {
     uint64 size;
     in = decode(&size, in);
@@ -69,7 +69,7 @@ inline void *decode(vector<host_tag, T> *out, void *in)
 }
 
 template <uint32 bits>
-inline void *decode(packed_vector<host_tag, bits> *out, void *in)
+inline void *decode(packed_vector<host, bits> *out, void *in)
 {
     in = decode(&out->m_size, in);
     in = decode(&out->m_storage, in);
@@ -110,7 +110,7 @@ inline void *encode(void *out, const std::vector<T> *in)
 }
 
 template <typename T>
-inline void *encode(void *out, const vector<host_tag, T> *in)
+inline void *encode(void *out, const vector<host, T> *in)
 {
     uint64 size = in->size();
     out = encode(out, &size);
@@ -124,7 +124,7 @@ inline void *encode(void *out, const vector<host_tag, T> *in)
 }
 
 template <uint32 bits>
-inline void *encode(void *out, packed_vector<host_tag, bits> *in)
+inline void *encode(void *out, packed_vector<host, bits> *in)
 {
     out = encode(out, &in->m_size);
     out = encode(out, &in->m_storage);
@@ -164,7 +164,7 @@ inline size_t serialized_size(const std::vector<std::string>& vec)
 }
 
 template <typename T>
-inline size_t serialized_size(const vector<host_tag, T>& vec)
+inline size_t serialized_size(const vector<host, T>& vec)
 {
     return sizeof(uint64) + sizeof(T) * vec.size();
 }

@@ -53,54 +53,55 @@ struct cigar_event
     }
 };
 
+template <target_system system>
 struct cigar_context
 {
     // prefix sum of cigar offsets
-    D_VectorU32 cigar_offsets;
+    vector<system, uint32> cigar_offsets;
 
     // a vector of cigar "events"
-    D_PackedVector_2b cigar_events;
+    d_packed_vector_2b<system> cigar_events;
     // the read index for each cigar event
-    D_VectorU32 cigar_event_read_index;
+    d_vector<system, uint32> cigar_event_read_index;
     // the read coordinate for each cigar event
-    D_VectorU16 cigar_event_read_coordinates;
+    d_vector<system, uint16> cigar_event_read_coordinates;
     // the reference coordinate for each cigar event, relative to the start of the alignment window
-    D_VectorU16 cigar_event_reference_coordinates;
+    d_vector<system, uint16> cigar_event_reference_coordinates;
 
     // alignment window in the read, not including clipped bases
-    D_VectorU16_2 read_window_clipped;
+    d_vector_u16_2<system> read_window_clipped;
     // alignment window in the read, not including clipped bases or leading/trailing insertions
-    D_VectorU16_2 read_window_clipped_no_insertions;
+    d_vector_u16_2<system> read_window_clipped_no_insertions;
     // alignment window in the reference, not including clipped bases (relative to base alignment position)
-    D_VectorU16_2 reference_window_clipped;
+    d_vector_u16_2<system> reference_window_clipped;
 
     // bit vector representing SNPs, one per read bp
     // (1 means reference mismatch, 0 means match or non-M cigar event)
-    D_PackedVector_1b is_snp;
+    d_packed_vector_1b<system> is_snp;
     // bit vector representing insertions, one per read bp (similar to is_snp)
-    D_PackedVector_1b is_insertion;
+    d_packed_vector_1b<system> is_insertion;
     // bit vector representing deletions, one per read bp
     // note that this only flags the starting base for a deletion and is independent of the other bit vectors
     // in other words, the same bp can have is_deletion and one of is_insertion or is_snp set
-    D_PackedVector_1b is_deletion;
+    d_packed_vector_1b<system> is_deletion;
 
     // number of errors for each read
-    D_VectorU16 num_errors;
+    d_vector<system, uint16> num_errors;
 
     struct view
     {
-        D_VectorU32::view cigar_offsets;
-        D_PackedVector_2b::view cigar_events;
-        D_VectorU32::view cigar_event_read_index;
-        D_VectorU16::view cigar_event_read_coordinates;
-        D_VectorU16::view cigar_event_reference_coordinates;
-        D_VectorU16_2::view read_window_clipped;
-        D_VectorU16_2::view read_window_clipped_no_insertions;
-        D_VectorU16_2::view reference_window_clipped;
-        D_PackedVector_1b::view is_snp;
-        D_PackedVector_1b::view is_insertion;
-        D_PackedVector_1b::view is_deletion;
-        D_VectorU16::view num_errors;
+        typename d_vector<system, uint32>::view cigar_offsets;
+        typename d_packed_vector_2b<system>::view cigar_events;
+        typename d_vector<system, uint32>::view cigar_event_read_index;
+        typename d_vector<system, uint16>::view cigar_event_read_coordinates;
+        typename d_vector<system, uint16>::view cigar_event_reference_coordinates;
+        typename d_vector_u16_2<system>::view read_window_clipped;
+        typename d_vector_u16_2<system>::view read_window_clipped_no_insertions;
+        typename d_vector_u16_2<system>::view reference_window_clipped;
+        typename d_packed_vector_1b<system>::view is_snp;
+        typename d_packed_vector_1b<system>::view is_insertion;
+        typename d_packed_vector_1b<system>::view is_deletion;
+        typename d_vector<system, uint16>::view num_errors;
     };
 
     operator view()
@@ -124,8 +125,7 @@ struct cigar_context
     }
 };
 
-void expand_cigars(firepony_context& context, const alignment_batch& batch);
-void debug_cigar(firepony_context& context, const alignment_batch& batch, int read_index);
+template <target_system system> void expand_cigars(firepony_context<system>& context, const alignment_batch<system>& batch);
+template <target_system system> void debug_cigar(firepony_context<system>& context, const alignment_batch<system>& batch, int read_index);
 
 } // namespace firepony
-

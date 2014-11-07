@@ -34,24 +34,21 @@ namespace SequenceDataMask
     };
 }
 
-template <typename system_tag>
+template <target_system system>
 struct sequence_data_storage
 {
-    template <typename T> using Vector = firepony::vector<system_tag, T>;
-    template <uint32 bits> using PackedVector = firepony::packed_vector<system_tag, bits>;
-
     uint32 data_mask;
     uint32 num_sequences;
 
-    PackedVector<4> bases;
-    Vector<uint8> qualities;
+    packed_vector<system, 4> bases;
+    vector<system, uint8> qualities;
 
-    Vector<uint32> sequence_id;
+    vector<system, uint32> sequence_id;
     // note: bases and quality indexes may not match if sequences are padded to dword length
-    Vector<uint64> sequence_bp_start;
-    Vector<uint64> sequence_bp_len;
-    Vector<uint64> sequence_qual_start;
-    Vector<uint64> sequence_qual_len;
+    vector<system, uint64> sequence_bp_start;
+    vector<system, uint64> sequence_bp_len;
+    vector<system, uint64> sequence_qual_start;
+    vector<system, uint64> sequence_qual_len;
 
     CUDA_HOST sequence_data_storage()
         : num_sequences(0)
@@ -62,13 +59,13 @@ struct sequence_data_storage
         uint32 data_mask;
         uint32 num_sequences;
 
-        typename PackedVector<4>::const_view bases;
-        typename Vector<uint8>::const_view qualities;
-        typename Vector<uint32>::const_view sequence_id;
-        typename Vector<uint64>::const_view sequence_bp_start;
-        typename Vector<uint64>::const_view sequence_bp_len;
-        typename Vector<uint64>::const_view sequence_qual_start;
-        typename Vector<uint64>::const_view sequence_qual_len;
+        typename packed_vector<system, 4>::const_view bases;
+        typename vector<system, uint8>::const_view qualities;
+        typename vector<system, uint32>::const_view sequence_id;
+        typename vector<system, uint64>::const_view sequence_bp_start;
+        typename vector<system, uint64>::const_view sequence_bp_len;
+        typename vector<system, uint64>::const_view sequence_qual_start;
+        typename vector<system, uint64>::const_view sequence_qual_len;
     };
 
     CUDA_HOST operator const_view() const
@@ -89,19 +86,17 @@ struct sequence_data_storage
     }
 };
 
-typedef sequence_data_storage<host_tag> sequence_data_host_storage;
-
 struct sequence_data_host
 {
     string_database sequence_names;
 
     // the const_view that wraps all sequence data
     // this will be populated either from malloc-backed storage or from a memory-mapped file
-    sequence_data_host_storage::const_view view;
+    sequence_data_storage<host>::const_view view;
 
     // the containers that store the actual data
     // only one of these is used
-    sequence_data_host_storage host_malloc_container;
+    sequence_data_storage<host> host_malloc_container;
     shared_memory_file host_mmap_container;
 
     size_t serialized_size(void)
@@ -156,8 +151,8 @@ struct sequence_data_host
         in = serialization::decode(&m_size, in);
         in = serialization::decode(&temp, in);
 
-        view.bases = firepony::packed_vector<host_tag, 4>::const_view(in, m_size);
-        in = static_cast<uint32*>(in) + divide_ri(m_size, firepony::packed_vector<host_tag, 4>::SYMBOLS_PER_WORD);
+        view.bases = firepony::packed_vector<host, 4>::const_view(in, m_size);
+        in = static_cast<uint32*>(in) + divide_ri(m_size, firepony::packed_vector<host, 4>::SYMBOLS_PER_WORD);
 
         in = serialization::unwrap_vector_view(view.qualities, in);
         in = serialization::unwrap_vector_view(view.sequence_id, in);

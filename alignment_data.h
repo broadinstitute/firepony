@@ -29,17 +29,15 @@ namespace firepony {
 
 // contains information referenced by an alignment data batch
 // xxxnsubtil: a better name might be in order
-template <typename system_tag>
+template <target_system system>
 struct alignment_header_storage
 {
-    template <typename T> using Vector = firepony::vector<system_tag, T>;
-
     // the length of each chromosome in the reference
-    Vector<uint32> chromosome_lengths;
+    vector<system, uint32> chromosome_lengths;
 
     struct const_view
     {
-        vector<target_system_tag, uint32>::const_view chromosome_lengths;
+        typename vector<system, uint32>::const_view chromosome_lengths;
     };
 
     operator const_view() const
@@ -52,7 +50,7 @@ struct alignment_header_storage
     }
 };
 
-struct alignment_header_host : public alignment_header_storage<host_tag>
+struct alignment_header_host : public alignment_header_storage<host>
 {
     string_database read_groups_db;
 };
@@ -126,63 +124,60 @@ struct CRQ_index
     { }
 };
 
-template <typename system_tag>
+template <target_system system>
 struct alignment_batch_storage
 {
-    template <typename T> using Vector = vector<system_tag, T>;
-    template <uint32 bits> using PackedVector = packed_vector<system_tag, bits>;
-
     uint32 num_reads;
     uint32 max_read_size;
     uint32 data_mask;
 
     // chromosome index of the read
-    Vector<uint32> chromosome;
+    vector<system, uint32> chromosome;
     // the reference position of the first base in the read
-    Vector<uint32> alignment_start;
+    vector<system, uint32> alignment_start;
     // (1-based and inclusive) alignment stop position
-    Vector<uint32> alignment_stop;
+    vector<system, uint32> alignment_stop;
     // integer representation of the mate's chromosome
-    Vector<uint32> mate_chromosome;
+    vector<system, uint32> mate_chromosome;
     // (1-based and inclusive) mate's alignment start position
-    Vector<uint32> mate_alignment_start;
+    vector<system, uint32> mate_alignment_start;
     // inferred insert size
-    Vector<int16> inferred_insert_size;
+    vector<system, int16> inferred_insert_size;
 
     // cigar ops
-    Vector<cigar_op> cigars;
+    vector<system, cigar_op> cigars;
     // cigar index vectors
-    Vector<uint32> cigar_start;
-    Vector<uint32> cigar_len;
+    vector<system, uint32> cigar_start;
+    vector<system, uint32> cigar_len;
 
     // read data (4 bits per base pair)
-    PackedVector<4> reads;
+    packed_vector<system, 4> reads;
     // read index vectors
-    Vector<uint32> read_start;
-    Vector<uint32> read_len;
+    vector<system, uint32> read_start;
+    vector<system, uint32> read_len;
 
     // quality data
-    Vector<uint8> qualities;
+    vector<system, uint8> qualities;
     // quality index vectors
-    Vector<uint32> qual_start;
-    Vector<uint32> qual_len;
+    vector<system, uint32> qual_start;
+    vector<system, uint32> qual_len;
 
     // alignment flags
-    Vector<uint16> flags;
+    vector<system, uint16> flags;
     // mapping qualities
-    Vector<uint8> mapq;
+    vector<system, uint8> mapq;
 
     // read group ID
-    Vector<uint32> read_group;
+    vector<system, uint32> read_group;
 
     // prevent storage creation on the device
     CUDA_HOST alignment_batch_storage() { }
 };
 
-struct alignment_batch_host : public alignment_batch_storage<host_tag>
+struct alignment_batch_host : public alignment_batch_storage<host>
 {
     // data that never gets copied to the device
-    H_Vector<std::string> name;
+    h_vector<std::string> name;
 
     const CRQ_index crq_index(uint32 read_id) const
     {

@@ -22,17 +22,17 @@ namespace firepony {
 #include "bit_packing.h"
 
 // this is a little weird, since it doesn't actually change
-template <typename PreviousCovariate = covariate_null>
-struct covariate_EventTracker : public covariate<PreviousCovariate, 2>
+template <target_system system, typename PreviousCovariate = covariate_null<system> >
+struct covariate_EventTracker : public covariate<system, PreviousCovariate, 2>
 {
-    static CUDA_HOST_DEVICE covariate_key_set encode(firepony_context::view ctx,
-                                                     const alignment_batch_device::const_view batch,
+    static CUDA_HOST_DEVICE covariate_key_set encode(typename firepony_context<system>::view ctx,
+                                                     const typename alignment_batch_device<system>::const_view batch,
                                                      uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
                                                      covariate_key_set input_key = {0, 0, 0})
     {
-        return covariate<PreviousCovariate, 2>::build_key(input_key,
-                                                          { cigar_event::M, cigar_event::I, cigar_event::D },
-                                                          ctx, batch, read_index, bp_offset, cigar_event_index);
+        return covariate<system, PreviousCovariate, 2>::build_key(input_key,
+                                                                  { cigar_event::M, cigar_event::I, cigar_event::D },
+                                                                  ctx, batch, read_index, bp_offset, cigar_event_index);
     }
 };
 

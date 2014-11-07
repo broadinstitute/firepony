@@ -100,4 +100,3 @@ void io_thread::run(void)
 }
 
 } // namespace firepony
-

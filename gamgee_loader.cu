@@ -27,9 +27,10 @@
 #include <string>
 
 #include "alignment_data.h"
+#include "sequence_data.h"
 #include "gamgee_loader.h"
+
 #include "device/util.h"
-#include "device/sequence_data.h"
 #include "device/variant_data.h"
 #include "device/mmap.h"
 #include "device/serialization.h"
@@ -279,7 +280,7 @@ struct iupac16 : public thrust::unary_function<char, uint8>
 };
 
 // loader for sequence data
-bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 data_mask, bool try_mmap)
+bool gamgee_load_sequences(sequence_data_host *output, const char *filename, uint32 data_mask, bool try_mmap)
 {
     if (try_mmap)
     {
@@ -294,8 +295,8 @@ bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 d
         }
     }
 
-    sequence_data_host& h = output->host_malloc_container;
-    output->data_mask = data_mask;
+    sequence_data_host_storage& h = output->host_malloc_container;
+    h.data_mask = data_mask;
 
     for (gamgee::Fastq& record : gamgee::FastqReader(std::string(filename)))
     {
@@ -331,11 +332,11 @@ bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 d
         }
     }
 
-    output->host = output->host_malloc_container;
+    output->view = output->host_malloc_container;
     return true;
 }
 
-bool gamgee_load_vcf(variant_database *output, const sequence_data& reference, const char *filename, uint32 data_mask, bool try_mmap)
+bool gamgee_load_vcf(variant_database *output, const sequence_data_host& reference, const char *filename, uint32 data_mask, bool try_mmap)
 {
     if (try_mmap)
     {
@@ -387,7 +388,7 @@ bool gamgee_load_vcf(variant_database *output, const sequence_data& reference, c
 
         variant_data.chromosome_window_start = record.alignment_start();
         // note: VCF positions are 1-based, but we convert to 0-based in the reference window
-        variant_data.reference_window_start = record.alignment_start() + reference.host.sequence_bp_start[variant_data.chromosome] - 1;
+        variant_data.reference_window_start = record.alignment_start() + reference.view.sequence_bp_start[variant_data.chromosome] - 1;
         variant_data.alignment_window_len = record.alignment_stop() - record.alignment_start();
 
         if (data_mask & VariantDataMask::ID)

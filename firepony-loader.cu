@@ -22,14 +22,14 @@
 #include <string>
 
 #include "gamgee_loader.h"
-#include "device/sequence_data.h"
+#include "sequence_data.h"
 #include "device/variant_data.h"
 #include "device/mmap.h"
 #include "device/serialization.h"
 
 using namespace firepony;
 
-firepony::sequence_data reference;
+sequence_data_host reference;
 
 void load_fasta(const char *fname)
 {

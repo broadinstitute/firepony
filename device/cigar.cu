@@ -866,14 +866,14 @@ void debug_cigar(firepony_context& context, const alignment_batch& batch, int re
     fprintf(stderr, "]\n");
 
     const uint32 ref_sequence_id = h_batch.chromosome[read_index];
-    const uint32 ref_sequence_base = context.reference.host.sequence_bp_start[ref_sequence_id];
+    const uint32 ref_sequence_base = context.reference.host.view.sequence_bp_start[ref_sequence_id];
     const uint32 ref_sequence_offset = ref_sequence_base + h_batch.alignment_start[read_index];
 
     fprintf(stderr, "    reference sequence data     = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
         const uint16 ref_bp = ctx.cigar_event_reference_coordinates[i];
-        fprintf(stderr, "  %c ", ref_bp == uint16(-1) ? '-' : from_nvbio::iupac16_to_char(context.reference.host.bases[ref_sequence_offset + ref_bp]));
+        fprintf(stderr, "  %c ", ref_bp == uint16(-1) ? '-' : from_nvbio::iupac16_to_char(context.reference.host.view.bases[ref_sequence_offset + ref_bp]));
     }
     fprintf(stderr, "]\n");
 

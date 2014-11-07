@@ -28,7 +28,7 @@
 
 #include "device_types.h"
 #include "alignment_data_device.h"
-#include "sequence_data.h"
+#include "sequence_data_device.h"
 #include "firepony_context.h"
 
 #include "primitives/util.h"
@@ -1407,8 +1407,8 @@ void debug_baq(firepony_context& context, const alignment_batch& batch, int read
     fprintf(stderr, "    absolute reference window   = [ %u %u ]\n", reference_window.x, reference_window.y);
     //fprintf(stderr, "    sequence base: %u\n", genome.sequence_offsets[batch.alignment_sequence_IDs[read_index]]);
     fprintf(stderr, "    relative reference window   = [ %lu %lu ]\n",
-            reference_window.x - context.reference.host.sequence_bp_start[h_batch.chromosome[read_index]],
-            reference_window.y - context.reference.host.sequence_bp_start[h_batch.chromosome[read_index]]);
+            reference_window.x - context.reference.host.view.sequence_bp_start[h_batch.chromosome[read_index]],
+            reference_window.y - context.reference.host.view.sequence_bp_start[h_batch.chromosome[read_index]]);
 
     fprintf(stderr, "    BAQ quals                   = [ ");
     for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)

@@ -19,6 +19,9 @@
 #include <map>
 
 #include "alignment_data.h"
+#include "sequence_data.h"
+#include "device/alignment_data_device.h"
+#include "device/sequence_data_device.h"
 
 #include "device/baq.h"
 #include "device/firepony_context.h"
@@ -28,13 +31,10 @@
 #include "device/fractional_errors.h"
 #include "device/read_filters.h"
 #include "device/read_group_table.h"
-#include "device/sequence_data.h"
 #include "device/snp_filter.h"
 #include "device/string_database.h"
 #include "device/util.h"
 #include "device/variant_data.h"
-
-#include "device/alignment_data_device.h"
 
 #include "command_line.h"
 #include "gamgee_loader.h"
@@ -64,7 +64,8 @@ void init_cuda(void)
 
 int main(int argc, char **argv)
 {
-    firepony::sequence_data reference;
+    sequence_data_host h_reference;
+
     variant_database vcf;
     size_t num_bytes;
     bool ret;
@@ -77,7 +78,7 @@ int main(int argc, char **argv)
 
     // load the reference genome
     fprintf(stderr, "loading reference from %s...\n", command_line_options.reference);
-    ret = gamgee_load_sequences(&reference, command_line_options.reference,
+    ret = gamgee_load_sequences(&h_reference, command_line_options.reference,
                                 SequenceDataMask::BASES |
                                 SequenceDataMask::NAMES);
     if (ret == false)
@@ -86,12 +87,13 @@ int main(int argc, char **argv)
         exit(1);
     }
 
+    firepony::sequence_data reference(h_reference);
     num_bytes = reference.download();
     fprintf(stderr, "downloaded %lu MB of reference data\n", num_bytes / (1024 * 1024));
 
     fprintf(stderr, "loading variant database %s...\n", command_line_options.snp_database);
-    ret = gamgee_load_vcf(&vcf, reference, command_line_options.snp_database, VariantDataMask::CHROMOSOME |
-                                                                              VariantDataMask::ALIGNMENT);
+    ret = gamgee_load_vcf(&vcf, h_reference, command_line_options.snp_database,
+                          VariantDataMask::CHROMOSOME | VariantDataMask::ALIGNMENT);
     if (ret == false)
     {
         fprintf(stderr, "failed to load variant database %s\n", command_line_options.snp_database);
@@ -324,8 +326,8 @@ void debug_read(firepony_context *context, const alignment_batch& batch, int rea
 
     const uint2 alignment_window = context->alignment_windows[read_index];
     fprintf(stderr, "  sequence name [%s]\n  sequence base [%lu]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
-            context->reference.sequence_names.lookup(h_batch.chromosome[read_index]).c_str(),
-            context->reference.host.sequence_bp_start[h_batch.chromosome[read_index]],
+            context->reference.host.sequence_names.lookup(h_batch.chromosome[read_index]).c_str(),
+            context->reference.host.view.sequence_bp_start[h_batch.chromosome[read_index]],
             h_batch.alignment_start[read_index],
             alignment_window.x,
             alignment_window.y);

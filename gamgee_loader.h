@@ -20,7 +20,7 @@
 
 #include <gamgee/sam_reader.h>
 #include "alignment_data.h"
-#include "device/sequence_data.h"
+#include "sequence_data.h"
 #include "device/variant_data.h"
 
 namespace firepony {
@@ -46,7 +46,8 @@ public:
     const char *get_sequence_name(uint32 id);
 };
 
-bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 data_mask, bool try_mmap = true);
-bool gamgee_load_vcf(variant_database *output, const sequence_data& reference, const char *filename, uint32 data_mask, bool try_mmap = true);
+bool gamgee_load_sequences(sequence_data_host *output, const char *filename, uint32 data_mask, bool try_mmap = true);
+bool gamgee_load_vcf(variant_database *output, const sequence_data_host& reference, const char *filename, uint32 data_mask, bool try_mmap = true);
 
 } // namespace firepony
+

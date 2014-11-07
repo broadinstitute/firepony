@@ -19,8 +19,7 @@ read_filters.cu
 read_filters.h
 read_group_table.cu
 read_group_table.h
-sequence_data.cu
-sequence_data.h
+sequence_data_device.h
 serialization.h
 serialization_inl.h
 snp_filter.cu

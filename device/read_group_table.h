@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "bqsr_types.h"
+#include "types.h"
 #include "covariates_table.h"
 
 namespace firepony {
@@ -54,7 +54,8 @@ struct read_group_table_context
     }
 };
 
-void build_read_group_table(bqsr_context *context);
-void output_read_group_table(bqsr_context *context);
+void build_read_group_table(context *context);
+void output_read_group_table(context *context);
 
 } // namespace firepony
+

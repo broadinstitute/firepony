@@ -17,9 +17,9 @@
  */
 
 
-#include "bqsr_types.h"
+#include "types.h"
 #include "alignment_data.h"
-#include "bqsr_context.h"
+#include "firepony_context.h"
 #include "covariates.h"
 
 #include "covariates/table_context.h"
@@ -35,9 +35,9 @@ namespace firepony {
 
 // accumulates events from a read batch into a given covariate table
 template <typename covariate_table>
-struct covariate_gatherer : public bqsr_lambda
+struct covariate_gatherer : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator()(const uint32 cigar_event_index)
     {
@@ -90,14 +90,14 @@ struct covariate_gatherer : public bqsr_lambda
 
 // functor used for filtering out invalid keys in a table
 template <typename covariate_table>
-struct flag_valid_keys : public bqsr_lambda
+struct flag_valid_keys : public lambda
 {
     D_VectorU8::view flags;
 
-    flag_valid_keys(bqsr_context::view ctx,
+    flag_valid_keys(context::view ctx,
                     const alignment_batch_device::const_view batch,
                     D_VectorU8::view flags)
-        : bqsr_lambda(ctx, batch), flags(flags)
+        : lambda(ctx, batch), flags(flags)
     { }
 
     CUDA_HOST_DEVICE void operator() (const uint32 key_index)
@@ -118,7 +118,7 @@ struct flag_valid_keys : public bqsr_lambda
 
 // processes a batch of reads and updates covariate table data for a given table
 template <typename covariate_table>
-static void build_covariates_table(D_CovariateTable& table, bqsr_context *context, const alignment_batch& batch)
+static void build_covariates_table(D_CovariateTable& table, context *context, const alignment_batch& batch)
 {
     covariates_context& cv = context->covariates;
     auto& scratch_table = cv.scratch_table_space;
@@ -202,9 +202,9 @@ static void build_covariates_table(D_CovariateTable& table, bqsr_context *contex
     }
 }
 
-struct compute_high_quality_windows : public bqsr_lambda
+struct compute_high_quality_windows : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     enum {
         // any bases with q <= LOW_QUAL_TAIL are considered low quality
@@ -234,7 +234,7 @@ struct compute_high_quality_windows : public bqsr_lambda
     }
 };
 
-void gather_covariates(bqsr_context *context, const alignment_batch& batch)
+void gather_covariates(context *context, const alignment_batch& batch)
 {
     auto& cv = context->covariates;
 
@@ -249,7 +249,7 @@ void gather_covariates(bqsr_context *context, const alignment_batch& batch)
     build_covariates_table<covariate_table_context>(cv.context, context, batch);
 }
 
-void output_covariates(bqsr_context *context)
+void output_covariates(context *context)
 {
     covariate_table_quality::dump_table(context, context->covariates.quality);
 

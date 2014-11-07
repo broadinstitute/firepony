@@ -16,7 +16,7 @@
  *
  */
 
-#include "bqsr_types.h"
+#include "types.h"
 
 #include "primitives/cuda.h"
 #include "primitives/util.h"

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "bqsr_types.h"
+#include "types.h"
 #include "covariates_table.h"
 
 namespace firepony {
@@ -53,7 +53,8 @@ struct covariates_context
     }
 };
 
-void gather_covariates(bqsr_context *context, const alignment_batch& batch);
-void output_covariates(bqsr_context *context);
+void gather_covariates(context *context, const alignment_batch& batch);
+void output_covariates(context *context);
 
 } // namespace firepony
+

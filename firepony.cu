@@ -16,14 +16,12 @@
  *
  */
 
-//#include "firepony/from_nvbio/dna.h"
-
 #include <map>
 
 #include "device/alignment_data.h"
 #include "device/baq.h"
-#include "device/bqsr_context.h"
-#include "device/bqsr_types.h"
+#include "device/firepony_context.h"
+#include "device/types.h"
 #include "device/cigar.h"
 #include "device/covariates.h"
 #include "device/fractional_errors.h"
@@ -39,7 +37,7 @@
 
 using namespace firepony;
 
-void debug_read(bqsr_context *context, const alignment_batch& batch, int read_index);
+void debug_read(context *context, const alignment_batch& batch, int read_index);
 
 #include <thread>
 
@@ -212,7 +210,7 @@ int main(int argc, char **argv)
     io_thread bam_thread(command_line_options.input, data_mask);
     bam_thread.start();
 
-    bqsr_context context(bam_thread.file.header, vcf, reference);
+    context context(bam_thread.file.header, vcf, reference);
 
     auto& stats = context.stats;
     cpu_timer wall_clock;
@@ -380,7 +378,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void debug_read(bqsr_context *context, const alignment_batch& batch, int read_id)
+void debug_read(context *context, const alignment_batch& batch, int read_id)
 {
     const alignment_batch_host& h_batch = batch.host;
 

@@ -22,8 +22,8 @@
 #include <thrust/functional.h>
 
 #include "cigar.h"
-#include "bqsr_types.h"
-#include "bqsr_context.h"
+#include "types.h"
+#include "firepony_context.h"
 #include "alignment_data.h"
 #include "util.h"
 
@@ -42,9 +42,9 @@ struct cigar_op_len : public thrust::unary_function<const cigar_op&, uint32>
 };
 
 // expand cigar ops into temp storage
-struct cigar_op_expand : public bqsr_lambda
+struct cigar_op_expand : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 op_index)
     {
@@ -83,11 +83,11 @@ struct cigar_op_expand : public bqsr_lambda
 };
 
 // compact the cigar events from temporary storage into a 2-bit packed vector
-struct cigar_op_compact : public bqsr_lambda
+struct cigar_op_compact : public lambda
 {
-    cigar_op_compact(bqsr_context::view ctx,
+    cigar_op_compact(context::view ctx,
                      const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
+        : lambda(ctx, batch)
     { }
 
     CUDA_HOST_DEVICE void operator() (const uint32 word_index)
@@ -104,9 +104,9 @@ struct cigar_op_compact : public bqsr_lambda
 
 // initialize read windows
 // note: this does not initialize the reference window, as it needs to be computed once all clipping has been done
-struct read_window_init : public bqsr_lambda
+struct read_window_init : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -116,9 +116,9 @@ struct read_window_init : public bqsr_lambda
 };
 
 // clips sequencing adapters from the reads
-struct remove_adapters : public bqsr_lambda
+struct remove_adapters : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE bool hasWellDefinedFragmentSize(const uint32 read_index)
     {
@@ -244,9 +244,9 @@ struct remove_adapters : public bqsr_lambda
 };
 
 // remove soft-clip regions from the active read window
-struct remove_soft_clips : public bqsr_lambda
+struct remove_soft_clips : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -307,9 +307,9 @@ struct remove_soft_clips : public bqsr_lambda
 };
 
 // compute clipped read window without leading/trailing insertions
-struct compute_no_insertions_window : public bqsr_lambda
+struct compute_no_insertions_window : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -351,9 +351,9 @@ struct compute_no_insertions_window : public bqsr_lambda
     }
 };
 
-struct compute_reference_window : public bqsr_lambda
+struct compute_reference_window : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -415,9 +415,9 @@ struct compute_reference_window : public bqsr_lambda
 
 // expand cigar coordinates for a read
 // xxxnsubtil: this is very similar to compute_alignment_window, should merge
-struct cigar_coordinates_expand : public bqsr_lambda
+struct cigar_coordinates_expand : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -492,9 +492,9 @@ struct cigar_coordinates_expand : public bqsr_lambda
     }
 };
 
-struct compute_error_vectors : public bqsr_lambda
+struct compute_error_vectors : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -588,11 +588,11 @@ struct compute_error_vectors : public bqsr_lambda
 
 #ifdef CUDA_DEBUG
 // debug aid: sanity check that the expanded cigar events match what we expect
-struct sanity_check_cigar_events : public bqsr_lambda
+struct sanity_check_cigar_events : public lambda
 {
-    sanity_check_cigar_events(bqsr_context::view ctx,
+    sanity_check_cigar_events(context::view ctx,
                               const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
+        : lambda(ctx, batch)
     { }
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
@@ -664,7 +664,7 @@ struct sanity_check_cigar_events : public bqsr_lambda
 };
 #endif
 
-void expand_cigars(bqsr_context *context, const alignment_batch& batch)
+void expand_cigars(context *context, const alignment_batch& batch)
 {
     cigar_context& ctx = context->cigar;
 
@@ -764,7 +764,7 @@ void expand_cigars(bqsr_context *context, const alignment_batch& batch)
                      compute_error_vectors(*context, batch.device));
 }
 
-void debug_cigar(bqsr_context *context, const alignment_batch& batch, int read_index)
+void debug_cigar(context *context, const alignment_batch& batch, int read_index)
 {
     const alignment_batch_host& h_batch = batch.host;
 

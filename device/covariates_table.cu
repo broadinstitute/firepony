@@ -17,8 +17,8 @@
  */
 
 
-#include "bqsr_types.h"
-#include "bqsr_context.h"
+#include "types.h"
+#include "firepony_context.h"
 #include "covariates.h"
 #include "covariates_table.h"
 

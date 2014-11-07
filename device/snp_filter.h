@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "bqsr_types.h"
+#include "types.h"
 #include "alignment_data.h"
 #include "sequence_data.h"
 #include "variant_data.h"
@@ -52,13 +52,13 @@ struct snp_filter_context
     }
 };
 
-void build_read_offset_list(bqsr_context *context,
+void build_read_offset_list(context *context,
                             const alignment_batch& batch);
 
-void build_alignment_windows(bqsr_context *ctx,
+void build_alignment_windows(context *ctx,
                              const alignment_batch& batch);
 
-void filter_known_snps(bqsr_context *context,
+void filter_known_snps(context *context,
                        const alignment_batch& batch);
 
 } // namespace firepony

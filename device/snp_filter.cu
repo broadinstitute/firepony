@@ -16,8 +16,8 @@
  *
  */
 
-#include "bqsr_types.h"
-#include "bqsr_context.h"
+#include "types.h"
+#include "firepony_context.h"
 #include "snp_filter.h"
 
 #include "primitives/algorithms.h"
@@ -28,11 +28,11 @@ namespace firepony {
 
 // functor used to compute the read offset list
 // for each read, fills in a list of uint16 values with the offset of each BP in the reference relative to the start of the alignment
-struct compute_read_offset_list : public bqsr_lambda
+struct compute_read_offset_list : public lambda
 {
-    compute_read_offset_list(bqsr_context::view ctx,
+    compute_read_offset_list(context::view ctx,
                              const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
+        : lambda(ctx, batch)
     { }
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
@@ -90,7 +90,7 @@ struct compute_read_offset_list : public bqsr_lambda
 };
 
 // for each read, compute the offset of each read BP relative to the base alignment position of the read
-void build_read_offset_list(bqsr_context *context,
+void build_read_offset_list(context *context,
                             const alignment_batch& batch)
 {
     context->read_offset_list.resize(batch.device.reads.size());
@@ -102,11 +102,11 @@ void build_read_offset_list(bqsr_context *context,
 // functor used to compute the alignment window list
 // for each read, compute the end of the alignment window in the reference and the sequence
 // xxxnsubtil: this is very similar to cigar_coordinates_expand, should merge
-struct compute_alignment_window : public bqsr_lambda
+struct compute_alignment_window : public lambda
 {
-    compute_alignment_window(bqsr_context::view ctx,
+    compute_alignment_window(context::view ctx,
                              const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
+        : lambda(ctx, batch)
     { }
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
@@ -140,7 +140,7 @@ struct compute_alignment_window : public bqsr_lambda
 };
 
 // for each read, compute the end of the alignment window in the reference
-void build_alignment_windows(bqsr_context *ctx, const alignment_batch& batch)
+void build_alignment_windows(context *ctx, const alignment_batch& batch)
 {
     // set up the alignment window buffer
     ctx->alignment_windows.resize(batch.device.num_reads);
@@ -151,11 +151,11 @@ void build_alignment_windows(bqsr_context *ctx, const alignment_batch& batch)
                      compute_alignment_window(*ctx, batch.device));
 }
 
-struct compute_vcf_ranges : public bqsr_lambda
+struct compute_vcf_ranges : public lambda
 {
-    compute_vcf_ranges(bqsr_context::view ctx,
+    compute_vcf_ranges(context::view ctx,
                        const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
+        : lambda(ctx, batch)
     { }
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
@@ -225,11 +225,11 @@ struct vcf_active_predicate
     }
 };
 
-struct filter_bps : public bqsr_lambda
+struct filter_bps : public lambda
 {
-    filter_bps(bqsr_context::view ctx,
+    filter_bps(context::view ctx,
                const alignment_batch_device::const_view batch)
-        : bqsr_lambda(ctx, batch)
+        : lambda(ctx, batch)
     { }
 
 public:
@@ -317,7 +317,7 @@ public:
 
 // filter out known SNPs from the active BP list
 // for each BP in batch, set the corresponding bit in active_loc_list to zero if it matches a known SNP
-void filter_known_snps(bqsr_context *context, const alignment_batch& batch)
+void filter_known_snps(context *context, const alignment_batch& batch)
 {
     snp_filter_context& snp = context->snp_filter;
 

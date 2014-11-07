@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "../bqsr_types.h"
+#include "../types.h"
 #include "dna.h"
 #include "../primitives/cuda.h"
 

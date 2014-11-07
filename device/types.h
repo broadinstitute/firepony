@@ -61,7 +61,7 @@ typedef host_tag target_system_tag;
 typedef device_tag target_system_tag;
 #endif
 
-struct bqsr_context;
+struct context;
 
 template <typename T> using D_Vector = vector<target_system_tag, T>;
 template <typename T> using H_Vector = vector<host_tag, T>;

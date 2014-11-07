@@ -70,11 +70,11 @@ gamgee_alignment_file::~gamgee_alignment_file()
 {
 }
 
-static uint8 gamgee_to_bqsr_cigar_op(gamgee::CigarElement e)
+static uint8 gamgee_to_firepony_cigar_op(gamgee::CigarElement e)
 {
     if (gamgee::Cigar::cigar_op(e) == gamgee::CigarOperator::B)
     {
-        // xxxnsubtil: bqsr does not have B; return X instead
+        // xxxnsubtil: firepony does not have B; return X instead
         return cigar_op::OP_X;
     } else {
         return uint8(gamgee::Cigar::cigar_op(e));
@@ -184,7 +184,7 @@ bool gamgee_alignment_file::next_batch(alignment_batch *batch, uint32 data_mask,
             {
                 cigar_op op;
 
-                op.op = gamgee_to_bqsr_cigar_op(cigar[i]);
+                op.op = gamgee_to_firepony_cigar_op(cigar[i]);
                 op.len = gamgee::Cigar::cigar_oplen(cigar[i]);
 
                 h_batch->cigars.push_back(op);
@@ -317,8 +317,8 @@ bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 d
             h.bases.resize(seq_start + seq_len);
 
             assign(sequence.size(),
-                         thrust::make_transform_iterator(sequence.begin(), iupac16()),
-                         h.bases.stream_at_index(seq_start));
+                   thrust::make_transform_iterator(sequence.begin(), iupac16()),
+                   h.bases.stream_at_index(seq_start));
         }
 
         if (data_mask & SequenceDataMask::QUALITIES)

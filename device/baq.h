@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "bqsr_types.h"
+#include "types.h"
 
 namespace firepony {
 
@@ -71,7 +71,8 @@ struct baq_context
     }
 };
 
-void baq_reads(bqsr_context *context, const alignment_batch& batch);
-void debug_baq(bqsr_context *context, const alignment_batch& batch, int read_index);
+void baq_reads(context *context, const alignment_batch& batch);
+void debug_baq(context *context, const alignment_batch& batch, int read_index);
 
 } // namespace firepony
+

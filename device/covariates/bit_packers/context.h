@@ -90,7 +90,7 @@ struct covariate_Context : public covariate<PreviousCovariate, 4 + constexpr_max
 
     // context encoding (MSB to LSB): BB[bp_offset] BB[bp_offset-1] BB[bp_offset-2] ... SSSS
     // B = base pair bit, S = size bit
-    static CUDA_HOST_DEVICE covariate_key_set encode(bqsr_context::view ctx,
+    static CUDA_HOST_DEVICE covariate_key_set encode(context::view ctx,
                                                      const alignment_batch_device::const_view batch,
                                                      uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
                                                      covariate_key_set input_key = {0, 0, 0})

@@ -16,12 +16,12 @@
  *
  */
 
-#include "bqsr_context.h"
+#include "firepony_context.h"
 #include "util.h"
 
 namespace firepony {
 
-void bqsr_context::start_batch(alignment_batch& batch)
+void context::start_batch(alignment_batch& batch)
 {
     // initialize the read order with 0..N
     active_read_list.resize(batch.host.num_reads);
@@ -37,7 +37,7 @@ void bqsr_context::start_batch(alignment_batch& batch)
                  0xffffffff);
 }
 
-void bqsr_context::end_batch(alignment_batch& batch)
+void context::end_batch(alignment_batch& batch)
 {
     stats.total_reads += batch.host.num_reads;
 }

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "bqsr_types.h"
+#include "types.h"
 #include "alignment_data.h"
 #include "sequence_data.h"
 #include "variant_data.h"
@@ -33,7 +33,7 @@
 
 namespace firepony {
 
-struct bqsr_statistics // host-only
+struct pipeline_statistics // host-only
 {
     uint32 total_reads;        // total number of reads processed
     uint32 filtered_reads;     // number of reads filtered out in pre-processing
@@ -57,14 +57,14 @@ struct bqsr_statistics // host-only
     time_series covariates_sort;
     time_series covariates_pack;
 
-    bqsr_statistics()
+    pipeline_statistics()
         : total_reads(0),
           filtered_reads(0),
           baq_reads(0)
     { }
 };
 
-struct bqsr_context
+struct context
 {
     alignment_header& bam_header;
     const variant_database& variant_db;
@@ -102,11 +102,11 @@ struct bqsr_context
     read_group_table_context read_group_table;
 
     // --- everything below this line is host-only and not available on the device
-    bqsr_statistics stats;
+    pipeline_statistics stats;
 
-    bqsr_context(alignment_header& bam_header,
-                 const variant_database& variant_db,
-                 const sequence_data& reference)
+    context(alignment_header& bam_header,
+            const variant_database& variant_db,
+            const sequence_data& reference)
         : bam_header(bam_header),
           variant_db(variant_db),
           reference(reference)
@@ -169,25 +169,26 @@ struct bqsr_context
 };
 
 // encapsulates common state for our thrust functors to save a little typing
-struct bqsr_lambda
+struct lambda
 {
-    bqsr_context::view ctx;
+    context::view ctx;
     const alignment_batch_device::const_view batch;
 
-    bqsr_lambda(bqsr_context::view ctx,
-                const alignment_batch_device::const_view batch)
+    lambda(context::view ctx,
+           const alignment_batch_device::const_view batch)
         : ctx(ctx),
           batch(batch)
     { }
 };
 
-struct bqsr_lambda_context
+struct lambda_context
 {
-    bqsr_context::view ctx;
+    context::view ctx;
 
-    bqsr_lambda_context(bqsr_context::view ctx)
+    lambda_context(context::view ctx)
         : ctx(ctx)
     { }
 };
 
 } // namespace firepony
+

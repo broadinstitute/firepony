@@ -77,7 +77,7 @@ static std::string compute_shmem_path(const char *fname)
         }
     }
 
-    ret = std::string("/bqsr_") + std::string(abs_path);
+    ret = std::string("/firepony_") + std::string(abs_path);
     free(abs_path);
 
     return ret;

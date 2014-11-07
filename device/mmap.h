@@ -21,7 +21,7 @@
 #include <sys/types.h>
 #include <vector>
 
-#include "bqsr_types.h"
+#include "types.h"
 
 namespace firepony {
 

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "bqsr_types.h"
+#include "types.h"
 #include "string_database.h"
 #include "mmap.h"
 

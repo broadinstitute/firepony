@@ -26,10 +26,10 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "bqsr_types.h"
+#include "types.h"
 #include "alignment_data.h"
 #include "sequence_data.h"
-#include "bqsr_context.h"
+#include "firepony_context.h"
 
 #include "primitives/util.h"
 #include "primitives/parallel.h"
@@ -55,9 +55,9 @@ namespace firepony {
 #define LMEM_MAX_READ_LEN 151
 #define LMEM_MAT_SIZE ((LMEM_MAX_READ_LEN + 1) * 6 * (2 * MAX_BAND_WIDTH + 1))
 
-struct compute_hmm_windows : public bqsr_lambda
+struct compute_hmm_windows : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -98,14 +98,14 @@ struct compute_hmm_windows : public bqsr_lambda
 };
 
 // runs the entire BAQ algorithm in a single kernel, storing forward and backward matrices in local memory
-struct hmm_glocal_full_lmem : public bqsr_lambda
+struct hmm_glocal_full_lmem : public lambda
 {
     D_VectorU32::view baq_state;
 
-    hmm_glocal_full_lmem(bqsr_context::view ctx,
+    hmm_glocal_full_lmem(context::view ctx,
                     const alignment_batch_device::const_view batch,
                     D_VectorU32::view baq_state)
-        : bqsr_lambda(ctx, batch), baq_state(baq_state)
+        : lambda(ctx, batch), baq_state(baq_state)
     { }
 
     int bandWidth, bandWidth2;
@@ -539,14 +539,14 @@ struct hmm_glocal_full_lmem : public bqsr_lambda
 };
 
 // encapsulates common state for the HMM algorithm
-struct hmm_common : public bqsr_lambda
+struct hmm_common : public lambda
 {
     D_VectorU32::view baq_state;
 
-    hmm_common(bqsr_context::view ctx,
+    hmm_common(context::view ctx,
                const alignment_batch_device::const_view batch,
                D_VectorU32::view baq_state)
-        : bqsr_lambda(ctx, batch), baq_state(baq_state)
+        : lambda(ctx, batch), baq_state(baq_state)
     { }
 
     int bandWidth, bandWidth2;
@@ -1011,9 +1011,9 @@ struct hmm_glocal_map : public hmm_common
 
 // functor to compute the size required for the forward/backward HMM matrix
 // note that this computes the size required for *one* matrix only; we allocate the matrices on two separate vectors and use the same index for both
-struct compute_hmm_matrix_size : public thrust::unary_function<uint32, uint32>, public bqsr_lambda
+struct compute_hmm_matrix_size : public thrust::unary_function<uint32, uint32>, public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE uint32 operator() (const uint32 read_index)
     {
@@ -1022,9 +1022,9 @@ struct compute_hmm_matrix_size : public thrust::unary_function<uint32, uint32>, 
     }
 };
 
-struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, uint32>, public bqsr_lambda
+struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, uint32>, public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE uint32 operator() (const uint32 read_index)
     {
@@ -1033,9 +1033,9 @@ struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, u
     }
 };
 
-struct read_needs_baq : public bqsr_lambda
+struct read_needs_baq : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
@@ -1046,9 +1046,9 @@ struct read_needs_baq : public bqsr_lambda
     }
 };
 
-struct read_flat_baq : public bqsr_lambda
+struct read_flat_baq : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -1074,14 +1074,14 @@ struct read_flat_baq : public bqsr_lambda
 };
 
 // bottom half of BAQ.calcBAQFromHMM in GATK
-struct cap_baq_qualities : public bqsr_lambda
+struct cap_baq_qualities : public lambda
 {
     D_VectorU32::view baq_state;
 
-    cap_baq_qualities(bqsr_context::view ctx,
+    cap_baq_qualities(context::view ctx,
                       const alignment_batch_device::const_view batch,
                       D_VectorU32::view baq_state)
-        : bqsr_lambda(ctx, batch), baq_state(baq_state)
+        : lambda(ctx, batch), baq_state(baq_state)
     { }
 
     CUDA_HOST_DEVICE bool stateIsIndel(uint32 state)
@@ -1189,9 +1189,9 @@ struct cap_baq_qualities : public bqsr_lambda
 };
 
 // transforms BAQ scores the same way as GATK's encodeBQTag
-struct recode_baq_qualities : public bqsr_lambda
+struct recode_baq_qualities : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -1212,7 +1212,7 @@ struct recode_baq_qualities : public bqsr_lambda
     }
 };
 
-void baq_reads(bqsr_context *context, const alignment_batch& batch)
+void baq_reads(context *context, const alignment_batch& batch)
 {
     struct baq_context& baq = context->baq;
     D_VectorU32& active_baq_read_list = context->temp_u32;
@@ -1238,10 +1238,10 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     active_baq_read_list.resize(context->active_read_list.size());
 
     num_active = copy_if(context->active_read_list.begin(),
-                               context->active_read_list.size(),
-                               active_baq_read_list.begin(),
-                               read_needs_baq(*context, batch.device),
-                               context->temp_storage);
+                         context->active_read_list.size(),
+                         active_baq_read_list.begin(),
+                         read_needs_baq(*context, batch.device),
+                         context->temp_storage);
 
     active_baq_read_list.resize(num_active);
 
@@ -1253,10 +1253,10 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
         thrust::fill_n(baq.matrix_index.begin(), 1, 0);
         // do an inclusive scan to compute all offsets + the total size
         inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
-                compute_hmm_matrix_size(*context, batch.device)),
-                num_active,
-                baq.matrix_index.begin() + 1,
-                thrust::plus<uint32>());
+                       compute_hmm_matrix_size(*context, batch.device)),
+                       num_active,
+                       baq.matrix_index.begin() + 1,
+                       thrust::plus<uint32>());
 
         uint32 matrix_len = baq.matrix_index[num_active];
 
@@ -1269,10 +1269,10 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     // first offset is zero
     thrust::fill_n(baq.scaling_index.begin(), 1, 0);
     inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
-                                                         compute_hmm_scaling_factor_size(*context, batch.device)),
-                         num_active,
-                         baq.scaling_index.begin() + 1,
-                         thrust::plus<uint32>());
+                                                   compute_hmm_scaling_factor_size(*context, batch.device)),
+                   num_active,
+                   baq.scaling_index.begin() + 1,
+                   thrust::plus<uint32>());
 
     uint32 scaling_len = baq.scaling_index[num_active];
     baq.scaling.resize(scaling_len);
@@ -1392,7 +1392,7 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     context->stats.baq_postprocess.add(baq_postprocess);
 }
 
-void debug_baq(bqsr_context *context, const alignment_batch& batch, int read_index)
+void debug_baq(context *context, const alignment_batch& batch, int read_index)
 {
     const alignment_batch_host& h_batch = batch.host;
 

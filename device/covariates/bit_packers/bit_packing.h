@@ -20,8 +20,7 @@
 
 // defines the base types for implementing bit-packing chains that track covariate values
 
-#include "../../bqsr_types.h"
-#include "../../bqsr_context.h"
+#include "../../types.h"
 #include "../../primitives/cuda.h"
 #include "../../from_nvbio/dna.h"
 #include "../../from_nvbio/alphabet.h"
@@ -83,7 +82,7 @@ struct covariate
 
 protected:
     static CUDA_HOST_DEVICE covariate_key_set build_key(covariate_key_set input_key, covariate_key_set data,
-                                                        bqsr_context::view ctx,
+                                                        context::view ctx,
                                                         const alignment_batch_device::const_view batch,
                                                         uint32 read_index, uint16 bp_offset, uint32 cigar_event_index)
     {
@@ -136,7 +135,7 @@ struct covariate_null
         next_offset = 0
     };
 
-    static CUDA_HOST_DEVICE covariate_key_set encode(bqsr_context::view ctx,
+    static CUDA_HOST_DEVICE covariate_key_set encode(context::view ctx,
                                                      const alignment_batch_device::const_view batch,
                                                      uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
                                                      covariate_key_set input_key = {0, 0, 0})

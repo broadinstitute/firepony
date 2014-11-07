@@ -16,23 +16,23 @@
  *
  */
 
-#include "bqsr_context.h"
+#include "firepony_context.h"
 #include "util.h"
 #include "baq.h"
 
 namespace firepony {
 
 // implements GATK's BaseRecalibrator.calculateFractionalErrorArray
-struct compute_fractional_errors : public bqsr_lambda
+struct compute_fractional_errors : public lambda
 {
     D_PackedVector_1b::const_view error_vector;
     D_VectorF64::view output_vector;
 
-    compute_fractional_errors(bqsr_context::view ctx,
+    compute_fractional_errors(context::view ctx,
                               const alignment_batch_device::const_view batch,
                               const D_PackedVector_1b::const_view error_vector,
                               D_VectorF64::view output_vector)
-        : bqsr_lambda(ctx, batch), error_vector(error_vector), output_vector(output_vector)
+        : lambda(ctx, batch), error_vector(error_vector), output_vector(output_vector)
     { }
 
     CUDA_HOST_DEVICE void calculateAndStoreErrorsInBlock(const int iii,
@@ -99,7 +99,7 @@ struct compute_fractional_errors : public bqsr_lambda
     }
 };
 
-void build_fractional_error_arrays(bqsr_context *ctx, const alignment_batch& batch)
+void build_fractional_error_arrays(context *ctx, const alignment_batch& batch)
 {
     auto& frac = ctx->fractional_error;
 
@@ -122,7 +122,7 @@ void build_fractional_error_arrays(bqsr_context *ctx, const alignment_batch& bat
                      compute_fractional_errors(*ctx, batch.device, ctx->cigar.is_deletion, frac.deletion_errors));
 }
 
-void debug_fractional_error_arrays(bqsr_context *context, const alignment_batch& batch, int read_index)
+void debug_fractional_error_arrays(context *context, const alignment_batch& batch, int read_index)
 {
     const alignment_batch_host& h_batch = batch.host;
 

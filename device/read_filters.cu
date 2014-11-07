@@ -20,8 +20,8 @@
 
 #include "primitives/parallel.h"
 
-#include "bqsr_types.h"
-#include "bqsr_context.h"
+#include "types.h"
+#include "firepony_context.h"
 #include "alignment_data.h"
 #include "read_filters.h"
 
@@ -29,9 +29,9 @@ namespace firepony {
 
 // filter if any of the flags are set
 template<uint32 flags>
-struct filter_if_any_set : public bqsr_lambda
+struct filter_if_any_set : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
@@ -45,9 +45,9 @@ struct filter_if_any_set : public bqsr_lambda
 };
 
 // implements the GATK filters MappingQualityUnavailable and MappingQualityZero
-struct filter_mapq : public bqsr_lambda
+struct filter_mapq : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
@@ -62,9 +62,9 @@ struct filter_mapq : public bqsr_lambda
 };
 
 // partially implements the GATK MalformedReadFilter
-struct filter_malformed_reads : public bqsr_lambda
+struct filter_malformed_reads : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
@@ -139,9 +139,9 @@ struct filter_malformed_reads : public bqsr_lambda
 };
 
 // implements another part of the GATK MalformedReadFilter
-struct filter_malformed_cigars : public bqsr_lambda
+struct filter_malformed_cigars : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
     {
@@ -242,7 +242,7 @@ struct filter_malformed_cigars : public bqsr_lambda
 };
 
 // apply read filters to the batch
-void filter_reads(bqsr_context *context, const alignment_batch& batch)
+void filter_reads(context *context, const alignment_batch& batch)
 {
     D_VectorU32& active_read_list = context->active_read_list;
     D_VectorU32& temp_u32 = context->temp_u32;
@@ -273,31 +273,31 @@ void filter_reads(bqsr_context *context, const alignment_batch& batch)
 
     // apply the mapq filter, copying from active_read_list into temp_u32
     num_active = copy_if(active_read_list.begin(),
-                               num_active,
-                               temp_u32.begin(),
-                               mapq_filter,
-                               context->temp_storage);
+                         num_active,
+                         temp_u32.begin(),
+                         mapq_filter,
+                         context->temp_storage);
 
     // apply the flags filters, copying from temp_u32 into active_read_list
     num_active = copy_if(temp_u32.begin(),
-                               num_active,
-                               active_read_list.begin(),
-                               flags_filter,
-                               context->temp_storage);
+                         num_active,
+                         active_read_list.begin(),
+                         flags_filter,
+                         context->temp_storage);
 
     // apply the malformed read filters, copying from active_read_list into temp_u32
     num_active = copy_if(active_read_list.begin(),
-                               num_active,
-                               temp_u32.begin(),
-                               malformed_read_filter,
-                               context->temp_storage);
+                         num_active,
+                         temp_u32.begin(),
+                         malformed_read_filter,
+                         context->temp_storage);
 
     // apply the malformed cigar filters, copying from temp_u32 into active_read_list
     num_active = copy_if(temp_u32.begin(),
-                               num_active,
-                               active_read_list.begin(),
-                               malformed_cigar_filter,
-                               context->temp_storage);
+                         num_active,
+                         active_read_list.begin(),
+                         malformed_cigar_filter,
+                         context->temp_storage);
 
     // resize active_read_list
     active_read_list.resize(num_active);
@@ -307,9 +307,9 @@ void filter_reads(bqsr_context *context, const alignment_batch& batch)
 }
 
 // filter non-regular bases (anything other than A, C, G, T)
-struct filter_non_regular_bases : public bqsr_lambda
+struct filter_non_regular_bases : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -336,9 +336,9 @@ struct filter_non_regular_bases : public bqsr_lambda
 #define MIN_USABLE_Q_SCORE 6
 
 // filter bases with quality < MIN_USABLE_Q_SCORE
-struct filter_low_quality_bases : public bqsr_lambda
+struct filter_low_quality_bases : public lambda
 {
-    using bqsr_lambda::bqsr_lambda;
+    using lambda::lambda;
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -357,7 +357,7 @@ struct filter_low_quality_bases : public bqsr_lambda
 
 // apply per-BP filters to the batch
 // (known SNPs are filtered elsewhere)
-void filter_bases(bqsr_context *context, const alignment_batch& batch)
+void filter_bases(context *context, const alignment_batch& batch)
 {
     thrust::for_each(context->active_read_list.begin(),
                      context->active_read_list.end(),

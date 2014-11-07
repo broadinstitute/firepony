@@ -1,4 +1,4 @@
-# build zlib (used by bqsr)
+# build zlib
 set(zlib_PREFIX ${CMAKE_BINARY_DIR}/contrib/zlib-prefix)
 ExternalProject_Add(zlib
     PREFIX ${zlib_PREFIX}

@@ -16,7 +16,7 @@
  *
  */
 
-#include "bqsr_context.h"
+#include "firepony_context.h"
 #include "covariates_table.h"
 #include "read_group_table.h"
 
@@ -28,9 +28,9 @@
 
 namespace firepony {
 
-struct generate_read_group_table : public bqsr_lambda_context
+struct generate_read_group_table : public lambda_context
 {
-    using bqsr_lambda_context::bqsr_lambda_context;
+    using lambda_context::lambda_context;
 
     CUDA_HOST_DEVICE double qualToErrorProb(uint8 qual)
     {
@@ -73,9 +73,9 @@ struct covariate_empirical_value_sum
     }
 };
 
-struct covariate_compute_empirical_quality : public bqsr_lambda_context
+struct covariate_compute_empirical_quality : public lambda_context
 {
-    using bqsr_lambda_context::bqsr_lambda_context;
+    using lambda_context::lambda_context;
 
     static constexpr int SMOOTHING_CONSTANT = 1;
     static constexpr int MAX_RECALIBRATED_Q_SCORE = 93;
@@ -208,7 +208,7 @@ struct covariate_compute_empirical_quality : public bqsr_lambda_context
     }
 };
 
-void build_read_group_table(bqsr_context *context)
+void build_read_group_table(context *context)
 {
     const auto& cv = context->covariates;
     auto& rg = context->read_group_table;
@@ -262,7 +262,7 @@ void build_read_group_table(bqsr_context *context)
                      covariate_compute_empirical_quality(*context));
 }
 
-void output_read_group_table(bqsr_context *context)
+void output_read_group_table(context *context)
 {
     auto& rg = context->read_group_table;
     auto& rg_keys = rg.read_group_keys;

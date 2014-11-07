@@ -68,7 +68,7 @@ struct covariate_table_context
         return chain::decode(key, id);
     }
 
-    static void dump_table(bqsr_context *context, D_CovariateTable& d_table)
+    static void dump_table(context *context, D_CovariateTable& d_table)
     {
         H_CovariateTable table;
         table.copyfrom(d_table);

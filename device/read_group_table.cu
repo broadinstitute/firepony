@@ -275,7 +275,7 @@ void output_read_group_table(firepony_context& context)
     for(uint32 i = 0; i < rg_keys.size(); i++)
     {
         uint32 rg_id = covariate_table_quality::decode(rg_keys[i], covariate_table_quality::ReadGroup);
-        const std::string& rg_name = context.bam_header.read_groups_db.lookup(rg_id);
+        const std::string& rg_name = context.bam_header.host.read_groups_db.lookup(rg_id);
 
         covariate_empirical_value val = rg_values[i];
 

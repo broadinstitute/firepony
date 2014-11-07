@@ -24,13 +24,13 @@ namespace firepony {
 void firepony_context::start_batch(const alignment_batch& batch)
 {
     // initialize the read order with 0..N
-    active_read_list.resize(batch.host.num_reads);
+    active_read_list.resize(batch.host->num_reads);
     thrust::copy(thrust::make_counting_iterator(0),
-                 thrust::make_counting_iterator(0) + batch.host.num_reads,
+                 thrust::make_counting_iterator(0) + batch.host->num_reads,
                  active_read_list.begin());
 
     // set up the active location list to cover all of the current batch
-    active_location_list.resize(batch.host.reads.size());
+    active_location_list.resize(batch.host->reads.size());
     // mark all BPs as active
     thrust::fill(active_location_list.m_storage.begin(),
                  active_location_list.m_storage.end(),
@@ -39,7 +39,7 @@ void firepony_context::start_batch(const alignment_batch& batch)
 
 void firepony_context::end_batch(const alignment_batch& batch)
 {
-    stats.total_reads += batch.host.num_reads;
+    stats.total_reads += batch.host->num_reads;
 }
 
 } // namespace firepony

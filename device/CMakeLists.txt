@@ -1,5 +1,5 @@
 set(firepony_sources
-alignment_data.h
+alignment_data_device.h
 baq.cu
 baq.h
 cigar.cu

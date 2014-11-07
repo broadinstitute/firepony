@@ -124,7 +124,7 @@ void build_fractional_error_arrays(firepony_context& context, const alignment_ba
 
 void debug_fractional_error_arrays(firepony_context& context, const alignment_batch& batch, int read_index)
 {
-    const alignment_batch_host& h_batch = batch.host;
+    const alignment_batch_host& h_batch = *batch.host;
 
     fprintf(stderr, "  fractional error arrays:\n");
 

@@ -19,7 +19,7 @@
 #pragma once
 
 #include <gamgee/sam_reader.h>
-#include "device/alignment_data.h"
+#include "alignment_data.h"
 #include "device/sequence_data.h"
 #include "device/variant_data.h"
 
@@ -37,12 +37,12 @@ private:
     std::map<std::string, std::string> read_group_id_to_name;
 
 public:
-    alignment_header header;
+    alignment_header_host header;
 
     gamgee_alignment_file(const char *fname);
     ~gamgee_alignment_file();
 
-    bool next_batch(alignment_batch *batch, uint32 data_mask, const uint32 batch_size = 100000);
+    bool next_batch(alignment_batch_host *batch, uint32 data_mask, const uint32 batch_size = 100000);
     const char *get_sequence_name(uint32 id);
 };
 

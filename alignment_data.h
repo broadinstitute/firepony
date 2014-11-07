@@ -21,25 +21,21 @@
 #include <vector>
 #include <map>
 
-#include <gamgee/sam.h>
-
-#include "device_types.h"
-#include "string_database.h"
-
-#include "primitives/cuda.h"
+#include "types.h"
+#include "device/primitives/vector.h"
+#include "device/string_database.h"
 
 namespace firepony {
 
 // contains information referenced by an alignment data batch
 // xxxnsubtil: a better name might be in order
-struct alignment_header
+template <typename system_tag>
+struct alignment_header_storage
 {
-    // the length of each chromosome in the reference
-    // xxxnsubtil: this is an ugly hack
-    H_Vector<uint32> chromosome_lengths;
-    D_Vector<uint32> d_chromosome_lengths;
+    template <typename T> using Vector = firepony::vector<system_tag, T>;
 
-    string_database read_groups_db;
+    // the length of each chromosome in the reference
+    Vector<uint32> chromosome_lengths;
 
     struct const_view
     {
@@ -49,11 +45,16 @@ struct alignment_header
     operator const_view() const
     {
         const_view v = {
-                d_chromosome_lengths,
+            chromosome_lengths,
         };
 
         return v;
     }
+};
+
+struct alignment_header_host : public alignment_header_storage<host_tag>
+{
+    string_database read_groups_db;
 };
 
 enum AlignmentFlags
@@ -133,6 +134,7 @@ struct alignment_batch_storage
 
     uint32 num_reads;
     uint32 max_read_size;
+    uint32 data_mask;
 
     // chromosome index of the read
     Vector<uint32> chromosome;
@@ -177,89 +179,12 @@ struct alignment_batch_storage
     CUDA_HOST alignment_batch_storage() { }
 };
 
-struct alignment_batch_device : public alignment_batch_storage<target_system_tag>
-{
-    CUDA_DEVICE const CRQ_index crq_index(uint32 read_id) const
-    {
-        return CRQ_index(cigar_start[read_id],
-                         cigar_len[read_id],
-                         read_start[read_id],
-                         read_len[read_id],
-                         qual_start[read_id],
-                         qual_len[read_id]);
-    }
-
-    struct const_view
-    {
-        uint32 num_reads;
-        uint32 max_read_size;
-
-        D_Vector<uint32>::const_view chromosome;
-        D_Vector<uint32>::const_view alignment_start;
-        D_Vector<uint32>::const_view alignment_stop;
-        D_Vector<uint32>::const_view mate_chromosome;
-        D_Vector<uint32>::const_view mate_alignment_start;
-        D_Vector<int16>::const_view inferred_insert_size;
-        D_Vector<cigar_op>::const_view cigars;
-        D_Vector<uint32>::const_view cigar_start;
-        D_Vector<uint32>::const_view cigar_len;
-        D_PackedVector<4>::const_view reads;
-        D_Vector<uint32>::const_view read_start;
-        D_Vector<uint32>::const_view read_len;
-        D_Vector<uint8>::const_view qualities;
-        D_Vector<uint32>::const_view qual_start;
-        D_Vector<uint32>::const_view qual_len;
-        D_Vector<uint16>::const_view flags;
-        D_Vector<uint8>::const_view mapq;
-        D_Vector<uint32>::const_view read_group;
-
-        CUDA_HOST_DEVICE const CRQ_index crq_index(uint32 read_id) const
-        {
-            return CRQ_index(cigar_start[read_id],
-                             cigar_len[read_id],
-                             read_start[read_id],
-                             read_len[read_id],
-                             qual_start[read_id],
-                             qual_len[read_id]);
-        }
-    };
-
-    operator const_view() const
-    {
-        const_view v = {
-                num_reads,
-                max_read_size,
-
-                chromosome,
-                alignment_start,
-                alignment_stop,
-                mate_chromosome,
-                mate_alignment_start,
-                inferred_insert_size,
-                cigars,
-                cigar_start,
-                cigar_len,
-                reads,
-                read_start,
-                read_len,
-                qualities,
-                qual_start,
-                qual_len,
-                flags,
-                mapq,
-                read_group,
-        };
-
-        return v;
-    }
-};
-
 struct alignment_batch_host : public alignment_batch_storage<host_tag>
 {
     // data that never gets copied to the device
     H_Vector<std::string> name;
 
-    CUDA_HOST const CRQ_index crq_index(uint32 read_id) const
+    const CRQ_index crq_index(uint32 read_id) const
     {
         return CRQ_index(cigar_start[read_id],
                          cigar_len[read_id],
@@ -273,6 +198,7 @@ struct alignment_batch_host : public alignment_batch_storage<host_tag>
     {
         num_reads = 0;
         max_read_size = 0;
+        this->data_mask = data_mask;
 
         name.clear();
         chromosome.clear();
@@ -372,120 +298,5 @@ struct alignment_batch_host : public alignment_batch_storage<host_tag>
     }
 };
 
-struct alignment_batch
-{
-    uint32 data_mask;
-
-    alignment_batch_host host;
-    alignment_batch_device device;
-
-    void reset(uint32 mask, uint32 batch_size)
-    {
-        data_mask = mask;
-        host.reset(data_mask, batch_size);
-    }
-
-    void download(void)
-    {
-        device.num_reads = host.num_reads;
-        device.max_read_size = host.max_read_size;
-
-        if (data_mask & AlignmentDataMask::CHROMOSOME)
-        {
-            device.chromosome = host.chromosome;
-        } else {
-            device.chromosome.clear();
-        }
-
-        if (data_mask & AlignmentDataMask::ALIGNMENT_START)
-        {
-            device.alignment_start = host.alignment_start;
-        } else {
-            device.alignment_start.clear();
-        }
-
-        if (data_mask & AlignmentDataMask::ALIGNMENT_STOP)
-        {
-            device.alignment_stop = host.alignment_stop;
-        } else {
-            device.alignment_stop.clear();
-        }
-
-        if (data_mask & AlignmentDataMask::MATE_CHROMOSOME)
-        {
-            device.mate_chromosome = host.mate_chromosome;
-        } else {
-            device.mate_chromosome.clear();
-        }
-
-        if (data_mask & AlignmentDataMask::MATE_ALIGNMENT_START)
-        {
-            device.mate_alignment_start = host.mate_alignment_start;
-        } else {
-            device.mate_alignment_start.clear();
-        }
-
-        if (data_mask & AlignmentDataMask::INFERRED_INSERT_SIZE)
-        {
-            device.inferred_insert_size = host.inferred_insert_size;
-        } else {
-            device.inferred_insert_size.clear();
-        }
-
-        if (data_mask & AlignmentDataMask::CIGAR)
-        {
-            device.cigars = host.cigars;
-            device.cigar_start = host.cigar_start;
-            device.cigar_len = host.cigar_len;
-        } else {
-            device.cigars.clear();
-            device.cigar_start.clear();
-            device.cigar_len.clear();
-        }
-
-        if (data_mask & AlignmentDataMask::READS)
-        {
-            device.reads = host.reads;
-            device.read_start = host.read_start;
-            device.read_len = host.read_len;
-        } else {
-            device.reads.clear();
-            device.read_start.clear();
-            device.read_len.clear();
-        }
-
-        if (data_mask & AlignmentDataMask::QUALITIES)
-        {
-            device.qualities = host.qualities;
-            device.qual_start = host.qual_start;
-            device.qual_len = host.qual_len;
-        } else {
-            device.qualities.clear();
-            device.qual_start.clear();
-            device.qual_len.clear();
-        }
-
-        if (data_mask & AlignmentDataMask::FLAGS)
-        {
-            device.flags = host.flags;
-        } else {
-            device.flags.clear();
-        }
-
-        if (data_mask & AlignmentDataMask::MAPQ)
-        {
-            device.mapq = host.mapq;
-        } else {
-            device.mapq.clear();
-        }
-
-        if (data_mask & AlignmentDataMask::READ_GROUP)
-        {
-            device.read_group = host.read_group;
-        } else {
-            device.read_group.clear();
-        }
-    }
-};
-
 } // namespace firepony
+

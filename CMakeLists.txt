@@ -55,6 +55,7 @@ include("contrib/cub.cmake")
 add_subdirectory(device)
 
 set(firepony_common_sources
+    alignment_data.h
     command_line.cu
     command_line.h
     gamgee_loader.cu

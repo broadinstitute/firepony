@@ -27,7 +27,7 @@
 #include <math.h>
 
 #include "device_types.h"
-#include "alignment_data.h"
+#include "alignment_data_device.h"
 #include "sequence_data.h"
 #include "firepony_context.h"
 
@@ -1219,7 +1219,7 @@ void baq_reads(firepony_context& context, const alignment_batch& batch)
     D_VectorU32& baq_state = context.temp_u32_2;
 
     // check if we can use the lmem kernel
-    const bool baq_use_lmem = (batch.host.max_read_size <= LMEM_MAX_READ_LEN);
+    const bool baq_use_lmem = (batch.host->max_read_size <= LMEM_MAX_READ_LEN);
     static bool baq_lmem_warning_printed = false;
 
     if (!baq_use_lmem && !baq_lmem_warning_printed)
@@ -1394,7 +1394,7 @@ void baq_reads(firepony_context& context, const alignment_batch& batch)
 
 void debug_baq(firepony_context& context, const alignment_batch& batch, int read_index)
 {
-    const alignment_batch_host& h_batch = batch.host;
+    const alignment_batch_host& h_batch = *batch.host;
 
     fprintf(stderr, "  BAQ info:\n");
 

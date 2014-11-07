@@ -19,7 +19,7 @@
 #pragma once
 
 #include "device_types.h"
-#include "alignment_data.h"
+#include "alignment_data_device.h"
 #include "sequence_data.h"
 
 namespace firepony

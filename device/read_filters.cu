@@ -22,7 +22,7 @@
 
 #include "device_types.h"
 #include "firepony_context.h"
-#include "alignment_data.h"
+#include "alignment_data_device.h"
 #include "read_filters.h"
 
 namespace firepony {

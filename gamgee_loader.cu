@@ -26,9 +26,9 @@
 
 #include <string>
 
+#include "alignment_data.h"
 #include "gamgee_loader.h"
 #include "device/util.h"
-#include "device/alignment_data.h"
 #include "device/sequence_data.h"
 #include "device/variant_data.h"
 #include "device/mmap.h"
@@ -61,7 +61,6 @@ gamgee_alignment_file::gamgee_alignment_file(const char *fname)
     {
         header.chromosome_lengths.push_back(gamgee_header.sequence_length(i));
     }
-    header.d_chromosome_lengths = header.chromosome_lengths;
 
     iterator = file.begin();
 }
@@ -124,13 +123,11 @@ static uint32 extract_gamgee_flags(gamgee::Sam& record)
     return flags;
 }
 
-bool gamgee_alignment_file::next_batch(alignment_batch *batch, uint32 data_mask, const uint32 batch_size)
+bool gamgee_alignment_file::next_batch(alignment_batch_host *batch, uint32 data_mask, const uint32 batch_size)
 {
-    alignment_batch_host *h_batch = &batch->host;
     uint32 read_id;
 
-    batch->data_mask = data_mask;
-    h_batch->reset(data_mask, batch_size);
+    batch->reset(data_mask, batch_size);
 
     for(read_id = 0; read_id < batch_size; read_id++, ++iterator)
     {
@@ -140,45 +137,45 @@ bool gamgee_alignment_file::next_batch(alignment_batch *batch, uint32 data_mask,
             break;
         }
 
-        h_batch->num_reads++;
-        h_batch->name.push_back(record.name());
+        batch->num_reads++;
+        batch->name.push_back(record.name());
 
         if (data_mask & AlignmentDataMask::CHROMOSOME)
         {
-            h_batch->chromosome.push_back(record.chromosome());
+            batch->chromosome.push_back(record.chromosome());
         }
 
         if (data_mask & AlignmentDataMask::ALIGNMENT_START)
         {
-            h_batch->alignment_start.push_back(record.alignment_start() - 1);
+            batch->alignment_start.push_back(record.alignment_start() - 1);
         }
 
         if (data_mask & AlignmentDataMask::ALIGNMENT_STOP)
         {
-            h_batch->alignment_stop.push_back(record.alignment_stop() - 1);
+            batch->alignment_stop.push_back(record.alignment_stop() - 1);
         }
 
         if (data_mask & AlignmentDataMask::MATE_CHROMOSOME)
         {
-            h_batch->mate_chromosome.push_back(record.mate_chromosome());
+            batch->mate_chromosome.push_back(record.mate_chromosome());
         }
 
         if (data_mask & AlignmentDataMask::MATE_ALIGNMENT_START)
         {
-            h_batch->mate_alignment_start.push_back(record.mate_alignment_start() - 1);
+            batch->mate_alignment_start.push_back(record.mate_alignment_start() - 1);
         }
 
         if (data_mask & AlignmentDataMask::INFERRED_INSERT_SIZE)
         {
-            h_batch->inferred_insert_size.push_back(record.insert_size());
+            batch->inferred_insert_size.push_back(record.insert_size());
         }
 
         if (data_mask & AlignmentDataMask::CIGAR)
         {
             gamgee::Cigar cigar = record.cigar();
 
-            h_batch->cigar_start.push_back(h_batch->cigars.size());
-            h_batch->cigar_len.push_back(cigar.size());
+            batch->cigar_start.push_back(batch->cigars.size());
+            batch->cigar_len.push_back(cigar.size());
 
             for(uint32 i = 0; i < cigar.size(); i++)
             {
@@ -187,7 +184,7 @@ bool gamgee_alignment_file::next_batch(alignment_batch *batch, uint32 data_mask,
                 op.op = gamgee_to_firepony_cigar_op(cigar[i]);
                 op.len = gamgee::Cigar::cigar_oplen(cigar[i]);
 
-                h_batch->cigars.push_back(op);
+                batch->cigars.push_back(op);
             }
         }
 
@@ -195,25 +192,25 @@ bool gamgee_alignment_file::next_batch(alignment_batch *batch, uint32 data_mask,
         {
             gamgee::ReadBases read = record.bases();
 
-            h_batch->read_start.push_back(h_batch->reads.size());
-            h_batch->read_len.push_back(read.size());
+            batch->read_start.push_back(batch->reads.size());
+            batch->read_len.push_back(read.size());
 
             // figure out the length of the sequence data,
             // rounded up to reach a dword boundary
             const uint32 padded_read_len_bp = ((read.size() + 7) / 8) * 8;
 
             // make sure we have enough memory, then read in the sequence
-            h_batch->reads.resize(h_batch->reads.size() + padded_read_len_bp);
+            batch->reads.resize(batch->reads.size() + padded_read_len_bp);
 
             // xxxnsubtil: this is going to be really slow
             for(uint32 i = 0; i < read.size(); i++)
             {
-                h_batch->reads[h_batch->read_start[read_id] + i] = uint32(read[i]);
+                batch->reads[batch->read_start[read_id] + i] = uint32(read[i]);
             }
 
-            if (h_batch->max_read_size < read.size())
+            if (batch->max_read_size < read.size())
             {
-                h_batch->max_read_size = read.size();
+                batch->max_read_size = read.size();
             }
         }
 
@@ -221,21 +218,21 @@ bool gamgee_alignment_file::next_batch(alignment_batch *batch, uint32 data_mask,
         {
             gamgee::BaseQuals quals = record.base_quals();
 
-            h_batch->qual_start.push_back(h_batch->qualities.size());
-            h_batch->qual_len.push_back(quals.size());
+            batch->qual_start.push_back(batch->qualities.size());
+            batch->qual_len.push_back(quals.size());
 
-            h_batch->qualities.resize(h_batch->qualities.size() + quals.size());
-            memcpy(&h_batch->qualities[h_batch->qual_start[read_id]], &quals[0], quals.size());
+            batch->qualities.resize(batch->qualities.size() + quals.size());
+            memcpy(&batch->qualities[batch->qual_start[read_id]], &quals[0], quals.size());
         }
 
         if (data_mask & AlignmentDataMask::FLAGS)
         {
-            h_batch->flags.push_back(extract_gamgee_flags(record));
+            batch->flags.push_back(extract_gamgee_flags(record));
         }
 
         if (data_mask & AlignmentDataMask::MAPQ)
         {
-            h_batch->mapq.push_back(record.mapping_qual());
+            batch->mapq.push_back(record.mapping_qual());
         }
 
         if (data_mask & AlignmentDataMask::READ_GROUP)
@@ -245,16 +242,16 @@ bool gamgee_alignment_file::next_batch(alignment_batch *batch, uint32 data_mask,
             if (tag.missing())
             {
                 // invalid read group
-                h_batch->read_group.push_back(uint32(-1));
+                batch->read_group.push_back(uint32(-1));
             } else {
                 auto iter = read_group_id_to_name.find(tag.value());
                 if (iter == read_group_id_to_name.end())
                 {
                     fprintf(stderr, "WARNING: found read with invalid read group identifier\n");
-                    h_batch->read_group.push_back(uint32(-1));
+                    batch->read_group.push_back(uint32(-1));
                 } else {
                     uint32 rg_id = header.read_groups_db.insert(iter->second);
-                    h_batch->read_group.push_back(rg_id);
+                    batch->read_group.push_back(rg_id);
                 }
             }
         }

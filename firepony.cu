@@ -18,7 +18,8 @@
 
 #include <map>
 
-#include "device/alignment_data.h"
+#include "alignment_data.h"
+
 #include "device/baq.h"
 #include "device/firepony_context.h"
 #include "device/device_types.h"
@@ -32,6 +33,9 @@
 #include "device/string_database.h"
 #include "device/util.h"
 #include "device/variant_data.h"
+
+#include "device/alignment_data_device.h"
+
 #include "command_line.h"
 #include "gamgee_loader.h"
 
@@ -46,7 +50,7 @@ struct io_thread
     static constexpr bool DISABLE_THREADING = false;
     static constexpr int NUM_BUFFERS = 3;
 
-    alignment_batch batches[NUM_BUFFERS];
+    alignment_batch_host batches[NUM_BUFFERS];
     volatile int put, get;
     volatile bool eof;
 
@@ -84,7 +88,7 @@ struct io_thread
         return val % NUM_BUFFERS;
     }
 
-    alignment_batch& next_buffer(void)
+    alignment_batch_host& next_buffer(void)
     {
         if (DISABLE_THREADING)
         {
@@ -210,7 +214,11 @@ int main(int argc, char **argv)
     io_thread bam_thread(command_line_options.input, data_mask);
     bam_thread.start();
 
-    firepony_context context(bam_thread.file.header, reference, vcf);
+    // xxxnsubtil: fix later
+    alignment_header header(bam_thread.file.header);
+    header.download();
+
+    firepony_context context(header, reference, vcf);
 
     auto& stats = context.stats;
     cpu_timer wall_clock;
@@ -226,14 +234,15 @@ int main(int argc, char **argv)
 
     wall_clock.start();
 
+    alignment_batch batch;
+
     while(!bam_thread.done())
     {
         io.start();
         // fetch the next batch
-        alignment_batch& batch = bam_thread.next_buffer();
-
+        alignment_batch_host& h_batch = bam_thread.next_buffer();
         // load the next batch on the device
-        batch.download();
+        batch.download(&h_batch);
         context.start_batch(batch);
         io.stop();
 
@@ -380,7 +389,7 @@ int main(int argc, char **argv)
 
 void debug_read(firepony_context *context, const alignment_batch& batch, int read_id)
 {
-    const alignment_batch_host& h_batch = batch.host;
+    const alignment_batch_host& h_batch = *batch.host;
 
     const uint32 read_index = context->active_read_list[read_id];
     const CRQ_index idx = h_batch.crq_index(read_index);

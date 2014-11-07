@@ -61,7 +61,7 @@ struct covariate_table_quality
         for(uint32 i = 0; i < table.size(); i++)
         {
             uint32 rg_id = decode(table.keys[i], ReadGroup);
-            const std::string& rg_name = context.bam_header.read_groups_db.lookup(rg_id);
+            const std::string& rg_name = context.bam_header.host.read_groups_db.lookup(rg_id);
 
             printf("%s\t%d\t\t%c\t\t%.4f\t\t\t%d\t\t%.2f\n",
                     rg_name.c_str(),

@@ -24,7 +24,7 @@
 #include "cigar.h"
 #include "device_types.h"
 #include "firepony_context.h"
-#include "alignment_data.h"
+#include "alignment_data_device.h"
 #include "util.h"
 
 #include "primitives/cuda.h"
@@ -766,7 +766,7 @@ void expand_cigars(firepony_context& context, const alignment_batch& batch)
 
 void debug_cigar(firepony_context& context, const alignment_batch& batch, int read_index)
 {
-    const alignment_batch_host& h_batch = batch.host;
+    const alignment_batch_host& h_batch = *batch.host;
 
     const CRQ_index idx = h_batch.crq_index(read_index);
     const cigar_context& ctx = context.cigar;

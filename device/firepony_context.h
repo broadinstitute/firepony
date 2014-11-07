@@ -19,13 +19,12 @@
 #pragma once
 
 #include "device_types.h"
-#include "alignment_data.h"
+#include "alignment_data_device.h"
 #include "sequence_data.h"
 #include "variant_data.h"
 #include "snp_filter.h"
 #include "covariates.h"
 #include "cigar.h"
-#include "alignment_data.h"
 #include "baq.h"
 #include "fractional_errors.h"
 #include "read_group_table.h"
@@ -114,7 +113,7 @@ struct firepony_context
 
     struct view
     {
-        alignment_header::const_view            bam_header;
+        alignment_header_device::const_view     bam_header;
         variant_database_device::const_view     variant_db;
         sequence_data_device::const_view        reference;
         D_VectorU32::view                       active_read_list;
@@ -139,7 +138,7 @@ struct firepony_context
     operator view()
     {
         view v = {
-            bam_header,
+            bam_header.device,
             variant_db.device,
             reference.device,
             active_read_list,

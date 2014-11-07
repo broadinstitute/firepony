@@ -20,8 +20,10 @@
 
 #include "alignment_data.h"
 #include "sequence_data.h"
+#include "variant_data.h"
 #include "device/alignment_data_device.h"
 #include "device/sequence_data_device.h"
+#include "device/variant_data_device.h"
 
 #include "device/baq.h"
 #include "device/firepony_context.h"
@@ -34,7 +36,6 @@
 #include "device/snp_filter.h"
 #include "device/string_database.h"
 #include "device/util.h"
-#include "device/variant_data.h"
 
 #include "command_line.h"
 #include "gamgee_loader.h"
@@ -65,8 +66,7 @@ void init_cuda(void)
 int main(int argc, char **argv)
 {
     sequence_data_host h_reference;
-
-    variant_database vcf;
+    variant_database_host h_dbsnp;
     size_t num_bytes;
     bool ret;
 
@@ -92,17 +92,19 @@ int main(int argc, char **argv)
     fprintf(stderr, "downloaded %lu MB of reference data\n", num_bytes / (1024 * 1024));
 
     fprintf(stderr, "loading variant database %s...\n", command_line_options.snp_database);
-    ret = gamgee_load_vcf(&vcf, h_reference, command_line_options.snp_database,
+    ret = gamgee_load_vcf(&h_dbsnp, h_reference, command_line_options.snp_database,
                           VariantDataMask::CHROMOSOME | VariantDataMask::ALIGNMENT);
+
     if (ret == false)
     {
         fprintf(stderr, "failed to load variant database %s\n", command_line_options.snp_database);
         exit(1);
     }
 
-    fprintf(stderr, "%u variants\n", vcf.host.num_variants);
+    fprintf(stderr, "%u variants\n", h_dbsnp.view.num_variants);
 
-    num_bytes = vcf.download();
+    variant_database dbsnp(h_dbsnp);
+    num_bytes = dbsnp.download();
     fprintf(stderr, "downloaded %lu MB of variant data\n", num_bytes / (1024 * 1024));
 
     fprintf(stderr, "processing file %s...\n", command_line_options.input);
@@ -126,8 +128,8 @@ int main(int argc, char **argv)
     // xxxnsubtil: fix later
     alignment_header header(bam_thread.file.header);
     header.download();
-
-    firepony_context context(header, reference, vcf);
+    
+    firepony_context context(header, reference, dbsnp);
 
     auto& stats = context.stats;
     cpu_timer wall_clock;

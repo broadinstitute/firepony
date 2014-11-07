@@ -21,7 +21,7 @@
 #include "device_types.h"
 #include "alignment_data_device.h"
 #include "sequence_data_device.h"
-#include "variant_data.h"
+#include "variant_data_device.h"
 #include "snp_filter.h"
 #include "covariates.h"
 #include "cigar.h"

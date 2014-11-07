@@ -23,7 +23,7 @@
 
 #include "gamgee_loader.h"
 #include "sequence_data.h"
-#include "device/variant_data.h"
+#include "variant_data.h"
 #include "device/mmap.h"
 #include "device/serialization.h"
 
@@ -70,7 +70,7 @@ void load_fasta(const char *fname)
 void load_vcf(const char *fname)
 {
     shared_memory_file shmem;
-    variant_database data;
+    variant_database_host data;
     size_t size;
     bool ret;
 

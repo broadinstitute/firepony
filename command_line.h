@@ -18,12 +18,11 @@
 
 #pragma once
 
-#include "firepony_context.h"
+#include "runtime_options.h"
 
 namespace firepony {
 
-void filter_reads(firepony_context& context, const alignment_batch& batch);
-void filter_bases(firepony_context& context, const alignment_batch& batch);
+extern runtime_options command_line_options;
+void parse_command_line(int argc, char **argv);
 
 } // namespace firepony
-

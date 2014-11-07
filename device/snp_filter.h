@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "types.h"
+#include "device_types.h"
 #include "alignment_data.h"
 #include "sequence_data.h"
 #include "variant_data.h"

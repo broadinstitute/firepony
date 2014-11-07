@@ -17,7 +17,7 @@
  */
 
 
-#include "types.h"
+#include "device_types.h"
 #include "firepony_context.h"
 #include "covariates.h"
 #include "covariates_table.h"

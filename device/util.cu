@@ -16,7 +16,7 @@
  *
  */
 
-#include "types.h"
+#include "device_types.h"
 
 #include "primitives/cuda.h"
 #include "primitives/util.h"

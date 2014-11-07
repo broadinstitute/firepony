@@ -22,7 +22,7 @@
 #include <unistd.h>
 #include <getopt.h>
 
-#include "options.h"
+#include "runtime_options.h"
 
 namespace firepony {
 

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "types.h"
+#include "device_types.h"
 #include "serialization.h"
 
 #include <vector>

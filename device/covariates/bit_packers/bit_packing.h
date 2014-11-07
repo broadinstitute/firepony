@@ -20,7 +20,7 @@
 
 // defines the base types for implementing bit-packing chains that track covariate values
 
-#include "../../types.h"
+#include "../../device_types.h"
 #include "../../primitives/cuda.h"
 #include "../../from_nvbio/dna.h"
 #include "../../from_nvbio/alphabet.h"

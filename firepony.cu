@@ -21,11 +21,10 @@
 #include "device/alignment_data.h"
 #include "device/baq.h"
 #include "device/firepony_context.h"
-#include "device/types.h"
+#include "device/device_types.h"
 #include "device/cigar.h"
 #include "device/covariates.h"
 #include "device/fractional_errors.h"
-#include "device/options.h"
 #include "device/read_filters.h"
 #include "device/read_group_table.h"
 #include "device/sequence_data.h"
@@ -33,6 +32,7 @@
 #include "device/string_database.h"
 #include "device/util.h"
 #include "device/variant_data.h"
+#include "command_line.h"
 #include "gamgee_loader.h"
 
 using namespace firepony;

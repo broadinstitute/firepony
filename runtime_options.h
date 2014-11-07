@@ -53,8 +53,5 @@ struct runtime_options
     }
 };
 
-extern struct runtime_options command_line_options;
-
-void parse_command_line(int argc, char **argv);
-
 } // namespace firepony
+

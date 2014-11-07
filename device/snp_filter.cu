@@ -16,7 +16,7 @@
  *
  */
 
-#include "types.h"
+#include "device_types.h"
 #include "firepony_context.h"
 #include "snp_filter.h"
 

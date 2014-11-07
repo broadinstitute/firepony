@@ -22,7 +22,7 @@
 #include <thrust/functional.h>
 
 #include "cigar.h"
-#include "types.h"
+#include "device_types.h"
 #include "firepony_context.h"
 #include "alignment_data.h"
 #include "util.h"

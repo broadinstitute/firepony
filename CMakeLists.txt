@@ -55,8 +55,12 @@ include("contrib/cub.cmake")
 add_subdirectory(device)
 
 set(firepony_common_sources
+    command_line.cu
+    command_line.h
     gamgee_loader.cu
-    gamgee_loader.h)
+    gamgee_loader.h
+    types.h
+    runtime_options.h)
 
 cuda_add_library(firepony-common ${firepony_common_sources})
 add_dependencies(firepony-common gamgee zlib)

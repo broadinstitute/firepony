@@ -20,7 +20,7 @@
 
 #include "primitives/parallel.h"
 
-#include "types.h"
+#include "device_types.h"
 #include "firepony_context.h"
 #include "alignment_data.h"
 #include "read_filters.h"

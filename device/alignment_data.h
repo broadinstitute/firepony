@@ -23,7 +23,7 @@
 
 #include <gamgee/sam.h>
 
-#include "types.h"
+#include "device_types.h"
 #include "string_database.h"
 
 #include "primitives/cuda.h"

@@ -38,104 +38,11 @@
 
 #include "command_line.h"
 #include "gamgee_loader.h"
+#include "io_thread.h"
 
 using namespace firepony;
 
 void debug_read(firepony_context *context, const alignment_batch& batch, int read_index);
-
-#include <thread>
-
-struct io_thread
-{
-    static constexpr bool DISABLE_THREADING = false;
-    static constexpr int NUM_BUFFERS = 3;
-
-    alignment_batch_host batches[NUM_BUFFERS];
-    volatile int put, get;
-    volatile bool eof;
-
-    gamgee_alignment_file file;
-    uint32 data_mask;
-
-    std::thread thread;
-
-    io_thread(const char *fname, uint32 data_mask)
-        : put(1),
-          get(0),
-          eof(false),
-          file(fname),
-          data_mask(data_mask)
-    { }
-
-    void start(void)
-    {
-        if (!DISABLE_THREADING)
-        {
-            thread = std::thread(&io_thread::run, this);
-        }
-    }
-
-    void join(void)
-    {
-        if (!DISABLE_THREADING)
-        {
-            thread.join();
-        }
-    }
-
-    int wrap(int val)
-    {
-        return val % NUM_BUFFERS;
-    }
-
-    alignment_batch_host& next_buffer(void)
-    {
-        if (DISABLE_THREADING)
-        {
-            return batches[0];
-        } else {
-            while(wrap(get + 1) == put)
-                std::this_thread::yield();
-
-            get = wrap(get + 1);
-            return batches[get];
-        }
-    }
-
-    bool done(void)
-    {
-        if (DISABLE_THREADING)
-        {
-            eof = !(file.next_batch(&batches[0], data_mask, command_line_options.batch_size));
-            return eof;
-        } else {
-            if (!eof)
-                return false;
-
-            if (wrap(get + 1) != put)
-                return false;
-
-            return true;
-        }
-    }
-
-private:
-    void run(void)
-    {
-        while(!eof)
-        {
-            // wait for a slot
-            while (put == get)
-                std::this_thread::yield();
-
-            eof = !(file.next_batch(&batches[put], data_mask, command_line_options.batch_size));
-            if (!eof)
-            {
-                put = wrap(put + 1);
-            }
-        }
-    }
-};
 
 void init_cuda(void)
 {

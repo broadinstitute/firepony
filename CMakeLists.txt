@@ -7,6 +7,30 @@ option(USE_SYSTEM_BOOST
        "Use the system-wide installed version of Boost"
        ON)
 
+option(ENABLE_CUDA_BACKEND
+       "Enable the GPU-accelerated CUDA backend"
+       ON)
+
+option(ENABLE_CPP_BACKEND
+       "Enable the CPP threads CPU backend"
+       ON)
+
+option(ENABLE_OPENMP_BACKEND
+       "Enable the OpenMP CPU backend"
+       ON)
+
+if (ENABLE_CUDA_BACKEND)
+    add_definitions(-DENABLE_CUDA_BACKEND=1)
+endif()
+
+if (ENABLE_CPP_BACKEND)
+    add_definitions(-DENABLE_CPP_BACKEND=1)
+endif()
+
+if (ENABLE_OPENMP_BACKEND)
+    add_definitions(-DENABLE_OMP_BACKEND=1)
+endif()
+
 # default to debug builds
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")

@@ -130,7 +130,7 @@ static void build_covariates_table(d_covariate_table<system>& table, firepony_co
     firepony::vector<system, covariate_value> temp_values;
     firepony::vector<system, covariate_key> temp_keys;
 
-    device_timer covariates_gather, covariates_filter, covariates_sort, covariates_pack;
+    timer<system> covariates_gather, covariates_filter, covariates_sort, covariates_pack;
 
     covariates_gather.start();
 

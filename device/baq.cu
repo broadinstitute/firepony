@@ -1215,7 +1215,7 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
         baq_lmem_warning_printed = true;
     }
 
-    device_timer baq_setup, baq_hmm, baq_postprocess;
+    timer<system> baq_setup, baq_hmm, baq_postprocess;
 
     baq_setup.start();
 

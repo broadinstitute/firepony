@@ -19,6 +19,8 @@
 #pragma once
 
 #include "../types.h"
+#include "../runtime_options.h"
+
 #include "alignment_data_device.h"
 #include "sequence_data_device.h"
 #include "variant_data_device.h"
@@ -29,6 +31,8 @@
 #include "fractional_errors.h"
 #include "read_group_table.h"
 #include "util.h"
+
+#include "device/primitives/timer.h"
 
 namespace firepony {
 
@@ -56,6 +60,9 @@ struct pipeline_statistics // host-only
     time_series covariates_sort;
     time_series covariates_pack;
 
+    time_series postprocessing;
+    time_series output;
+
     pipeline_statistics()
         : total_reads(0),
           filtered_reads(0),
@@ -66,6 +73,8 @@ struct pipeline_statistics // host-only
 template <target_system system>
 struct firepony_context
 {
+    const runtime_options& options;
+
     const alignment_header<system>& bam_header;
     const variant_database<system>& variant_db;
     const sequence_data<system>& reference;
@@ -104,10 +113,12 @@ struct firepony_context
     // --- everything below this line is host-only and not available on the device
     pipeline_statistics stats;
 
-    firepony_context(const alignment_header<system>& bam_header,
+    firepony_context(const runtime_options& options,
+                     const alignment_header<system>& bam_header,
                      const sequence_data<system>& reference,
                      const variant_database<system>& variant_db)
-        : bam_header(bam_header),
+        : options(options),
+          bam_header(bam_header),
           reference(reference),
           variant_db(variant_db)
     { }

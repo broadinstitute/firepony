@@ -12,6 +12,9 @@ firepony_context.cu
 firepony_context.h
 fractional_errors.cu
 fractional_errors.h
+pipeline.cu
+pipeline_interface.cu
+pipeline.h
 read_filters.cu
 read_filters.h
 read_group_table.cu

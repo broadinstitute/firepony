@@ -21,9 +21,6 @@
 #include "alignment_data.h"
 #include "sequence_data.h"
 #include "variant_data.h"
-#include "device/alignment_data_device.h"
-#include "device/sequence_data_device.h"
-#include "device/variant_data_device.h"
 
 #include "types.h"
 #include "command_line.h"
@@ -31,53 +28,77 @@
 #include "io_thread.h"
 #include "string_database.h"
 
-#include "device/baq.h"
-#include "device/firepony_context.h"
-#include "device/cigar.h"
-#include "device/covariates.h"
-#include "device/fractional_errors.h"
-#include "device/read_filters.h"
-#include "device/read_group_table.h"
-#include "device/snp_filter.h"
-#include "device/util.h"
+#include "device/pipeline.h"
 
 using namespace firepony;
 
-template <target_system system>
-void debug_read(firepony_context<system> *context, const alignment_batch<system>& batch, int read_index);
-
-void init_cuda(void)
+bool init_cuda(void)
 {
-    cudaDeviceProp prop;
-    int dev;
-    int runtime_version;
+    cudaError_t err;
+    int device_count;
 
     // trigger runtime initialization
     fprintf(stderr, "loading CUDA runtime...\n");
     cudaFree(0);
 
-    cudaRuntimeGetVersion(&runtime_version);
-    cudaGetDevice(&dev);
-    cudaGetDeviceProperties(&prop, dev);
+    err = cudaGetDeviceCount(&device_count);
+    if (err != cudaSuccess)
+    {
+        return false;
+    }
 
-    fprintf(stderr, "CUDA runtime version: %d.%d\n", runtime_version / 1000, runtime_version % 100);
-    fprintf(stderr, "device: %s (%lu MB)\n", prop.name, prop.totalGlobalMem / (1024 * 1024));
+    if (device_count == 0)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+firepony_pipeline *choose_pipeline(void)
+{
+#if ENABLE_CUDA_BACKEND
+    if (command_line_options.enable_cuda && init_cuda())
+    {
+        return firepony_pipeline::create(firepony::cuda);
+    }
+#endif
+
+#if ENABLE_CPP_BACKEND
+    if (command_line_options.enable_cpp)
+    {
+        return firepony_pipeline::create(firepony::cpp);
+    }
+#endif
+
+#if ENABLE_OMP_BACKEND
+    if (command_line_options.enable_omp)
+    {
+        return firepony_pipeline::create(firepony::omp);
+    }
+#endif
+
+    return nullptr;
 }
 
 int main(int argc, char **argv)
 {
-    constexpr auto target_system = firepony::cuda;
-
+    firepony_pipeline *pipeline;
     sequence_data_host h_reference;
     variant_database_host h_dbsnp;
-    size_t num_bytes;
     bool ret;
 
     parse_command_line(argc, argv);
 
-#ifndef RUN_ON_CPU
-//    init_cuda();
-#endif
+    // choose a pipeline to use
+    pipeline = choose_pipeline();
+    if (pipeline == nullptr)
+    {
+        fprintf(stderr, "failed to initialize compute backend\n");
+        exit(1);
+    }
+
+    fprintf(stderr, "compute device: %s\n", pipeline->get_name().c_str());
 
     // load the reference genome
     fprintf(stderr, "loading reference from %s...\n", command_line_options.reference);
@@ -89,10 +110,6 @@ int main(int argc, char **argv)
         fprintf(stderr, "failed to load reference %s\n", command_line_options.reference);
         exit(1);
     }
-
-    firepony::sequence_data<target_system> reference(h_reference);
-    num_bytes = reference.download();
-    fprintf(stderr, "downloaded %lu MB of reference data\n", num_bytes / (1024 * 1024));
 
     fprintf(stderr, "loading variant database %s...\n", command_line_options.snp_database);
     ret = gamgee_load_vcf(&h_dbsnp, h_reference, command_line_options.snp_database,
@@ -106,11 +123,6 @@ int main(int argc, char **argv)
 
     fprintf(stderr, "%u variants\n", h_dbsnp.view.num_variants);
 
-    variant_database<target_system> dbsnp(h_dbsnp);
-    num_bytes = dbsnp.download();
-    fprintf(stderr, "downloaded %lu MB of variant data\n", num_bytes / (1024 * 1024));
-
-    fprintf(stderr, "processing file %s...\n", command_line_options.input);
 
     const uint32 data_mask = AlignmentDataMask::NAME |
                              AlignmentDataMask::CHROMOSOME |
@@ -128,118 +140,26 @@ int main(int argc, char **argv)
     io_thread bam_thread(command_line_options.input, data_mask);
     bam_thread.start();
 
-    // xxxnsubtil: fix later
-    alignment_header<target_system> header(bam_thread.file.header);
-    header.download();
-    
-    firepony_context<target_system> context(header, reference, dbsnp);
+    pipeline->setup(&command_line_options,
+                    &bam_thread.file.header,
+                    &h_reference,
+                    &h_dbsnp);
 
-    auto& stats = context.stats;
-    cpu_timer wall_clock;
-    cpu_timer io;
+    fprintf(stderr, "processing file %s...\n", command_line_options.input);
 
-    device_timer read_filter;
-    device_timer bp_filter;
-    device_timer snp_filter;
-    device_timer cigar_expansion;
-    device_timer baq;
-    device_timer fractional_error;
-    device_timer covariates;
+    timer<host> wall_clock;
+    timer<host> io;
 
     wall_clock.start();
-
-    alignment_batch<target_system> batch;
 
     while(!bam_thread.done())
     {
         io.start();
         // fetch the next batch
         alignment_batch_host& h_batch = bam_thread.next_buffer();
-        // load the next batch on the device
-        batch.download(&h_batch);
-        context.start_batch(batch);
         io.stop();
 
-        read_filter.start();
-
-        // build read offset and alignment window list (required by read filters)
-        build_read_offset_list(context, batch);
-        build_alignment_windows(context, batch);
-        // apply read filters
-        filter_reads(context, batch);
-
-        read_filter.stop();
-
-        // if all reads have been filtered out, skip the rest of the pipeline
-        if (context.active_read_list.size() == 0)
-            continue;
-
-        // generate cigar events and coordinates
-        // this will generate -1 read indices for events belonging to inactive reads, so it must happen after read filtering
-        cigar_expansion.start();
-        expand_cigars(context, batch);
-        cigar_expansion.stop();
-
-        // apply per-BP filters
-        bp_filter.start();
-        filter_bases(context, batch);
-        bp_filter.stop();
-
-        // filter known SNPs from active_loc_list
-        snp_filter.start();
-        filter_known_snps(context, batch);
-        snp_filter.stop();
-
-        // compute the base alignment quality for each read
-        baq.start();
-        baq_reads(context, batch);
-        baq.stop();
-
-        fractional_error.start();
-        build_fractional_error_arrays(context, batch);
-        fractional_error.stop();
-
-        // build covariate tables
-        covariates.start();
-        gather_covariates(context, batch);
-        covariates.stop();
-
-        if (command_line_options.debug)
-        {
-            for(uint32 read_id = 0; read_id < context.active_read_list.size(); read_id++)
-            {
-                const uint32 read_index = context.active_read_list[read_id];
-                debug_read(&context, batch, read_index);
-            }
-        }
-
-#if 0
-        fprintf(stderr, "active VCF ranges: %lu out of %lu reads (%f %%)\n",
-                context.snp_filter.active_read_ids.size(),
-                context.active_read_list.size(),
-                100.0 * float(context.snp_filter.active_read_ids.size()) / context.active_read_list.size());
-
-        H_ActiveLocationList h_bplist = context.active_location_list;
-        uint32 zeros = 0;
-        for(uint32 i = 0; i < h_bplist.size(); i++)
-        {
-            if (h_bplist[i] == 0)
-                zeros++;
-        }
-
-        fprintf(stderr, "active BPs: %u out of %u (%f %%)\n", h_bplist.size() - zeros, h_bplist.size(), 100.0 * float(h_bplist.size() - zeros) / float(h_bplist.size()));
-#endif
-
-        context.end_batch(batch);
-
-        cudaDeviceSynchronize();
-        stats.read_filter.add(read_filter);
-        stats.cigar_expansion.add(cigar_expansion);
-        stats.bp_filter.add(bp_filter);
-        stats.snp_filter.add(snp_filter);
-        stats.baq.add(baq);
-        stats.fractional_error.add(fractional_error);
-        stats.covariates.add(covariates);
+        pipeline->process_batch(&h_batch);
 
         if (!command_line_options.debug)
         {
@@ -250,30 +170,21 @@ int main(int argc, char **argv)
 
     fprintf(stderr, "\n");
 
-    device_timer postprocessing;
-    cpu_timer output;
-
-    postprocessing.start();
-    build_read_group_table(context);
-    postprocessing.stop();
-
-    output.start();
-    output_read_group_table(context);
-    output_covariates(context);
-    output.stop();
-
-    cudaDeviceSynchronize();
     wall_clock.stop();
 
+    pipeline->finish();
+
+    auto& stats = pipeline->get_statistics();
+
     fprintf(stderr, "%d reads filtered out of %d (%f%%)\n",
-            context.stats.filtered_reads,
-            context.stats.total_reads,
-            float(context.stats.filtered_reads) / float(context.stats.total_reads) * 100.0);
+            stats.filtered_reads,
+            stats.total_reads,
+            float(stats.filtered_reads) / float(stats.total_reads) * 100.0);
 
     fprintf(stderr, "computed base alignment quality for %d reads out of %d (%f%%)\n",
-            context.stats.baq_reads,
-            context.stats.total_reads - context.stats.filtered_reads,
-            float(context.stats.baq_reads) / float(context.stats.total_reads - context.stats.filtered_reads) * 100.0);
+            stats.baq_reads,
+            stats.total_reads - stats.filtered_reads,
+            float(stats.baq_reads) / float(stats.total_reads - stats.filtered_reads) * 100.0);
 
     fprintf(stderr, "\n");
 
@@ -293,53 +204,10 @@ int main(int argc, char **argv)
     fprintf(stderr, "    filter: %.4f (%.2f%%)\n", stats.covariates_filter.elapsed_time, stats.covariates_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
     fprintf(stderr, "    sort: %.4f (%.2f%%)\n", stats.covariates_sort.elapsed_time, stats.covariates_sort.elapsed_time / wall_clock.elapsed_time() * 100.0);
     fprintf(stderr, "    pack: %.4f (%.2f%%)\n", stats.covariates_pack.elapsed_time, stats.covariates_pack.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "  post-processing: %.4f (%.2f%%)\n", postprocessing.elapsed_time(), postprocessing.elapsed_time() / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "  output: %.4f (%.2f%%)\n", output.elapsed_time(), output.elapsed_time() / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "  post-processing: %.4f (%.2f%%)\n", stats.postprocessing.elapsed_time, stats.postprocessing.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "  output: %.4f (%.2f%%)\n", stats.output.elapsed_time, stats.output.elapsed_time / wall_clock.elapsed_time() * 100.0);
 
     bam_thread.join();
 
     return 0;
-}
-
-template <target_system system>
-void debug_read(firepony_context<system> *context, const alignment_batch<system>& batch, int read_id)
-{
-    const alignment_batch_host& h_batch = *batch.host;
-
-    const uint32 read_index = context->active_read_list[read_id];
-    const CRQ_index idx = h_batch.crq_index(read_index);
-
-    fprintf(stderr, "== read %d\n", context->stats.total_reads + read_id);
-
-    fprintf(stderr, "name = [%s]\n", h_batch.name[read_index].c_str());
-
-    fprintf(stderr, "  offset list = [ ");
-    for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)
-    {
-        uint16 off = context->read_offset_list[i];
-        if (off == uint16(-1))
-        {
-            fprintf(stderr, "  - ");
-        } else {
-            fprintf(stderr, "% 3d ", off);
-        }
-    }
-    fprintf(stderr, "]\n");
-
-    debug_cigar(*context, batch, read_index);
-    debug_baq(*context, batch, read_index);
-    debug_fractional_error_arrays(*context, batch, read_index);
-
-    const uint2 alignment_window = context->alignment_windows[read_index];
-    fprintf(stderr, "  sequence name [%s]\n  sequence base [%lu]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
-            context->reference.host.sequence_names.lookup(h_batch.chromosome[read_index]).c_str(),
-            context->reference.host.view.sequence_bp_start[h_batch.chromosome[read_index]],
-            h_batch.alignment_start[read_index],
-            alignment_window.x,
-            alignment_window.y);
-
-    const uint2 vcf_range = context->snp_filter.active_vcf_ranges[read_index];
-    fprintf(stderr, "  active VCF range: [%u, %u[\n", vcf_range.x, vcf_range.y);
-
-    fprintf(stderr, "\n");
 }

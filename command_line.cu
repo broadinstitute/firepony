@@ -38,6 +38,15 @@ static void usage(void)
     fprintf(stderr, "  --no-snp-database-mmap                Do not attempt to use system shared memory for reference or dbSNP\n");
     fprintf(stderr, "  -d, --debug                           Enable debugging (*extremely* verbose)\n");
     fprintf(stderr, "  -b, --batch-size <n>                  Process input in batches of <n> reads\n");
+#if ENABLE_CUDA_BACKEND
+    fprintf(stderr, "  --gpu-only                            Use only the CUDA GPU-accelerated backend\n");
+#endif
+#if ENABLE_CPP_BACKEND
+    fprintf(stderr, "  --cpp-only                            Use only the CPP threads CPU backend\n");
+#endif
+#if ENABLE_OMP_BACKEND
+    fprintf(stderr, "  --openmp-only                         Use only the OpenMP CPU backend\n");
+#endif
     fprintf(stderr, "\n");
 
     exit(1);
@@ -57,6 +66,34 @@ static void parse_env_vars(void)
     {
         command_line_options.snp_database = strdup(command_line_options.snp_database);
     }
+
+    char *backend = getenv("FIREPONY_BACKEND");
+    if (backend)
+    {
+#if ENABLE_CUDA_BACKEND
+        if (!strcmp(backend, "cuda"))
+        {
+            command_line_options.disable_all_backends();
+            command_line_options.enable_cuda = true;
+        }
+#endif
+
+#if ENABLE_CPP_BACKEND
+        if (!strcmp(backend, "cpp"))
+        {
+            command_line_options.disable_all_backends();
+            command_line_options.enable_cpp = true;
+        }
+#endif
+
+#if ENABLE_OMP_BACKEND
+        if (!strcmp(backend, "omp"))
+        {
+            command_line_options.disable_all_backends();
+            command_line_options.enable_omp = true;
+        }
+#endif
+    }
 }
 
 void parse_command_line(int argc, char **argv)
@@ -69,6 +106,15 @@ void parse_command_line(int argc, char **argv)
             { "no-snp-database-mmap", no_argument, NULL, 'l' },
             { "debug", no_argument, NULL, 'd' },
             { "batch-size", required_argument, NULL, 'b' },
+#if ENABLE_CUDA_BACKEND
+            { "gpu-only", no_argument, NULL, 'g' },
+#endif
+#if ENABLE_CPP_BACKEND
+            { "cpp-only", no_argument, NULL, 'c' },
+#endif
+#if ENABLE_OMP_BACKEND
+            { "omp-only", no_argument, NULL, 'm' },
+#endif
     };
 
     parse_env_vars();
@@ -114,6 +160,30 @@ void parse_command_line(int argc, char **argv)
             }
 
             break;
+
+#if ENABLE_CUDA_BACKEND
+        case 'g':
+            // --gpu-only
+            command_line_options.disable_all_backends();
+            command_line_options.enable_cuda = true;
+            break;
+#endif
+
+#if ENABLE_CPP_BACKEND
+        case 'c':
+            // --cpp-only
+            command_line_options.disable_all_backends();
+            command_line_options.enable_cpp = true;
+            break;
+#endif
+
+#if ENABLE_OMP_BACKEND
+        case 'm':
+            // --omp-only
+            command_line_options.disable_all_backends();
+            command_line_options.enable_omp = true;
+            break;
+#endif
 
         case '?':
         case ':':

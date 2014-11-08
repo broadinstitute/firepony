@@ -39,6 +39,18 @@ struct runtime_options
     // enable debugging
     bool debug;
 
+    // enable/disable the various backends
+    bool enable_cuda;
+    bool enable_cpp;
+    bool enable_omp;
+
+    void disable_all_backends(void)
+    {
+        enable_cuda = false;
+        enable_cpp = false;
+        enable_omp = false;
+    }
+
     runtime_options()
     {
         reference = nullptr;
@@ -50,6 +62,10 @@ struct runtime_options
         batch_size = 20000;
 
         debug = false;
+
+        enable_cuda = true;
+        enable_cpp = true;
+        enable_omp = true;
     }
 };
 

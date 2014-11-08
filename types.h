@@ -27,8 +27,9 @@
 #define __constant__
 #define __const__
 #define __restrict__
-#define ENABLE_CPU 1
-#define ENABLE_GPU 1
+#define ENABLE_CUDA_BACKEND 1
+#define ENABLE_CPP_BACKEND 1
+#define ENABLE_OMP_BACKEND 1
 #endif
 
 #include <stdint.h>

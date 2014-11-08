@@ -32,8 +32,8 @@
 #include "gamgee_loader.h"
 
 #include "device/util.h"
-#include "device/mmap.h"
-#include "device/serialization.h"
+#include "mmap.h"
+#include "serialization.h"
 #include "device/from_nvbio/dna.h"
 
 namespace firepony {

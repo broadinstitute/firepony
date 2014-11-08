@@ -19,8 +19,8 @@
 #pragma once
 
 #include "types.h"
-#include "device/string_database.h"
-#include "device/mmap.h"
+#include "string_database.h"
+#include "mmap.h"
 
 namespace firepony {
 

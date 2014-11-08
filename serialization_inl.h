@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "primitives/util.h"
-
 namespace firepony {
 
 // serialization primitives

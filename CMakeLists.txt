@@ -58,10 +58,16 @@ set(firepony_common_sources
     alignment_data.h
     command_line.cu
     command_line.h
-    io_thread.cu
-    io_thread.h
     gamgee_loader.cu
     gamgee_loader.h
+    io_thread.cu
+    io_thread.h
+    mmap.cu
+    mmap.h
+    serialization.h
+    serialization_inl.h
+    string_database.cu
+    string_database.h
     types.h
     runtime_options.h)
 

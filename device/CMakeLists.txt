@@ -12,19 +12,13 @@ firepony_context.cu
 firepony_context.h
 fractional_errors.cu
 fractional_errors.h
-mmap.cu
-mmap.h
 read_filters.cu
 read_filters.h
 read_group_table.cu
 read_group_table.h
 sequence_data_device.h
-serialization.h
-serialization_inl.h
 snp_filter.cu
 snp_filter.h
-string_database.cu
-string_database.h
 util.cu
 util.h
 variant_data_device.h
@@ -41,7 +35,6 @@ covariates/table_quality_scores.h
 
 from_nvbio/alphabet_inl.h
 from_nvbio/alphabet.h
-from_nvbio/bufferedtextfile.h
 from_nvbio/dna.h
 
 primitives/algorithms.h

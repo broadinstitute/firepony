@@ -24,8 +24,8 @@
 #include "gamgee_loader.h"
 #include "sequence_data.h"
 #include "variant_data.h"
-#include "device/mmap.h"
-#include "device/serialization.h"
+#include "mmap.h"
+#include "serialization.h"
 
 using namespace firepony;
 

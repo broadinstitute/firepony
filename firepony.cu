@@ -29,6 +29,7 @@
 #include "command_line.h"
 #include "gamgee_loader.h"
 #include "io_thread.h"
+#include "string_database.h"
 
 #include "device/baq.h"
 #include "device/firepony_context.h"
@@ -38,7 +39,6 @@
 #include "device/read_filters.h"
 #include "device/read_group_table.h"
 #include "device/snp_filter.h"
-#include "device/string_database.h"
 #include "device/util.h"
 
 using namespace firepony;

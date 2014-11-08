@@ -78,6 +78,13 @@ firepony_pipeline *choose_pipeline(void)
     }
 #endif
 
+#if ENABLE_TBB_BACKEND
+    if (command_line_options.enable_tbb)
+    {
+        return firepony_pipeline::create(firepony::tbb);
+    }
+#endif
+
     return nullptr;
 }
 

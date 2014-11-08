@@ -118,7 +118,7 @@ std::string firepony_device_pipeline<firepony::cuda>::get_name(void)
 template<>
 std::string firepony_device_pipeline<firepony::cpp>::get_name(void)
 {
-    return std::string("CPU (CPP threads)");
+    return std::string("CPU (C++ threads)");
 }
 #endif
 
@@ -127,6 +127,14 @@ template<>
 std::string firepony_device_pipeline<firepony::omp>::get_name(void)
 {
     return std::string("CPU (OpenMP)");
+}
+#endif
+
+#if ENABLE_TBB_BACKEND
+template<>
+std::string firepony_device_pipeline<firepony::tbb>::get_name(void)
+{
+    return std::string("CPU (Threading Building Blocks)");
 }
 #endif
 
@@ -147,6 +155,11 @@ firepony_pipeline *firepony_pipeline::create(target_system system)
 #if ENABLE_OMP_BACKEND
     case firepony::omp:
         return new firepony_device_pipeline<firepony::omp>();
+#endif
+
+#if ENABLE_TBB_BACKEND
+    case firepony::tbb:
+        return new firepony_device_pipeline<firepony::tbb>();
 #endif
 
     default:

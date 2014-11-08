@@ -30,6 +30,7 @@
 #define ENABLE_CUDA_BACKEND 1
 #define ENABLE_CPP_BACKEND 1
 #define ENABLE_OMP_BACKEND 1
+#define ENABLE_TBB_BACKEND 1
 #endif
 
 #include <stdint.h>

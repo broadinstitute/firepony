@@ -19,6 +19,10 @@ option(ENABLE_OPENMP_BACKEND
        "Enable the OpenMP CPU backend"
        ON)
 
+option(ENABLE_TBB_BACKEND
+       "Enable the Threading Building Blocks backend"
+       ON)
+
 if (ENABLE_CUDA_BACKEND)
     add_definitions(-DENABLE_CUDA_BACKEND=1)
 endif()
@@ -29,6 +33,10 @@ endif()
 
 if (ENABLE_OPENMP_BACKEND)
     add_definitions(-DENABLE_OMP_BACKEND=1)
+endif()
+
+if (ENABLE_TBB_BACKEND)
+    add_definitions(-DENABLE_TBB_BACKEND=1)
 endif()
 
 # default to debug builds
@@ -76,6 +84,11 @@ include("contrib/gamgee.cmake")
 include("contrib/zlib.cmake")
 include("contrib/cub.cmake")
 
+if (ENABLE_TBB_BACKEND)
+    include("contrib/tbb.cmake")
+    set(SYSTEM_LINK_LIBRARIES ${SYSTEM_LINK_LIBRARIES} ${tbb_LIB})
+endif()
+
 add_subdirectory(device)
 
 set(firepony_common_sources
@@ -97,9 +110,13 @@ set(firepony_common_sources
 
 cuda_add_library(firepony-common ${firepony_common_sources})
 add_dependencies(firepony-common gamgee zlib)
+if (ENABLE_TBB)
+    # xxxnsubtil: this should really not be necessary, but we pull in tbb headers for firepony-common
+    add_dependencies(firepony-common tbb)
+endif()
 
 cuda_add_executable(firepony firepony.cu)
-target_link_libraries(firepony firepony-common firepony-device ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+target_link_libraries(firepony firepony-common firepony-device ${tbb_LIB} ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
 
 cuda_add_executable(firepony-loader firepony-loader.cu)
-target_link_libraries(firepony-loader firepony-common firepony-device ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+target_link_libraries(firepony-loader firepony-common firepony-device ${tbb_LIB} ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})

@@ -47,6 +47,9 @@ static void usage(void)
 #if ENABLE_OMP_BACKEND
     fprintf(stderr, "  --openmp-only                         Use only the OpenMP CPU backend\n");
 #endif
+#if ENABLE_TBB_BACKEND
+    fprintf(stderr, "  --tbb-only                            Use only the Threading Building Blocks CPU backend\n");
+#endif
     fprintf(stderr, "\n");
 
     exit(1);
@@ -93,6 +96,14 @@ static void parse_env_vars(void)
             command_line_options.enable_omp = true;
         }
 #endif
+
+#if ENABLE_TBB_BACKEND
+        if (!strcmp(backend, "tbb"))
+        {
+            command_line_options.disable_all_backends();
+            command_line_options.enable_tbb = true;
+        }
+#endif
     }
 }
 
@@ -114,6 +125,9 @@ void parse_command_line(int argc, char **argv)
 #endif
 #if ENABLE_OMP_BACKEND
             { "omp-only", no_argument, NULL, 'm' },
+#endif
+#if ENABLE_OMP_BACKEND
+            { "tbb-only", no_argument, NULL, 't' },
 #endif
     };
 
@@ -182,6 +196,14 @@ void parse_command_line(int argc, char **argv)
             // --omp-only
             command_line_options.disable_all_backends();
             command_line_options.enable_omp = true;
+            break;
+#endif
+
+#if ENABLE_TBB_BACKEND
+        case 't':
+            // --tbb-only
+            command_line_options.disable_all_backends();
+            command_line_options.enable_tbb = true;
             break;
 #endif
 

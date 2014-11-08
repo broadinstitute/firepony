@@ -18,13 +18,6 @@
 
 #pragma once
 
-#include <thrust/device_vector.h>
-#include <thrust/system/cuda/vector.h>
-#include <thrust/system/omp/vector.h>
-#include <thrust/system/cpp/vector.h>
-
-#include <thrust/execution_policy.h>
-
 #ifndef ENABLE_CUDA_BACKEND
 #define ENABLE_CUDA_BACKEND 0
 #endif
@@ -36,6 +29,30 @@
 #ifndef ENABLE_OMP_BACKEND
 #define ENABLE_OMP_BACKEND 0
 #endif
+
+#ifndef ENABLE_TBB_BACKEND
+#define ENABLE_TBB_BACKEND 0
+#endif
+
+#include <thrust/device_vector.h>
+
+#if ENABLE_CUDA_BACKEND
+#include <thrust/system/cuda/vector.h>
+#endif
+
+#if ENABLE_OMP_BACKEND
+#include <thrust/system/omp/vector.h>
+#endif
+
+#if ENABLE_CPP_BACKEND
+#include <thrust/system/cpp/vector.h>
+#endif
+
+#if ENABLE_TBB_BACKEND
+#include <thrust/system/tbb/vector.h>
+#endif
+
+#include <thrust/execution_policy.h>
 
 namespace firepony
 {
@@ -53,6 +70,9 @@ enum target_system
 #endif
 #if ENABLE_OMP_BACKEND
     omp,
+#endif
+#if ENABLE_TBB_BACKEND
+    tbb,
 #endif
 };
 
@@ -91,6 +111,25 @@ struct backend_policy<cuda>
 };
 #endif
 
+// cpp threads backend
+#if ENABLE_CPP_BACKEND
+template <typename T>
+struct backend_vector_type<cpp, T>
+{
+    typedef thrust::system::cpp::vector<T> vector_type;
+};
+
+template <>
+struct backend_policy<cpp>
+{
+    static inline decltype(thrust::cpp::par)& execution_policy(void)
+    {
+        return thrust::cpp::par;
+    }
+};
+#endif
+
+
 // openmp backend
 #if ENABLE_OMP_BACKEND
 template <typename T>
@@ -109,20 +148,21 @@ struct backend_policy<omp>
 };
 #endif
 
-// cpp threads backend
-#if ENABLE_CPP_BACKEND
+
+// threading building blocks backend
+#if ENABLE_TBB_BACKEND
 template <typename T>
-struct backend_vector_type<cpp, T>
+struct backend_vector_type<tbb, T>
 {
-    typedef thrust::system::cpp::vector<T> vector_type;
+    typedef thrust::system::tbb::vector<T> vector_type;
 };
 
 template <>
-struct backend_policy<cpp>
+struct backend_policy<tbb>
 {
-    static inline decltype(thrust::cpp::par)& execution_policy(void)
+    static inline decltype(thrust::tbb::par)& execution_policy(void)
     {
-        return thrust::cpp::par;
+        return thrust::tbb::par;
     }
 };
 #endif
@@ -155,12 +195,21 @@ struct backend_policy<cpp>
 #define __METHOD_OMP(base, method) ;
 #endif
 
+#if ENABLE_TBB_BACKEND
+#define __FUNC_TBB(fun) auto *ptr_TBB= fun<firepony::tbb>;
+#define __METHOD_TBB(base, method) auto ptr_TBB = &base<firepony::tbb>::method;
+#else
+#define __FUNC_TBB(fun) ;
+#define __METHOD_TBB(base, method) ;
+#endif
+
 // free function instantiation
 #define INSTANTIATE(fun) \
         namespace __ ## fun ## __instantiation {    \
             __FUNC_CUDA(fun);                       \
             __FUNC_CPP(fun);                        \
             __FUNC_OMP(fun);                        \
+            __FUNC_TBB(fun);                        \
     }
 
 // method instantiation
@@ -169,4 +218,5 @@ struct backend_policy<cpp>
             __METHOD_CUDA(base, method);                            \
             __METHOD_CPP(base, method);                             \
             __METHOD_OMP(base, method);                             \
+            __METHOD_TBB(base, method);                             \
     }

@@ -19,6 +19,8 @@
 #include "bqsr_context.h"
 #include "util.h"
 
+namespace firepony {
+
 void bqsr_context::start_batch(alignment_batch& batch)
 {
     // initialize the read order with 0..N
@@ -39,3 +41,5 @@ void bqsr_context::end_batch(alignment_batch& batch)
 {
     stats.total_reads += batch.host.num_reads;
 }
+
+} // namespace firepony

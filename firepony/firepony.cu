@@ -36,6 +36,8 @@
 #include "read_group_table.h"
 #include "options.h"
 
+using namespace firepony;
+
 void debug_read(bqsr_context *context, const alignment_batch& batch, int read_index);
 
 #include <thread>
@@ -152,7 +154,7 @@ void init_cuda(void)
 
 int main(int argc, char **argv)
 {
-    sequence_data reference;
+    firepony::sequence_data reference;
     variant_database vcf;
     size_t num_bytes;
     bool ret;

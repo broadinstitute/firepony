@@ -20,8 +20,7 @@
 
 #include "util.h"
 
-namespace bqsr
-{
+namespace firepony {
 
 // lifted directly from nvbio
 // xxxnsubtil: could use some cleanup
@@ -38,7 +37,7 @@ struct packer<BIG_ENDIAN_T,SYMBOL_SIZE,Symbol,InputStream,IndexType,uint32>
         const uint32 SYMBOL_COUNT = 1u << SYMBOL_SIZE;
         const uint32 SYMBOL_MASK  = SYMBOL_COUNT - 1u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const uint64     bit_idx  = uint64(sym_idx) * SYMBOL_SIZE;
         const index_type word_idx = index_type( bit_idx >> 5u );
@@ -79,7 +78,7 @@ struct packer<BIG_ENDIAN_T,SYMBOL_SIZE,Symbol,InputStream,IndexType,uint32>
         const uint32 SYMBOL_COUNT = 1u << SYMBOL_SIZE;
         const uint32 SYMBOL_MASK  = SYMBOL_COUNT - 1u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const uint64     bit_idx  = uint64(sym_idx) * SYMBOL_SIZE;
         const index_type word_idx = index_type( bit_idx >> 5u );
@@ -136,7 +135,7 @@ struct packer<BIG_ENDIAN_T,SYMBOL_SIZE,Symbol,InputStream,IndexType,uint64>
         const uint32 SYMBOL_COUNT = 1u << SYMBOL_SIZE;
         const uint32 SYMBOL_MASK  = SYMBOL_COUNT - 1u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const uint64     bit_idx  = uint64(sym_idx) * SYMBOL_SIZE;
         const index_type word_idx = index_type( bit_idx >> 6u );
@@ -177,7 +176,7 @@ struct packer<BIG_ENDIAN_T,SYMBOL_SIZE,Symbol,InputStream,IndexType,uint64>
         const uint32 SYMBOL_COUNT = 1u << SYMBOL_SIZE;
         const uint32 SYMBOL_MASK  = SYMBOL_COUNT - 1u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const uint64     bit_idx  = uint64(sym_idx) * SYMBOL_SIZE;
         const index_type word_idx = index_type( bit_idx >> 6u );
@@ -235,7 +234,7 @@ struct packer<BIG_ENDIAN_T,SYMBOL_SIZE,Symbol,InputStream,IndexType,uint8>
         const uint8 SYMBOL_COUNT = uint8(1u) << SYMBOL_SIZE;
         const uint8 SYMBOL_MASK  = SYMBOL_COUNT - uint8(1u);
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const uint64     bit_idx  = uint64(sym_idx) * SYMBOL_SIZE;
         const index_type word_idx = index_type( bit_idx >> 3u );
@@ -276,7 +275,7 @@ struct packer<BIG_ENDIAN_T,SYMBOL_SIZE,Symbol,InputStream,IndexType,uint8>
         const uint8 SYMBOL_COUNT = uint8(1u) << SYMBOL_SIZE;
         const uint8 SYMBOL_MASK  = SYMBOL_COUNT - uint8(1u);
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const uint64     bit_idx  = uint64(sym_idx) * SYMBOL_SIZE;
         const index_type word_idx = index_type( bit_idx >> 3u );
@@ -333,7 +332,7 @@ struct packer<BIG_ENDIAN_T,2u,Symbol,InputStream,IndexType,uint32>
     {
         const uint32 SYMBOL_MASK = 3u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const index_type word_idx = sym_idx >> 4u;
 
@@ -348,7 +347,7 @@ struct packer<BIG_ENDIAN_T,2u,Symbol,InputStream,IndexType,uint32>
     {
         const uint32 SYMBOL_MASK = 3u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const index_type word_idx = sym_idx >> 4u;
 
@@ -370,7 +369,7 @@ struct packer<BIG_ENDIAN_T,4u,Symbol,InputStream,IndexType,uint32>
     {
         const uint32 SYMBOL_MASK = 15u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const index_type word_idx = sym_idx >> 3u;
 
@@ -385,7 +384,7 @@ struct packer<BIG_ENDIAN_T,4u,Symbol,InputStream,IndexType,uint32>
     {
         const uint32 SYMBOL_MASK = 15u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const index_type word_idx = sym_idx >> 3u;
 
@@ -409,7 +408,7 @@ struct packer<BIG_ENDIAN_T,2u,Symbol,InputStream,IndexType,uint4>
     {
         const uint32 SYMBOL_MASK = 3u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const index_type word_idx = sym_idx >> 6u;
 
@@ -425,7 +424,7 @@ struct packer<BIG_ENDIAN_T,2u,Symbol,InputStream,IndexType,uint4>
     {
         const uint32 SYMBOL_MASK = 3u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const index_type word_idx = sym_idx >> 6u;
 
@@ -449,7 +448,7 @@ struct packer<BIG_ENDIAN_T,4u,Symbol,InputStream,IndexType,uint4>
     {
         const uint32 SYMBOL_MASK = 15u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const index_type word_idx = sym_idx >> 5u;
 
@@ -465,7 +464,7 @@ struct packer<BIG_ENDIAN_T,4u,Symbol,InputStream,IndexType,uint4>
     {
         const uint32 SYMBOL_MASK = 15u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const index_type word_idx = sym_idx >> 5u;
 
@@ -491,7 +490,7 @@ struct packer<BIG_ENDIAN_T,2u,Symbol,InputStream,IndexType,uint64>
     {
         const uint32 SYMBOL_MASK = 3u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const index_type word_idx = sym_idx >> 5u;
 
@@ -506,7 +505,7 @@ struct packer<BIG_ENDIAN_T,2u,Symbol,InputStream,IndexType,uint64>
     {
         const uint32 SYMBOL_MASK = 3u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const index_type word_idx = sym_idx >> 5u;
 
@@ -528,7 +527,7 @@ struct packer<BIG_ENDIAN_T,4u,Symbol,InputStream,IndexType,uint64>
     {
         const uint32 SYMBOL_MASK = 15u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const index_type word_idx = sym_idx >> 5u;
 
@@ -543,7 +542,7 @@ struct packer<BIG_ENDIAN_T,4u,Symbol,InputStream,IndexType,uint64>
     {
         const uint32 SYMBOL_MASK = 15u;
 
-        typedef typename bqsr::unsigned_type<IndexType>::type index_type;
+        typedef typename unsigned_type<IndexType>::type index_type;
 
         const index_type word_idx = sym_idx >> 5u;
 
@@ -559,4 +558,4 @@ struct packer<BIG_ENDIAN_T,4u,Symbol,InputStream,IndexType,uint64>
     }
 };
 
-} // namespace bqsr
+} // namespace firepony

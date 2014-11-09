@@ -22,6 +22,8 @@
 #include "bit_packers/quality_score.h"
 #include "bit_packers/event_tracker.h"
 
+namespace firepony {
+
 // defines a covariate chain equivalent to GATK's RecalTable1
 struct covariate_table_quality
 {
@@ -72,3 +74,5 @@ struct covariate_table_quality
         printf("\n");
     }
 };
+
+} // namespace firepony

@@ -24,6 +24,8 @@
 
 #include "primitives/cuda.h"
 
+namespace firepony {
+
 namespace SequenceDataMask
 {
     enum
@@ -37,8 +39,8 @@ namespace SequenceDataMask
 template <typename system_tag>
 struct sequence_data_storage
 {
-    template <typename T> using Vector = bqsr::vector<system_tag, T>;
-    template <uint32 bits> using PackedVector = bqsr::packed_vector<system_tag, bits>;
+    template <typename T> using Vector = vector<system_tag, T>;
+    template <uint32 bits> using PackedVector = packed_vector<system_tag, bits>;
 
     uint32 num_sequences;
 
@@ -111,3 +113,5 @@ struct sequence_data
 
     size_t download(void);
 };
+
+} // namespace firepony

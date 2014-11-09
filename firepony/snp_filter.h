@@ -24,6 +24,8 @@
 #include "variant_data.h"
 #include "util.h"
 
+namespace firepony {
+
 struct snp_filter_context
 {
     // the window in the reference for each sequence in the database
@@ -58,3 +60,5 @@ void build_alignment_windows(bqsr_context *ctx,
 
 void filter_known_snps(bqsr_context *context,
                        const alignment_batch& batch);
+
+} // namespace firepony

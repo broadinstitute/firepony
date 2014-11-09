@@ -22,6 +22,8 @@
 #include "dna.h"
 #include "../primitives/cuda.h"
 
+namespace firepony {
+
 namespace from_nvbio {
 
 /// convert a 2-bit RNA symbol to its ASCII character
@@ -202,3 +204,5 @@ inline CUDA_HOST_DEVICE void from_string(
 }
 
 } // namespace from_nvbio
+
+} // namespace firepony

@@ -24,8 +24,7 @@
 
 #include <thrust/iterator/iterator_traits.h>
 
-namespace bqsr
-{
+namespace firepony {
 
 // lifted directly from nvbio
 // xxxnsubtil: could use some cleanup
@@ -276,7 +275,7 @@ inline void assign(
         // encode a word's worth of characters
         word_type word = 0u;
 
-        const uint32 n_symbols = bqsr::min( SYMBOLS_PER_WORD, uint32( input_len - IndexType(i) ) );
+        const uint32 n_symbols = min( SYMBOLS_PER_WORD, uint32( input_len - IndexType(i) ) );
 
         // loop through the word's bp's
         for (uint32 j = 0; j < SYMBOLS_PER_WORD; ++j)
@@ -302,4 +301,4 @@ inline void assign(
     }
 }
 
-} // namespace bqsr
+} // namespace firepony

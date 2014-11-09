@@ -28,6 +28,8 @@
 
 #include "mmap.h"
 
+namespace firepony {
+
 shared_memory_file::shared_memory_file()
     : fd(-1),
       size(0),
@@ -165,3 +167,5 @@ bool shared_memory_file::create(shared_memory_file *out, const char *fname, size
 
     return true;
 }
+
+} // namespace firepony

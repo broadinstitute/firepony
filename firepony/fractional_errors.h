@@ -20,6 +20,8 @@
 
 #include "bqsr_types.h"
 
+namespace firepony {
+
 struct fractional_error_context
 {
     D_VectorF64 snp_errors;
@@ -47,3 +49,5 @@ struct fractional_error_context
 
 void build_fractional_error_arrays(bqsr_context *ctx, const alignment_batch& batch);
 void debug_fractional_error_arrays(bqsr_context *context, const alignment_batch& batch, int read_index);
+
+} // namespace firepony

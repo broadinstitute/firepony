@@ -27,6 +27,8 @@
 
 #include <stdexcept>
 
+namespace firepony {
+
 namespace from_nvbio {
 
 // Generic I/O class for consuming data from a text file delimited by a single record separator
@@ -153,3 +155,5 @@ public:
 };
 
 } // namespace from_nvbio
+
+} // namespace firepony

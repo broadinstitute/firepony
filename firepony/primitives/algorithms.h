@@ -20,8 +20,7 @@
 
 #include "cuda.h"
 
-namespace bqsr
-{
+namespace firepony {
 
 /// find the lower bound in a sequence
 ///
@@ -61,4 +60,4 @@ inline CUDA_HOST_DEVICE Iterator lower_bound(const Value         x,
     return begin;
 }
 
-} // namespace bqsr
+} // namespace firepony

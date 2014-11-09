@@ -31,6 +31,8 @@
 #include "read_group_table.h"
 #include "util.h"
 
+namespace firepony {
+
 struct bqsr_statistics // host-only
 {
     uint32 total_reads;        // total number of reads processed
@@ -188,4 +190,4 @@ struct bqsr_lambda_context
     { }
 };
 
-void debug_read(bqsr_context *context, const alignment_batch& batch, int read_id);
+} // namespace firepony

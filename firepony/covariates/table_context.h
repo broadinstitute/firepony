@@ -23,6 +23,8 @@
 #include "bit_packers/event_tracker.h"
 #include "bit_packers/context.h"
 
+namespace firepony {
+
 // the context portion of GATK's RecalTable2
 struct covariate_table_context
 {
@@ -103,3 +105,5 @@ struct covariate_table_context
         }
     }
 };
+
+} // namespace firepony

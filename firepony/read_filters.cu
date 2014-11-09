@@ -25,6 +25,8 @@
 #include "alignment_data.h"
 #include "read_filters.h"
 
+namespace firepony {
+
 // filter if any of the flags are set
 template<uint32 flags>
 struct filter_if_any_set : public bqsr_lambda
@@ -270,28 +272,28 @@ void filter_reads(bqsr_context *context, const alignment_batch& batch)
     context->temp_u32.resize(active_read_list.size());
 
     // apply the mapq filter, copying from active_read_list into temp_u32
-    num_active = bqsr::copy_if(active_read_list.begin(),
+    num_active = copy_if(active_read_list.begin(),
                                num_active,
                                temp_u32.begin(),
                                mapq_filter,
                                context->temp_storage);
 
     // apply the flags filters, copying from temp_u32 into active_read_list
-    num_active = bqsr::copy_if(temp_u32.begin(),
+    num_active = copy_if(temp_u32.begin(),
                                num_active,
                                active_read_list.begin(),
                                flags_filter,
                                context->temp_storage);
 
     // apply the malformed read filters, copying from active_read_list into temp_u32
-    num_active = bqsr::copy_if(active_read_list.begin(),
+    num_active = copy_if(active_read_list.begin(),
                                num_active,
                                temp_u32.begin(),
                                malformed_read_filter,
                                context->temp_storage);
 
     // apply the malformed cigar filters, copying from temp_u32 into active_read_list
-    num_active = bqsr::copy_if(temp_u32.begin(),
+    num_active = copy_if(temp_u32.begin(),
                                num_active,
                                active_read_list.begin(),
                                malformed_cigar_filter,
@@ -365,3 +367,5 @@ void filter_bases(bqsr_context *context, const alignment_batch& batch)
                      context->active_read_list.end(),
                      filter_low_quality_bases(*context, batch.device));
 }
+
+} // namespace firepony

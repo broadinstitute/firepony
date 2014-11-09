@@ -18,8 +18,7 @@
 
 #pragma once
 
-namespace bqsr
-{
+namespace firepony {
 
 /// a meta-function to convert a type to const
 ///
@@ -69,4 +68,4 @@ inline CUDA_HOST_DEVICE T max(const T a, const T b)
     return (a > b ? a : b);
 }
 
-} // namespace bqsr
+} // namespace firepony

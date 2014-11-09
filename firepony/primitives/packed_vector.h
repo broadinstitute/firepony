@@ -22,8 +22,7 @@
 #include "vector.h"
 #include "packed_stream.h"
 
-namespace bqsr
-{
+namespace firepony {
 
 // lifted directly from nvbio
 // xxxnsubtil: could use some cleanup
@@ -43,10 +42,10 @@ struct packed_vector
     typedef SystemTag           system_tag;
     typedef IndexType           index_type;
 
-    typedef typename bqsr::vector<system_tag, uint32>::pointer                                  pointer;
-    typedef typename bqsr::vector<system_tag, uint32>::const_pointer                            const_pointer;
-    typedef bqsr::packed_stream<SYMBOL_SIZE, uint8, IS_BIG_ENDIAN,       pointer, index_type>   stream_type;
-    typedef bqsr::packed_stream<SYMBOL_SIZE, uint8, IS_BIG_ENDIAN, const_pointer, index_type>   const_stream_type;
+    typedef typename vector<system_tag, uint32>::pointer                                  pointer;
+    typedef typename vector<system_tag, uint32>::const_pointer                            const_pointer;
+    typedef packed_stream<SYMBOL_SIZE, uint8, IS_BIG_ENDIAN,       pointer, index_type>   stream_type;
+    typedef packed_stream<SYMBOL_SIZE, uint8, IS_BIG_ENDIAN, const_pointer, index_type>   const_stream_type;
     typedef typename stream_type::iterator                                                      iterator;
     typedef typename const_stream_type::iterator                                                const_iterator;
     typedef uint8                                                                               value_type;
@@ -163,8 +162,8 @@ struct packed_vector
         m_size = other.size();
     }
 
-    bqsr::vector<system_tag, uint32> m_storage;
+    vector<system_tag, uint32> m_storage;
     index_type                       m_size;
 };
 
-} // namespace bqsr
+} // namespace firepony

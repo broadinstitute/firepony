@@ -19,6 +19,8 @@
 
 #include "bit_packing.h"
 
+namespace firepony {
+
 template <typename PreviousCovariate = covariate_null>
 struct covariate_QualityScore : public covariate<PreviousCovariate, 8>
 {
@@ -38,3 +40,5 @@ struct covariate_QualityScore : public covariate<PreviousCovariate, 8>
                                                           ctx, batch, read_index, bp_offset, cigar_event_index);
     }
 };
+
+} // namespace firepony

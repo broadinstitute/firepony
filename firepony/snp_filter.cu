@@ -24,6 +24,8 @@
 #include "primitives/cuda.h"
 #include "primitives/parallel.h"
 
+namespace firepony {
+
 // functor used to compute the read offset list
 // for each read, fills in a list of uint16 values with the offset of each BP in the reference relative to the start of the alignment
 struct compute_read_offset_list : public bqsr_lambda
@@ -171,9 +173,9 @@ struct compute_vcf_ranges : public bqsr_lambda
                                                   ref_sequence_offset + uint32(reference_window_clipped.y));
 
         // do a binary search for a feature that starts inside our read
-        const uint32 *vcf_start = bqsr::lower_bound(alignment_window.x,
-                                                    db.reference_window_start.begin(),
-                                                    db.reference_window_start.size());
+        const uint32 *vcf_start = lower_bound(alignment_window.x,
+                                              db.reference_window_start.begin(),
+                                              db.reference_window_start.size());
 
         // compute the initial vcf range
         uint2 vcf_range = make_uint2(vcf_start - db.reference_window_start.begin(),
@@ -302,10 +304,10 @@ public:
             }
 
             // truncate any portions of the feature range that fall outside the clipped read region
-            read_start = max(read_start, read_window_clipped.x);
-            read_start = min(read_start, read_window_clipped.y);
-            read_end = max(read_end, read_window_clipped.x);
-            read_end = min(read_end, read_window_clipped.y);
+            read_start = max<uint32>(read_start, read_window_clipped.x);
+            read_start = min<uint32>(read_start, read_window_clipped.y);
+            read_end = max<uint32>(read_end, read_window_clipped.x);
+            read_end = min<uint32>(read_end, read_window_clipped.y);
 
             for(uint32 dead_bp = read_start; dead_bp <= read_end; dead_bp++)
                 ctx.active_location_list[idx.read_start + dead_bp] = 0;
@@ -330,11 +332,11 @@ void filter_known_snps(bqsr_context *context, const alignment_batch& batch)
     context->temp_u32 = context->active_read_list;
 
     uint32 num_active;
-    num_active = bqsr::copy_if(context->temp_u32.begin(),
-                               context->temp_u32.size(),
-                               snp.active_read_ids.begin(),
-                               vcf_active_predicate(snp.active_vcf_ranges),
-                               context->temp_storage);
+    num_active = copy_if(context->temp_u32.begin(),
+                         context->temp_u32.size(),
+                         snp.active_read_ids.begin(),
+                         vcf_active_predicate(snp.active_vcf_ranges),
+                         context->temp_storage);
 
     snp.active_read_ids.resize(num_active);
 
@@ -343,4 +345,6 @@ void filter_known_snps(bqsr_context *context, const alignment_batch& batch)
     thrust::for_each(snp.active_read_ids.begin(),
                      snp.active_read_ids.end(),
                      filter_bps(*context, batch.device));
+}
+
 }

@@ -28,6 +28,8 @@
 
 #include "primitives/cuda.h"
 
+namespace firepony {
+
 // contains information referenced by an alignment data batch
 // xxxnsubtil: a better name might be in order
 struct alignment_header
@@ -41,7 +43,7 @@ struct alignment_header
 
     struct const_view
     {
-        bqsr::vector<target_system_tag, uint32>::const_view chromosome_lengths;
+        vector<target_system_tag, uint32>::const_view chromosome_lengths;
     };
 
     operator const_view() const
@@ -126,8 +128,8 @@ struct CRQ_index
 template <typename system_tag>
 struct alignment_batch_storage
 {
-    template <typename T> using Vector = bqsr::vector<system_tag, T>;
-    template <uint32 bits> using PackedVector = bqsr::packed_vector<system_tag, bits>;
+    template <typename T> using Vector = vector<system_tag, T>;
+    template <uint32 bits> using PackedVector = packed_vector<system_tag, bits>;
 
     uint32 num_reads;
     uint32 max_read_size;
@@ -484,3 +486,5 @@ struct alignment_batch
         }
     }
 };
+
+} // namespace firepony

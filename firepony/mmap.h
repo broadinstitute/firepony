@@ -23,6 +23,8 @@
 
 #include "bqsr_types.h"
 
+namespace firepony {
+
 struct shared_memory_file
 {
     int fd;
@@ -37,3 +39,5 @@ struct shared_memory_file
     // create a new shared memory segment of a given size with a read-write mapping
     static bool create(shared_memory_file *out, const char *fname, size_t size);
 };
+
+} // namespace firepony

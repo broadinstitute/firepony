@@ -36,6 +36,8 @@
 #include "from_nvbio/dna.h"
 #include "from_nvbio/alphabet.h"
 
+namespace firepony {
+
 #define MAX_PHRED_SCORE 93
 #define EM 0.33333333333
 #define EI 0.25
@@ -79,7 +81,7 @@ struct compute_hmm_windows : public bqsr_lambda
         uint32 readStart = reference_window.x + seq_to_alignment_offset; // always clipped
 
         // reference window for HMM
-        uint32 start = bqsr::max(readStart - offset - first_insertion_offset, 0u);
+        uint32 start = max(readStart - offset - first_insertion_offset, 0u);
         uint32 stop = reference_window.y + seq_to_alignment_offset + offset + last_insertion_offset;
 
         if (stop > ref_length)
@@ -1102,7 +1104,7 @@ struct cap_baq_qualities : public bqsr_lambda
         {
             b = MIN_BASE_QUAL; // just take b = minBaseQuality
         } else {
-            b = bqsr::min(bq, oq);
+            b = min(bq, oq);
         }
 
         return b;
@@ -1126,7 +1128,7 @@ struct cap_baq_qualities : public bqsr_lambda
         const int offset = MAX_BAND_WIDTH / 2;
 
         const uint32 readStart = reference_window.x + seq_to_alignment_offset;
-        const uint32 start = bqsr::max(readStart - offset - first_insertion_offset, 0u);
+        const uint32 start = max(readStart - offset - first_insertion_offset, 0u);
 
         const int refOffset = (int)(start - readStart);
 
@@ -1235,7 +1237,7 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     // collect the reads that we need to compute BAQ for
     active_baq_read_list.resize(context->active_read_list.size());
 
-    num_active = bqsr::copy_if(context->active_read_list.begin(),
+    num_active = copy_if(context->active_read_list.begin(),
                                context->active_read_list.size(),
                                active_baq_read_list.begin(),
                                read_needs_baq(*context, batch.device),
@@ -1250,7 +1252,7 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
         // first offset is zero
         thrust::fill_n(baq.matrix_index.begin(), 1, 0);
         // do an inclusive scan to compute all offsets + the total size
-        bqsr::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
+        inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
                 compute_hmm_matrix_size(*context, batch.device)),
                 num_active,
                 baq.matrix_index.begin() + 1,
@@ -1266,7 +1268,7 @@ void baq_reads(bqsr_context *context, const alignment_batch& batch)
     baq.scaling_index.resize(num_active + 1);
     // first offset is zero
     thrust::fill_n(baq.scaling_index.begin(), 1, 0);
-    bqsr::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
+    inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
                                                          compute_hmm_scaling_factor_size(*context, batch.device)),
                          num_active,
                          baq.scaling_index.begin() + 1,
@@ -1423,3 +1425,5 @@ void debug_baq(bqsr_context *context, const alignment_batch& batch, int read_ind
 
     fprintf(stderr, "\n");
 }
+
+} // namespace firepony

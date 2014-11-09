@@ -19,6 +19,8 @@
 #include "serialization.h"
 #include "sequence_data.h"
 
+namespace firepony {
+
 size_t sequence_data::serialized_size(void)
 {
     size_t ret = 0;
@@ -71,8 +73,8 @@ void sequence_data::unserialize(shared_memory_file& shm)
     in = serialization::decode(&m_size, in);
     in = serialization::decode(&temp, in);
 
-    host.bases = bqsr::packed_vector<host_tag, 4>::const_view(in, m_size);
-    in = static_cast<uint32*>(in) + divide_ri(m_size, bqsr::packed_vector<host_tag, 4>::SYMBOLS_PER_WORD);
+    host.bases = packed_vector<host_tag, 4>::const_view(in, m_size);
+    in = static_cast<uint32*>(in) + divide_ri(m_size, packed_vector<host_tag, 4>::SYMBOLS_PER_WORD);
 
     in = serialization::unwrap_vector_view(host.qualities, in);
     in = serialization::unwrap_vector_view(host.sequence_id, in);
@@ -124,3 +126,5 @@ size_t sequence_data::download(void)
 #undef TRACK_VECTOR_SIZE
 #undef TRACK_PACKED_VECTOR_SIZE
 }
+
+} // namespace firepony

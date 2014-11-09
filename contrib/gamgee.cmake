@@ -15,7 +15,7 @@ ExternalProject_Add(gamgee
     PREFIX ${gamgee_PREFIX}
     DEPENDS ${BOOST_DEPENDS}
     GIT_REPOSITORY "https://github.com/broadinstitute/gamgee.git"
-    GIT_TAG "3631525493724f7a05f82be389167dda27c9eedc"
+    GIT_TAG "a5187dc61f381f44740c7665e8ae4cb789c1130b"
     INSTALL_DIR ${gamgee_PREFIX}/install
     CMAKE_ARGS ${BOOST_CMAKE_ARGS}
                -DINSTALL_DEPENDENCIES=ON

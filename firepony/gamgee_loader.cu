@@ -36,6 +36,8 @@
 
 #include "from_nvbio/dna.h"
 
+namespace firepony {
+
 gamgee_alignment_file::gamgee_alignment_file(const char *fname)
     : file(std::string(fname))
 {
@@ -315,7 +317,7 @@ bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 d
 
             h.bases.resize(seq_start + seq_len);
 
-            bqsr::assign(sequence.size(),
+            assign(sequence.size(),
                          thrust::make_transform_iterator(sequence.begin(), iupac16()),
                          h.bases.stream_at_index(seq_start));
         }
@@ -479,3 +481,5 @@ bool gamgee_load_vcf(variant_database *output, const sequence_data& reference, c
     output->host = output->host_malloc_container;
     return true;
 }
+
+} // namespace firepony

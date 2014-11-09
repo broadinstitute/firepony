@@ -30,8 +30,8 @@
 #include <cub/device/device_select.cuh>
 #include <cub/device/device_radix_sort.cuh>
 
-namespace bqsr
-{
+namespace firepony {
+
 // simplified version of thrust::inclusive_scan
 template <typename InputIterator, typename OutputIterator, typename Predicate>
 inline void inclusive_scan(InputIterator first,
@@ -243,4 +243,4 @@ inline void sort_by_key(D_Vector<Key>& keys,
 }
 #endif
 
-} // namespace bqsr
+} // namespace firepony

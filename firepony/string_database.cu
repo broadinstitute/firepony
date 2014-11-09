@@ -18,6 +18,7 @@
 
 #include "string_database.h"
 
+namespace firepony {
 
 // returns the id of string if it exists in the database, otherwise returns -1
 uint32 string_database::lookup(const std::string& string) const
@@ -109,3 +110,5 @@ void *string_database::unserialize(void *in)
 
     return in;
 }
+
+} // namespace firepony

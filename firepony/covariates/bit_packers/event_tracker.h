@@ -17,6 +17,8 @@
 
 #pragma once
 
+namespace firepony {
+
 #include "bit_packing.h"
 
 // this is a little weird, since it doesn't actually change
@@ -33,3 +35,5 @@ struct covariate_EventTracker : public covariate<PreviousCovariate, 2>
                                                           ctx, batch, read_index, bp_offset, cigar_event_index);
     }
 };
+
+} // namespace firepony

@@ -20,6 +20,8 @@
 
 #include "bqsr_types.h"
 
+namespace firepony {
+
 #define NO_BAQ_UNCERTAINTY 64
 
 struct baq_context
@@ -71,3 +73,5 @@ struct baq_context
 
 void baq_reads(bqsr_context *context, const alignment_batch& batch);
 void debug_baq(bqsr_context *context, const alignment_batch& batch, int read_index);
+
+} // namespace firepony

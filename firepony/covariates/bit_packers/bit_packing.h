@@ -26,6 +26,8 @@
 #include "../../from_nvbio/dna.h"
 #include "../../from_nvbio/alphabet.h"
 
+namespace firepony {
+
 struct covariate_key_set
 {
     covariate_key M;
@@ -162,3 +164,5 @@ struct covariate_null
         return 0;
     }
 };
+
+} // namespace firepony

@@ -26,6 +26,8 @@
 
 #include <gamgee/variant.h>
 
+namespace firepony {
+
 namespace VariantDataMask
 {
     enum
@@ -44,8 +46,8 @@ namespace VariantDataMask
 template <typename system_tag>
 struct variant_database_storage
 {
-    template <typename T> using Vector = bqsr::vector<system_tag, T>;
-    template <uint32 bits> using PackedVector = bqsr::packed_vector<system_tag, bits>;
+    template <typename T> using Vector = vector<system_tag, T>;
+    template <uint32 bits> using PackedVector = packed_vector<system_tag, bits>;
 
     uint32 num_variants;
 
@@ -147,3 +149,5 @@ struct variant_database
 
     size_t download(void);
 };
+
+} // namespace firepony

@@ -21,5 +21,9 @@
 #include "bqsr_types.h"
 #include "bqsr_context.h"
 
+namespace firepony {
+
 void filter_reads(bqsr_context *context, const alignment_batch& batch);
 void filter_bases(bqsr_context *context, const alignment_batch& batch);
+
+} // namespace firepony

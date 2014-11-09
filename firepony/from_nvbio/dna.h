@@ -20,6 +20,8 @@
 
 #include "../bqsr_types.h"
 
+namespace firepony {
+
 namespace from_nvbio {
 
 /// convert a 2-bit DNA symbol to its ASCII character
@@ -211,3 +213,5 @@ inline CUDA_HOST_DEVICE void string_to_iupac16(
 }
 
 } // namespace from_nvbio
+
+} // namespace firepony

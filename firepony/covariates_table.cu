@@ -27,10 +27,12 @@
 #include <thrust/sort.h>
 #include <thrust/reduce.h>
 
+namespace firepony {
+
 void D_CovariateTable::sort(D_Vector<covariate_key>& temp_keys, D_Vector<covariate_value>& temp_values,
                             D_VectorU8& temp_storage, uint32 num_key_bits)
 {
-    bqsr::sort_by_key(keys, values, temp_keys, temp_values, temp_storage, num_key_bits);
+    sort_by_key(keys, values, temp_keys, temp_values, temp_storage, num_key_bits);
 }
 
 struct covariate_value_sum
@@ -63,3 +65,5 @@ void D_CovariateTable::pack(D_Vector<covariate_key>& temp_keys, D_Vector<covaria
 
     resize(new_size);
 }
+
+} // namespace firepony

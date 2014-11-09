@@ -21,6 +21,8 @@
 #include "bqsr_types.h"
 #include "covariates_table.h"
 
+namespace firepony {
+
 struct covariate_empirical_value
 {
     uint32 observations;
@@ -54,3 +56,5 @@ struct read_group_table_context
 
 void build_read_group_table(bqsr_context *context);
 void output_read_group_table(bqsr_context *context);
+
+} // namespace firepony

@@ -22,6 +22,9 @@
 #include "alignment_data.h"
 #include "sequence_data.h"
 
+namespace firepony
+{
+
 struct cigar_event
 {
     // note that this is stored in a packed 2-bit vector
@@ -123,3 +126,5 @@ struct cigar_context
 
 void expand_cigars(bqsr_context *context, const alignment_batch& batch);
 void debug_cigar(bqsr_context *context, const alignment_batch& batch, int read_index);
+
+} // namespace firepony

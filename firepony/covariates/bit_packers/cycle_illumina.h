@@ -19,6 +19,8 @@
 
 #include "bit_packing.h"
 
+namespace firepony {
+
 template <typename PreviousCovariate = covariate_null>
 struct covariate_Cycle_Illumina : public covariate<PreviousCovariate, 10, true>
 {
@@ -79,3 +81,5 @@ struct covariate_Cycle_Illumina : public covariate<PreviousCovariate, 10, true>
                                ctx, batch, read_index, bp_offset, cigar_event_index);
     }
 };
+
+} // namespace firepony

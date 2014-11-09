@@ -21,6 +21,8 @@
 #include "bqsr_types.h"
 #include "covariates_table.h"
 
+namespace firepony {
+
 struct covariates_context
 {
     // read window after clipping low quality ends
@@ -53,3 +55,5 @@ struct covariates_context
 
 void gather_covariates(bqsr_context *context, const alignment_batch& batch);
 void output_covariates(bqsr_context *context);
+
+} // namespace firepony

@@ -20,6 +20,8 @@
 
 #include "bqsr_types.h"
 
+namespace firepony {
+
 struct runtime_options
 {
     // file names for reference, SNP database and input files
@@ -54,3 +56,5 @@ struct runtime_options
 extern struct runtime_options command_line_options;
 
 void parse_command_line(int argc, char **argv);
+
+} // namespace firepony

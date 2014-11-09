@@ -20,6 +20,8 @@
 
 #include "primitives/util.h"
 
+namespace firepony {
+
 // serialization primitives
 namespace serialization {
 
@@ -55,7 +57,7 @@ inline void *decode(std::vector<T> *out, void *in)
 }
 
 template <typename T>
-inline void *decode(bqsr::vector<host_tag, T> *out, void *in)
+inline void *decode(vector<host_tag, T> *out, void *in)
 {
     uint64 size;
     in = decode(&size, in);
@@ -67,7 +69,7 @@ inline void *decode(bqsr::vector<host_tag, T> *out, void *in)
 }
 
 template <uint32 bits>
-inline void *decode(bqsr::packed_vector<host_tag, bits> *out, void *in)
+inline void *decode(packed_vector<host_tag, bits> *out, void *in)
 {
     in = decode(&out->m_size, in);
     in = decode(&out->m_storage, in);
@@ -108,7 +110,7 @@ inline void *encode(void *out, const std::vector<T> *in)
 }
 
 template <typename T>
-inline void *encode(void *out, const bqsr::vector<host_tag, T> *in)
+inline void *encode(void *out, const vector<host_tag, T> *in)
 {
     uint64 size = in->size();
     out = encode(out, &size);
@@ -122,7 +124,7 @@ inline void *encode(void *out, const bqsr::vector<host_tag, T> *in)
 }
 
 template <uint32 bits>
-inline void *encode(void *out, bqsr::packed_vector<host_tag, bits> *in)
+inline void *encode(void *out, packed_vector<host_tag, bits> *in)
 {
     out = encode(out, &in->m_size);
     out = encode(out, &in->m_storage);
@@ -162,13 +164,13 @@ inline size_t serialized_size(const std::vector<std::string>& vec)
 }
 
 template <typename T>
-inline size_t serialized_size(const bqsr::vector<host_tag, T>& vec)
+inline size_t serialized_size(const vector<host_tag, T>& vec)
 {
     return sizeof(uint64) + sizeof(T) * vec.size();
 }
 
 //template <typename system_tag, uint32 bits>
-//inline size_t serialized_size(const bqsr::packed_vector<system_tag, bits>& vec)
+//inline size_t serialized_size(const packed_vector<system_tag, bits>& vec)
 //{
 //    return serialized_size(vec.m_size) + serialized_size(vec.m_storage);
 //}
@@ -203,3 +205,5 @@ inline void *unwrap_packed_vector_view(T& view, void *in)
 }
 
 } // namespace serialization
+
+} // namespace firepony

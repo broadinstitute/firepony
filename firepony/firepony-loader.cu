@@ -27,7 +27,9 @@
 #include "mmap.h"
 #include "serialization.h"
 
-sequence_data reference;
+using namespace firepony;
+
+firepony::sequence_data reference;
 
 void load_fasta(const char *fname)
 {

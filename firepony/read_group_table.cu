@@ -26,6 +26,8 @@
 
 #include <thrust/reduce.h>
 
+namespace firepony {
+
 struct generate_read_group_table : public bqsr_lambda_context
 {
     using bqsr_lambda_context::bqsr_lambda_context;
@@ -228,7 +230,7 @@ void build_read_group_table(bqsr_context *context)
     temp_keys.resize(rg_keys.size());
     temp_values.resize(rg_keys.size());
 
-    bqsr::sort_by_key(rg_keys, rg_values, temp_keys, temp_values, temp_storage, covariate_table_quality::chain::bits_used);
+    sort_by_key(rg_keys, rg_values, temp_keys, temp_values, temp_storage, covariate_table_quality::chain::bits_used);
 
     // reduce the read group table by key
     thrust::pair<D_Vector<covariate_key>::iterator, D_Vector<covariate_empirical_value>::iterator> out;
@@ -284,3 +286,4 @@ void output_read_group_table(bqsr_context *context)
     printf("\n");
 }
 
+} // namespace firepony

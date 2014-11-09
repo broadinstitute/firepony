@@ -23,6 +23,8 @@
 #include "bit_packers/event_tracker.h"
 #include "bit_packers/cycle_illumina.h"
 
+namespace firepony {
+
 // the cycle portion of GATK's RecalTable2
 struct covariate_table_cycle_illumina
 {
@@ -83,3 +85,5 @@ struct covariate_table_cycle_illumina
         }
     }
 };
+
+} // namespace firepony

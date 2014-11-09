@@ -22,6 +22,8 @@
 
 #include <sys/time.h>
 
+namespace firepony {
+
 // prepare temp_storage to store num_elements to be packed into a bit vector
 void pack_prepare_storage_2bit(D_VectorU8& storage, uint32 num_elements);
 void pack_prepare_storage_1bit(D_VectorU8& storage, uint32 num_elements);
@@ -111,3 +113,5 @@ struct time_series
         elapsed_time += timer.elapsed_time();
     }
 };
+
+} // namespace firepony

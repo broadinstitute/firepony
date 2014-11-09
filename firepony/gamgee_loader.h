@@ -23,6 +23,8 @@
 #include "sequence_data.h"
 #include "variant_data.h"
 
+namespace firepony {
+
 struct gamgee_alignment_file
 {
 private:
@@ -46,3 +48,5 @@ public:
 
 bool gamgee_load_sequences(sequence_data *output, const char *filename, uint32 data_mask, bool try_mmap = true);
 bool gamgee_load_vcf(variant_database *output, const sequence_data& reference, const char *filename, uint32 data_mask, bool try_mmap = true);
+
+} // namespace firepony

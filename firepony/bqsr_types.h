@@ -31,6 +31,8 @@
 
 #include <stdint.h>
 
+namespace firepony {
+
 typedef uint64_t uint64;
 typedef int64_t int64;
 typedef uint32_t uint32;
@@ -40,12 +42,14 @@ typedef int16_t int16;
 typedef uint8_t uint8;
 typedef int8_t int8;
 
+} // namespace firepony
+
 #include "primitives/cuda.h"
 #include "primitives/vector.h"
 #include "primitives/packed_stream.h"
 #include "primitives/packed_vector.h"
 
-typedef bqsr::host_tag host_tag;
+namespace firepony {
 
 //#define RUN_ON_CPU
 #ifdef RUN_ON_CPU
@@ -54,15 +58,15 @@ typedef bqsr::host_tag host_tag;
 #endif
 typedef host_tag target_system_tag;
 #else
-typedef bqsr::device_tag target_system_tag;
+typedef device_tag target_system_tag;
 #endif
 
 struct bqsr_context;
 
-template <typename T> using D_Vector = bqsr::vector<target_system_tag, T>;
-template <typename T> using H_Vector = bqsr::vector<host_tag, T>;
-template <uint32 bits> using D_PackedVector = bqsr::packed_vector<target_system_tag, bits>;
-template <uint32 bits> using H_PackedVector = bqsr::packed_vector<host_tag, bits>;
+template <typename T> using D_Vector = vector<target_system_tag, T>;
+template <typename T> using H_Vector = vector<host_tag, T>;
+template <uint32 bits> using D_PackedVector = packed_vector<target_system_tag, bits>;
+template <uint32 bits> using H_PackedVector = packed_vector<host_tag, bits>;
 
 typedef D_Vector<uint8> D_VectorU8;
 typedef H_Vector<uint8> H_VectorU8;
@@ -139,3 +143,5 @@ struct cigar_op
 
 typedef D_Vector<cigar_op> D_VectorCigarOp;
 typedef H_Vector<cigar_op> H_VectorCigarOp;
+
+} // namespace firepony

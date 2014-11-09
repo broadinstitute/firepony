@@ -25,6 +25,8 @@
 #include <string>
 #include <map>
 
+namespace firepony {
+
 // utility struct to keep track of string identifiers using integers
 struct string_database
 {
@@ -52,3 +54,5 @@ private:
     std::vector<std::string> string_identifiers;
     std::map<uint32, uint32> string_hash_to_id;
 };
+
+} // namespace firepony

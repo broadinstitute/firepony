@@ -19,6 +19,8 @@
 #include "serialization.h"
 #include "variant_data.h"
 
+namespace firepony {
+
 size_t variant_database::serialized_size(void)
 {
     size_t ret = 0;
@@ -194,3 +196,5 @@ size_t variant_database::download(void)
 #undef TRACK_VECTOR_SIZE
 #undef TRACK_PACKED_VECTOR_SIZE
 }
+
+} // namespace firepony

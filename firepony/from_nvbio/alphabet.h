@@ -20,6 +20,8 @@
 
 #include "../bqsr_types.h"
 
+namespace firepony {
+
 namespace from_nvbio {
 
 ///@addtogroup Strings
@@ -274,4 +276,7 @@ struct from_char_functor
 
 } // namespace from_nvbio
 
+} // namespace firepony
+
 #include "alphabet_inl.h"
+

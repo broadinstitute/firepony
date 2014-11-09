@@ -19,6 +19,8 @@
 
 #include "bit_packing.h"
 
+namespace firepony {
+
 // context covariate
 template <uint32 NUM_BASES_MISMATCH, uint32 NUM_BASES_INDEL, typename PreviousCovariate = covariate_null>
 struct covariate_Context : public covariate<PreviousCovariate, 4 + constexpr_max(NUM_BASES_MISMATCH, NUM_BASES_INDEL) * 2 + 1, true>
@@ -104,7 +106,7 @@ struct covariate_Context : public covariate<PreviousCovariate, 4 + constexpr_max
         // which direction do we need to move in the read?
         const int direction = negative_strand ? 1 : -1;
         // how many context bases do we have available?
-        const int context_bases = negative_strand ? min(window.y - bp_offset + 1, max_context_bases) : min(bp_offset - window.x + 1, max_context_bases);
+        const int context_bases = negative_strand ? min<int>(window.y - bp_offset + 1, max_context_bases) : min<int>(bp_offset - window.x + 1, max_context_bases);
         // where is our starting point?
         const int start_offset = bp_offset;
         // where is our stopping point?
@@ -158,3 +160,5 @@ struct covariate_Context : public covariate<PreviousCovariate, 4 + constexpr_max
 
     }
 };
+
+} // namespace firepony

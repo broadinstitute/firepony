@@ -30,6 +30,8 @@
 #include "primitives/cuda.h"
 #include "primitives/parallel.h"
 
+namespace firepony {
+
 // compute the length of a given cigar operator
 struct cigar_op_len : public thrust::unary_function<const cigar_op&, uint32>
 {
@@ -209,7 +211,7 @@ struct remove_adapters : public bqsr_lambda
         auto& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
 
         ushort2 adapter = hardClipByReferenceCoordinates(read_index, -1, refStop);
-        read_window_clipped.x = max(read_window_clipped.x, adapter.y + 1);
+        read_window_clipped.x = max<uint16>(read_window_clipped.x, adapter.y + 1);
     }
 
     CUDA_HOST_DEVICE void hardClipByReferenceCoordinates_RightTail(const uint32 read_index, int refStart)
@@ -217,7 +219,7 @@ struct remove_adapters : public bqsr_lambda
         auto& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
 
         ushort2 adapter = hardClipByReferenceCoordinates(read_index, refStart, -1);
-        read_window_clipped.y = min(read_window_clipped.y, adapter.x - 1);
+        read_window_clipped.y = min<uint16>(read_window_clipped.y, adapter.x - 1);
     }
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
@@ -267,7 +269,7 @@ struct remove_soft_clips : public bqsr_lambda
             {
                 if (read_offset + op.len > read_window_clipped.x)
                 {
-                    read_window_clipped.x = min(read_offset + op.len, read_window_clipped.y);
+                    read_window_clipped.x = min<uint16>(read_offset + op.len, read_window_clipped.y);
                 }
 
                 read_offset += op.len;
@@ -290,7 +292,7 @@ struct remove_soft_clips : public bqsr_lambda
             {
                 if (read_offset - op.len < read_window_clipped.y)
                 {
-                    read_window_clipped.y = max(read_offset - op.len, read_window_clipped.x);
+                    read_window_clipped.y = max<uint16>(read_offset - op.len, read_window_clipped.x);
                 }
 
                 read_offset -= op.len;
@@ -674,10 +676,10 @@ void expand_cigars(bqsr_context *context, const alignment_batch& batch)
     // mark the first offset as 0
     thrust::fill_n(ctx.cigar_offsets.begin(), 1, 0);
     // do an inclusive scan to compute all offsets + the total size
-    bqsr::inclusive_scan(thrust::make_transform_iterator(batch.device.cigars.begin(), cigar_op_len()),
-                         batch.device.cigars.size(),
-                         ctx.cigar_offsets.begin() + 1,
-                         thrust::plus<uint32>());
+    inclusive_scan(thrust::make_transform_iterator(batch.device.cigars.begin(), cigar_op_len()),
+                   batch.device.cigars.size(),
+                   ctx.cigar_offsets.begin() + 1,
+                   thrust::plus<uint32>());
 
     // read back the last element, which contains the size of the buffer required
     uint32 expanded_cigar_len = ctx.cigar_offsets[batch.device.cigars.size()];
@@ -941,3 +943,5 @@ void debug_cigar(bqsr_context *context, const alignment_batch& batch, int read_i
 
     fprintf(stderr, "\n");
 }
+
+} // namespace firepony

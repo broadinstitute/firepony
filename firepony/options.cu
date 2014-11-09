@@ -24,6 +24,8 @@
 
 #include "options.h"
 
+namespace firepony {
+
 struct runtime_options command_line_options;
 
 static void usage(void)
@@ -148,3 +150,5 @@ void parse_command_line(int argc, char **argv)
 
     command_line_options.input = argv[optind];
 }
+
+} // namespace firepony

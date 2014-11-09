@@ -20,6 +20,8 @@
 #include "util.h"
 #include "baq.h"
 
+namespace firepony {
+
 // implements GATK's BaseRecalibrator.calculateFractionalErrorArray
 struct compute_fractional_errors : public bqsr_lambda
 {
@@ -39,14 +41,14 @@ struct compute_fractional_errors : public bqsr_lambda
                                                          double *fractionalErrors)
     {
         int totalErrors = 0;
-        for(int jjj = bqsr::max(0, blockStartIndex - 1); jjj <= iii; jjj++)
+        for(int jjj = max(0, blockStartIndex - 1); jjj <= iii; jjj++)
         {
             totalErrors += errorArray[jjj];
         }
 
-        for(int jjj = bqsr::max(0, blockStartIndex - 1); jjj <= iii; jjj++)
+        for(int jjj = max(0, blockStartIndex - 1); jjj <= iii; jjj++)
         {
-            fractionalErrors[jjj] = ((double) totalErrors) / ((double)(iii - bqsr::max(0, blockStartIndex - 1) + 1));
+            fractionalErrors[jjj] = ((double) totalErrors) / ((double)(iii - max(0, blockStartIndex - 1) + 1));
         }
     }
 
@@ -154,3 +156,5 @@ void debug_fractional_error_arrays(bqsr_context *context, const alignment_batch&
 
     fprintf(stderr, "\n");
 }
+
+} // namespace firepony

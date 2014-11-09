@@ -31,6 +31,8 @@
 
 #include <thrust/functional.h>
 
+namespace firepony {
+
 // accumulates events from a read batch into a given covariate table
 template <typename covariate_table>
 struct covariate_gatherer : public bqsr_lambda
@@ -155,13 +157,13 @@ static void build_covariates_table(D_CovariateTable& table, bqsr_context *contex
                      flag_valid_keys<covariate_table>(*context, batch.device, flags));
 
     // copy valid keys into the output table
-    bqsr::copy_flagged(scratch_table.keys.begin(),
+    copy_flagged(scratch_table.keys.begin(),
                        flags.size(),
                        table.keys.begin(),
                        flags.begin(),
                        context->temp_storage);
 
-    bqsr::copy_flagged(scratch_table.values.begin(),
+    copy_flagged(scratch_table.values.begin(),
                        flags.size(),
                        table.values.begin(),
                        flags.begin(),
@@ -249,3 +251,5 @@ void output_covariates(bqsr_context *context)
     covariate_table_cycle_illumina::dump_table(context, context->covariates.cycle);
     printf("\n");
 }
+
+} // namespace firepony

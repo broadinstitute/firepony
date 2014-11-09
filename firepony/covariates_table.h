@@ -20,6 +20,8 @@
 
 #include "bqsr_types.h"
 
+namespace firepony {
+
 typedef uint32 covariate_key;
 
 struct covariate_value
@@ -31,8 +33,8 @@ struct covariate_value
 template <typename system_tag>
 struct covariate_table_storage
 {
-    bqsr::vector<system_tag, covariate_key> keys;
-    bqsr::vector<system_tag, covariate_value> values;
+    vector<system_tag, covariate_key> keys;
+    vector<system_tag, covariate_value> values;
 
     covariate_table_storage()
     {
@@ -72,7 +74,7 @@ struct D_CovariateTable : public covariate_table_storage<target_system_tag>
     struct view
     {
         D_VectorU32::view keys;
-        bqsr::vector<target_system_tag, covariate_value>::view values;
+        vector<target_system_tag, covariate_value>::view values;
 
         // note: we don't use implicit cast operators here
         // we want to derive from this view to implement D_CovariatePool::view
@@ -82,3 +84,5 @@ struct D_CovariateTable : public covariate_table_storage<target_system_tag>
         { }
     };
 };
+
+} // namespace firepony

@@ -23,8 +23,7 @@
 #include <thrust/iterator/iterator_traits.h>
 #include <thrust/iterator/reverse_iterator.h>
 
-namespace bqsr
-{
+namespace firepony {
 
 typedef thrust::host_system_tag host_tag;
 typedef thrust::device_system_tag device_tag;
@@ -282,4 +281,4 @@ struct vector<device_tag, std::string>
     vector() = delete;
 };
 
-} // namespace bqsr
+} // namespace firepony

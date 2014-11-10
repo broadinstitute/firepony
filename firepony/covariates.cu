@@ -156,41 +156,50 @@ static void build_covariates_table(D_CovariateTable& table, bqsr_context *contex
                      thrust::make_counting_iterator(0u) + cv.scratch_table_space.keys.size(),
                      flag_valid_keys<covariate_table>(*context, batch.device, flags));
 
-    // copy valid keys into the output table
-    copy_flagged(scratch_table.keys.begin(),
-                       flags.size(),
-                       table.keys.begin(),
-                       flags.begin(),
-                       context->temp_storage);
-
-    copy_flagged(scratch_table.values.begin(),
-                       flags.size(),
-                       table.values.begin(),
-                       flags.begin(),
-                       context->temp_storage);
-
     // count valid keys
     uint32 valid_keys = thrust::reduce(flags.begin(), flags.end(), uint32(0));
 
-    // resize the table
-    table.resize(valid_keys);
+    if (valid_keys)
+    {
+        // concatenate valid keys to the end of the output table
+        size_t off = table.size();
+        table.resize(table.size() + valid_keys);
+
+        copy_flagged(scratch_table.keys.begin(),
+                     flags.size(),
+                     table.keys.begin() + off,
+                     flags.begin(),
+                     context->temp_storage);
+
+        copy_flagged(scratch_table.values.begin(),
+                     flags.size(),
+                     table.values.begin() + off,
+                     flags.begin(),
+                     context->temp_storage);
+    }
 
     covariates_filter.stop();
 
-    // sort and reduce the table by key
-    covariates_sort.start();
-    table.sort(temp_keys, temp_values, context->temp_storage, covariate_table::chain::bits_used);
-    covariates_sort.stop();
+    if (valid_keys)
+    {
+        // sort and reduce the table by key
+        covariates_sort.start();
+        table.sort(temp_keys, temp_values, context->temp_storage, covariate_table::chain::bits_used);
+        covariates_sort.stop();
 
-    covariates_pack.start();
-    table.pack(temp_keys, temp_values);
-    covariates_pack.stop();
+        covariates_pack.start();
+        table.pack(temp_keys, temp_values);
+        covariates_pack.stop();
+    }
 
     cudaDeviceSynchronize();
     context->stats.covariates_gather.add(covariates_gather);
     context->stats.covariates_filter.add(covariates_filter);
-    context->stats.covariates_sort.add(covariates_sort);
-    context->stats.covariates_pack.add(covariates_pack);
+    if (valid_keys)
+    {
+        context->stats.covariates_sort.add(covariates_sort);
+        context->stats.covariates_pack.add(covariates_pack);
+    }
 }
 
 struct compute_high_quality_windows : public bqsr_lambda

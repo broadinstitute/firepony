@@ -248,6 +248,10 @@ int main(int argc, char **argv)
 
         read_filter.stop();
 
+        // if all reads have been filtered out, skip the rest of the pipeline
+        if (context.active_read_list.size() == 0)
+            continue;
+
         // generate cigar events and coordinates
         // this will generate -1 read indices for events belonging to inactive reads, so it must happen after read filtering
         cigar_expansion.start();

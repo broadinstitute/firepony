@@ -216,6 +216,12 @@ void build_read_group_table(bqsr_context *context)
     auto& rg_keys = rg.read_group_keys;
     auto& rg_values = rg.read_group_values;
 
+    if (cv.quality.size() == 0)
+    {
+        // if we didn't gather any entries in the table, there's nothing to do
+        return;
+    }
+
     // convert the quality table into the read group table
     rg_keys.resize(cv.quality.size());
     rg_values.resize(cv.quality.size());

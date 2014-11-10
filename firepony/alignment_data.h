@@ -280,6 +280,7 @@ struct alignment_batch_host : public alignment_batch_storage<host_tag>
         alignment_stop.clear();
         mate_chromosome.clear();
         mate_alignment_start.clear();
+        inferred_insert_size.clear();
 
         cigars.clear();
         cigar_start.clear();

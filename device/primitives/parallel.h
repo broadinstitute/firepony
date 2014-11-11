@@ -29,7 +29,11 @@
 
 #include <cub/device/device_reduce.cuh>
 #include <cub/device/device_select.cuh>
+// silence warnings from debug code in cub
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #include <cub/device/device_radix_sort.cuh>
+#pragma GCC diagnostic pop
 
 namespace firepony {
 
@@ -256,22 +260,22 @@ struct parallel<cuda> : public parallel_thrust<cuda>
 
         size_t temp_storage_bytes = 0;
         cub::DeviceRadixSort::SortPairs(nullptr,
-                temp_storage_bytes,
-                d_keys,
-                d_values,
-                len,
-                0,
-                num_key_bits);
+                                        temp_storage_bytes,
+                                        d_keys,
+                                        d_values,
+                                        len,
+                                        0,
+                                        num_key_bits);
 
         temp_storage.resize(temp_storage_bytes);
 
         cub::DeviceRadixSort::SortPairs(thrust::raw_pointer_cast(temp_storage.data()),
-                temp_storage_bytes,
-                d_keys,
-                d_values,
-                len,
-                0,
-                num_key_bits);
+                                        temp_storage_bytes,
+                                        d_keys,
+                                        d_values,
+                                        len,
+                                        0,
+                                        num_key_bits);
 
         if (thrust::raw_pointer_cast(keys.data()) != d_keys.Current())
         {

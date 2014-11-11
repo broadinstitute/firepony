@@ -17,11 +17,11 @@ option(ENABLE_CUDA_BACKEND
 
 option(ENABLE_CPP_BACKEND
        "Enable the CPP threads CPU backend"
-       ON)
+       OFF)
 
 option(ENABLE_OPENMP_BACKEND
        "Enable the OpenMP CPU backend"
-       ON)
+       OFF)
 
 option(ENABLE_TBB_BACKEND
        "Enable the Threading Building Blocks backend"

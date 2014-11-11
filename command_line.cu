@@ -126,9 +126,10 @@ void parse_command_line(int argc, char **argv)
 #if ENABLE_OMP_BACKEND
             { "omp-only", no_argument, NULL, 'm' },
 #endif
-#if ENABLE_OMP_BACKEND
+#if ENABLE_TBB_BACKEND
             { "tbb-only", no_argument, NULL, 't' },
 #endif
+            { 0 },
     };
 
     parse_env_vars();

@@ -76,6 +76,10 @@ struct covariate_table_context
 
         for(uint32 i = 0; i < table.size(); i++)
         {
+            // skip null entries in the table
+            if (table.values[i].observations == 0)
+                continue;
+
             uint32 rg_id = decode(table.keys[i], ReadGroup);
             const std::string& rg_name = context.bam_header.host.read_groups_db.lookup(rg_id);
 

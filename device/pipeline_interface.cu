@@ -24,6 +24,10 @@
 
 #include "device/primitives/backends.h"
 
+#if ENABLE_TBB_BACKEND
+#include <tbb/task_scheduler_init.h>
+#endif
+
 namespace firepony {
 
 template <target_system system> void firepony_process_batch(firepony_context<system>& context, const alignment_batch<system>& batch);
@@ -87,10 +91,6 @@ struct firepony_device_pipeline : public firepony_pipeline
     }
 
 };
-METHOD_INSTANTIATE(firepony_device_pipeline, setup);
-METHOD_INSTANTIATE(firepony_device_pipeline, process_batch);
-METHOD_INSTANTIATE(firepony_device_pipeline, finish);
-METHOD_INSTANTIATE(firepony_device_pipeline, get_statistics);
 
 #if ENABLE_CUDA_BACKEND
 template<>
@@ -106,7 +106,7 @@ std::string firepony_device_pipeline<firepony::cuda>::get_name(void)
 
     char buf[1024];
     snprintf(buf, sizeof(buf),
-             "%s (%lu MB, CUDA %d.%d)\n",
+             "%s (%lu MB, CUDA %d.%d)",
              prop.name, prop.totalGlobalMem / (1024 * 1024),
              runtime_version / 1000, runtime_version % 100);
 
@@ -131,11 +131,17 @@ std::string firepony_device_pipeline<firepony::omp>::get_name(void)
 #endif
 
 #if ENABLE_TBB_BACKEND
+tbb::task_scheduler_init tbb_scheduler_init(tbb::task_scheduler_init::deferred);
+static int num_tbb_threads = -1;
+
 template<>
 std::string firepony_device_pipeline<firepony::intel_tbb>::get_name(void)
 {
-    return std::string("CPU (Threading Building Blocks)");
+    char buf[256];
+    snprintf(buf, sizeof(buf), "CPU (Intel TBB, %d threads)", num_tbb_threads);
+    return std::string(buf);
 }
+
 #endif
 
 firepony_pipeline *firepony_pipeline::create(target_system system)
@@ -159,6 +165,9 @@ firepony_pipeline *firepony_pipeline::create(target_system system)
 
 #if ENABLE_TBB_BACKEND
     case firepony::intel_tbb:
+        // reserve one thread for I/O
+        num_tbb_threads = tbb::task_scheduler_init::default_num_threads() - 1;
+        tbb_scheduler_init.initialize(num_tbb_threads);
         return new firepony_device_pipeline<firepony::intel_tbb>();
 #endif
 

@@ -132,7 +132,7 @@ std::string firepony_device_pipeline<firepony::omp>::get_name(void)
 
 #if ENABLE_TBB_BACKEND
 template<>
-std::string firepony_device_pipeline<firepony::tbb>::get_name(void)
+std::string firepony_device_pipeline<firepony::intel_tbb>::get_name(void)
 {
     return std::string("CPU (Threading Building Blocks)");
 }
@@ -158,8 +158,8 @@ firepony_pipeline *firepony_pipeline::create(target_system system)
 #endif
 
 #if ENABLE_TBB_BACKEND
-    case firepony::tbb:
-        return new firepony_device_pipeline<firepony::tbb>();
+    case firepony::intel_tbb:
+        return new firepony_device_pipeline<firepony::intel_tbb>();
 #endif
 
     default:

@@ -72,7 +72,7 @@ enum target_system
     omp,
 #endif
 #if ENABLE_TBB_BACKEND
-    tbb,
+    intel_tbb,
 #endif
 };
 
@@ -152,13 +152,13 @@ struct backend_policy<omp>
 // threading building blocks backend
 #if ENABLE_TBB_BACKEND
 template <typename T>
-struct backend_vector_type<tbb, T>
+struct backend_vector_type<intel_tbb, T>
 {
     typedef thrust::system::tbb::vector<T> vector_type;
 };
 
 template <>
-struct backend_policy<tbb>
+struct backend_policy<intel_tbb>
 {
     static inline decltype(thrust::tbb::par)& execution_policy(void)
     {
@@ -196,8 +196,8 @@ struct backend_policy<tbb>
 #endif
 
 #if ENABLE_TBB_BACKEND
-#define __FUNC_TBB(fun) auto *ptr_TBB= fun<firepony::tbb>;
-#define __METHOD_TBB(base, method) auto ptr_TBB = &base<firepony::tbb>::method;
+#define __FUNC_TBB(fun) auto *ptr_TBB= fun<firepony::intel_tbb>;
+#define __METHOD_TBB(base, method) auto ptr_TBB = &base<firepony::intel_tbb>::method;
 #else
 #define __FUNC_TBB(fun) ;
 #define __METHOD_TBB(base, method) ;

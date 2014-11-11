@@ -7,6 +7,10 @@ option(USE_SYSTEM_BOOST
        "Use the system-wide installed version of Boost"
        ON)
 
+option(USE_EXTERNAL_THRUST
+       "Build using Thrust from Github (do not use the CUDA toolkit version)"
+       OFF)
+
 option(ENABLE_CUDA_BACKEND
        "Enable the GPU-accelerated CUDA backend"
        ON)
@@ -47,6 +51,24 @@ endif()
 # grab gcc flags
 include("gcc.cmake")
 
+# build dependencies
+if (NOT USE_SYSTEM_BOOST)
+    include("contrib/boost.cmake")
+endif()
+
+if (USE_EXTERNAL_THRUST)
+    include("contrib/thrust.cmake")
+endif()
+
+include("contrib/gamgee.cmake")
+include("contrib/zlib.cmake")
+include("contrib/cub.cmake")
+
+if (ENABLE_TBB_BACKEND)
+    include("contrib/tbb.cmake")
+    set(SYSTEM_LINK_LIBRARIES ${SYSTEM_LINK_LIBRARIES} ${tbb_LIB})
+endif()
+
 # locate required packages
 # CUDA 7.0 is required to build
 find_package(CUDA 7.0 REQUIRED)
@@ -54,6 +76,12 @@ find_package(CUDA 7.0 REQUIRED)
 set(CUDA_NVCC_FLAGS "-std=c++11")
 # build for Kepler
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} --gpu-architecture=sm_35 -use_fast_math)
+
+if (USE_EXTERNAL_THRUST)
+    # inject our Thrust include path to override the CUDA toolkit include path
+    # (this is a bit of a hack)
+    set(CUDA_INCLUDE_DIRS ${thrust_INCLUDE} -I${CUDA_INCLUDE_DIRS})
+endif()
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -74,20 +102,6 @@ else()
 endif()
 
 include_directories(${CMAKE_SOURCE_DIR})
-
-# build dependencies
-if (NOT USE_SYSTEM_BOOST)
-    include("contrib/boost.cmake")
-endif()
-
-include("contrib/gamgee.cmake")
-include("contrib/zlib.cmake")
-include("contrib/cub.cmake")
-
-if (ENABLE_TBB_BACKEND)
-    include("contrib/tbb.cmake")
-    set(SYSTEM_LINK_LIBRARIES ${SYSTEM_LINK_LIBRARIES} ${tbb_LIB})
-endif()
 
 add_subdirectory(device)
 
@@ -111,8 +125,10 @@ set(firepony_common_sources
 cuda_add_library(firepony-common ${firepony_common_sources})
 add_dependencies(firepony-common gamgee zlib)
 if (ENABLE_TBB)
-    # xxxnsubtil: this should really not be necessary, but we pull in tbb headers for firepony-common
     add_dependencies(firepony-common tbb)
+endif()
+if (USE_EXTERNAL_THRUST)
+    add_dependencies(firepony-common thrust)
 endif()
 
 cuda_add_executable(firepony firepony.cu)

@@ -124,7 +124,7 @@ set(firepony_common_sources
 
 cuda_add_library(firepony-common ${firepony_common_sources})
 add_dependencies(firepony-common gamgee zlib)
-if (ENABLE_TBB)
+if (ENABLE_TBB_BACKEND)
     add_dependencies(firepony-common tbb)
 endif()
 if (USE_EXTERNAL_THRUST)

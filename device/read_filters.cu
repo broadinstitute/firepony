@@ -311,14 +311,13 @@ void filter_invalid_reads(firepony_context<system>& context, const alignment_bat
         pingpong.swap();
     }
 
+    pingpong.source().resize(num_active);
+
     // copy back into active_read_list if needed
-    if (&(pingpong.source()) != &active_read_list)
+    if (pingpong.is_swapped())
     {
         active_read_list = pingpong.source();
     }
-
-    // resize active_read_list
-    active_read_list.resize(num_active);
 
     // track how many reads we filtered
     context.stats.filtered_reads += start_count - num_active;
@@ -344,25 +343,17 @@ void filter_malformed_reads(firepony_context<system>& context, const alignment_b
     // make sure the temp buffer is big enough
     context.temp_u32.resize(active_read_list.size());
 
-    // set up a ping-pong queue between active_read_list and temp_u32
-    auto pingpong = make_pingpong_queue(active_read_list, temp_u32);
-
     // apply the malformed read filter
-    num_active = parallel<system>::copy_if(pingpong.source().begin(),
+    // this copies from active_read_list into temp_u32
+    num_active = parallel<system>::copy_if(active_read_list.begin(),
                                            num_active,
-                                           pingpong.dest().begin(),
+                                           temp_u32.begin(),
                                            malformed_read_filter,
                                            context.temp_storage);
-    pingpong.swap();
 
-    // copy back into active_read_list if needed
-    if (&(pingpong.source()) != &active_read_list)
-    {
-        active_read_list = pingpong.source();
-    }
-
-    // resize active_read_list
-    active_read_list.resize(num_active);
+    // resize and copy back to active_read_list
+    temp_u32.resize(num_active);
+    active_read_list = temp_u32;
 
     // track how many reads we filtered
     context.stats.filtered_reads += start_count - num_active;

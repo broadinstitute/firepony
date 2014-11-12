@@ -36,17 +36,22 @@ struct pingpong_queue
 
     V& source(void)
     {
-        return (which ? a : b);
+        return (which ? b : a);
     }
 
     V& dest(void)
     {
-        return (which ? b : a);
+        return (which ? a : b);
     }
 
     void swap(void)
     {
         which ^= 1;
+    }
+
+    bool is_swapped(void)
+    {
+        return (which != 0);
     }
 };
 

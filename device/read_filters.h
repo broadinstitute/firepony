@@ -22,7 +22,8 @@
 
 namespace firepony {
 
-template <target_system system> void filter_reads(firepony_context<system>& context, const alignment_batch<system>& batch);
+template <target_system system> void filter_invalid_reads(firepony_context<system>& context, const alignment_batch<system>& batch);
+template <target_system system> void filter_malformed_reads(firepony_context<system>& context, const alignment_batch<system>& batch);
 template <target_system system> void filter_bases(firepony_context<system>& context, const alignment_batch<system>& batch);
 
 } // namespace firepony

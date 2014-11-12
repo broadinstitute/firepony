@@ -22,6 +22,40 @@
 
 namespace firepony {
 
+// implements a pingpong queue between two objects
+template <typename V>
+struct pingpong_queue
+{
+    V& a;
+    V& b;
+    uint8 which;
+
+    pingpong_queue(V& source, V& dest)
+        : a(source), b(dest), which(0)
+    { }
+
+    V& source(void)
+    {
+        return (which ? a : b);
+    }
+
+    V& dest(void)
+    {
+        return (which ? b : a);
+    }
+
+    void swap(void)
+    {
+        which ^= 1;
+    }
+};
+
+template <typename V>
+static pingpong_queue<V> make_pingpong_queue(V& source, V& dest)
+{
+    return pingpong_queue<V>(source, dest);
+}
+
 // prepare temp_storage to store num_elements to be packed into a bit vector
 template <target_system system> void pack_prepare_storage_2bit(d_vector_u8<system>& storage, uint32 num_elements);
 template <target_system system> void pack_prepare_storage_1bit(d_vector_u8<system>& storage, uint32 num_elements);

@@ -55,43 +55,53 @@ void firepony_process_batch(firepony_context<system>& context, const alignment_b
 
     read_filter.start();
 
-    // build read offset and alignment window list (required by read filters)
-    build_read_offset_list(context, batch);
-    build_alignment_windows(context, batch);
-    // apply read filters
-    filter_reads(context, batch);
+    // filter out invalid reads
+    filter_invalid_reads(context, batch);
+
+    if (context.active_read_list.size() > 0)
+    {
+        // build read offset and alignment window list (required by read filters)
+        build_read_offset_list(context, batch);
+        build_alignment_windows(context, batch);
+
+        // filter malformed reads (uses the alignment windows)
+        filter_malformed_reads(context, batch);
+    }
 
     read_filter.stop();
 
-    // generate cigar events and coordinates
-    // this will generate -1 read indices for events belonging to inactive reads, so it must happen after read filtering
-    cigar_expansion.start();
-    expand_cigars(context, batch);
-    cigar_expansion.stop();
+    if (context.active_read_list.size() > 0)
+    {
+        // generate cigar events and coordinates
+        // this will generate -1 read indices for events belonging to inactive reads, so it must happen after read filtering
+        cigar_expansion.start();
+        expand_cigars(context, batch);
+        cigar_expansion.stop();
 
-    // apply per-BP filters
-    bp_filter.start();
-    filter_bases(context, batch);
-    bp_filter.stop();
+        // apply per-BP filters
+        bp_filter.start();
+        filter_bases(context, batch);
+        bp_filter.stop();
 
-    // filter known SNPs from active_loc_list
-    snp_filter.start();
-    filter_known_snps(context, batch);
-    snp_filter.stop();
+        // filter known SNPs from active_loc_list
+        snp_filter.start();
+        filter_known_snps(context, batch);
+        snp_filter.stop();
 
-    // compute the base alignment quality for each read
-    baq.start();
-    baq_reads(context, batch);
-    baq.stop();
+        // compute the base alignment quality for each read
+        baq.start();
+        baq_reads(context, batch);
+        baq.stop();
 
-    fractional_error.start();
-    build_fractional_error_arrays(context, batch);
-    fractional_error.stop();
+        fractional_error.start();
+        build_fractional_error_arrays(context, batch);
+        fractional_error.stop();
 
-    // build covariate tables
-    covariates.start();
-    gather_covariates(context, batch);
-    covariates.stop();
+        // build covariate tables
+        covariates.start();
+        gather_covariates(context, batch);
+        covariates.stop();
+    }
 
     if (context.options.debug)
     {
@@ -110,12 +120,16 @@ void firepony_process_batch(firepony_context<system>& context, const alignment_b
     }
 
     context.stats.read_filter.add(read_filter);
-    context.stats.cigar_expansion.add(cigar_expansion);
-    context.stats.bp_filter.add(bp_filter);
-    context.stats.snp_filter.add(snp_filter);
-    context.stats.baq.add(baq);
-    context.stats.fractional_error.add(fractional_error);
-    context.stats.covariates.add(covariates);
+
+    if (context.active_read_list.size() > 0)
+    {
+        context.stats.cigar_expansion.add(cigar_expansion);
+        context.stats.bp_filter.add(bp_filter);
+        context.stats.snp_filter.add(snp_filter);
+        context.stats.baq.add(baq);
+        context.stats.fractional_error.add(fractional_error);
+        context.stats.covariates.add(covariates);
+    }
 }
 INSTANTIATE(firepony_process_batch);
 

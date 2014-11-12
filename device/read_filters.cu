@@ -24,6 +24,7 @@
 #include "firepony_context.h"
 #include "alignment_data_device.h"
 #include "read_filters.h"
+#include "util.h"
 
 namespace firepony {
 
@@ -64,7 +65,7 @@ struct filter_mapq : public lambda<system>
 
 // partially implements the GATK MalformedReadFilter
 template <target_system system>
-struct filter_malformed_reads : public lambda<system>
+struct filter_if_read_malformed : public lambda<system>
 {
     LAMBDA_INHERIT;
 
@@ -142,7 +143,7 @@ struct filter_malformed_reads : public lambda<system>
 
 // implements another part of the GATK MalformedReadFilter
 template <target_system system>
-struct filter_malformed_cigars : public lambda<system>
+struct filter_if_cigar_malformed : public lambda<system>
 {
     LAMBDA_INHERIT;
 
@@ -244,14 +245,18 @@ struct filter_malformed_cigars : public lambda<system>
     }
 };
 
-// apply read filters to the batch
+// filter invalid reads
+// (this runs prior to any other pieces of the context being populated)
 template <target_system system>
-void filter_reads(firepony_context<system>& context, const alignment_batch<system>& batch)
+void filter_invalid_reads(firepony_context<system>& context, const alignment_batch<system>& batch)
 {
     auto& active_read_list = context.active_read_list;
     auto& temp_u32 = context.temp_u32;
     uint32 num_active;
     uint32 start_count;
+
+    // corresponds to the GATK filters MappingQualityUnavailable and MappingQualityZero
+    filter_mapq<system> mapq_filter(context, batch.device);
 
     // this filter corresponds to the following GATK filters:
     // - DuplicateReadFilter
@@ -264,11 +269,8 @@ void filter_reads(firepony_context<system>& context, const alignment_batch<syste
                       AlignmentFlags::UNMAP |
                       AlignmentFlags::SECONDARY> flags_filter(context, batch.device);
 
-    // corresponds to the GATK filters MappingQualityUnavailable and MappingQualityZero
-    filter_mapq<system> mapq_filter(context, batch.device);
-    // corresponds to the GATK filter MalformedReadFilter
-    filter_malformed_reads<system> malformed_read_filter(context, batch.device);
-    filter_malformed_cigars<system> malformed_cigar_filter(context, batch.device);
+    // implements part of the GATK filter MalformedReadFilter
+    filter_if_cigar_malformed<system> malformed_cigar_filter(context, batch.device);
 
     start_count = active_read_list.size();
     num_active = active_read_list.size();
@@ -276,33 +278,44 @@ void filter_reads(firepony_context<system>& context, const alignment_batch<syste
     // make sure the temp buffer is big enough
     context.temp_u32.resize(active_read_list.size());
 
-    // apply the mapq filter, copying from active_read_list into temp_u32
-    num_active = parallel<system>::copy_if(active_read_list.begin(),
+    // set up a ping-pong queue between active_read_list and temp_u32
+    auto pingpong = make_pingpong_queue(active_read_list, temp_u32);
+
+    // apply the mapq filter
+    num_active = parallel<system>::copy_if(pingpong.source().begin(),
                                            num_active,
-                                           temp_u32.begin(),
+                                           pingpong.dest().begin(),
                                            mapq_filter,
                                            context.temp_storage);
+    pingpong.swap();
 
-    // apply the flags filters, copying from temp_u32 into active_read_list
-    num_active = parallel<system>::copy_if(temp_u32.begin(),
-                                           num_active,
-                                           active_read_list.begin(),
-                                           flags_filter,
-                                           context.temp_storage);
+    if (num_active)
+    {
+        // apply the flags filters
+        num_active = parallel<system>::copy_if(pingpong.source().begin(),
+                                               num_active,
+                                               pingpong.dest().begin(),
+                                               flags_filter,
+                                               context.temp_storage);
+        pingpong.swap();
+    }
 
-    // apply the malformed read filters, copying from active_read_list into temp_u32
-    num_active = parallel<system>::copy_if(active_read_list.begin(),
-                                           num_active,
-                                           temp_u32.begin(),
-                                           malformed_read_filter,
-                                           context.temp_storage);
+    if (num_active)
+    {
+        // apply the malformed cigar filters
+        num_active = parallel<system>::copy_if(pingpong.source().begin(),
+                                               num_active,
+                                               pingpong.dest().begin(),
+                                               malformed_cigar_filter,
+                                               context.temp_storage);
+        pingpong.swap();
+    }
 
-    // apply the malformed cigar filters, copying from temp_u32 into active_read_list
-    num_active = parallel<system>::copy_if(temp_u32.begin(),
-                                           num_active,
-                                           active_read_list.begin(),
-                                           malformed_cigar_filter,
-                                           context.temp_storage);
+    // copy back into active_read_list if needed
+    if (&(pingpong.source()) != &active_read_list)
+    {
+        active_read_list = pingpong.source();
+    }
 
     // resize active_read_list
     active_read_list.resize(num_active);
@@ -310,7 +323,51 @@ void filter_reads(firepony_context<system>& context, const alignment_batch<syste
     // track how many reads we filtered
     context.stats.filtered_reads += start_count - num_active;
 }
-INSTANTIATE(filter_reads);
+INSTANTIATE(filter_invalid_reads);
+
+// filter invalid reads
+// (this runs prior to any other pieces of the context being populated)
+template <target_system system>
+void filter_malformed_reads(firepony_context<system>& context, const alignment_batch<system>& batch)
+{
+    auto& active_read_list = context.active_read_list;
+    auto& temp_u32 = context.temp_u32;
+    uint32 num_active;
+    uint32 start_count;
+
+    // implements part of the GATK filter MalformedReadFilter
+    filter_if_read_malformed<system> malformed_read_filter(context, batch.device);
+
+    start_count = active_read_list.size();
+    num_active = active_read_list.size();
+
+    // make sure the temp buffer is big enough
+    context.temp_u32.resize(active_read_list.size());
+
+    // set up a ping-pong queue between active_read_list and temp_u32
+    auto pingpong = make_pingpong_queue(active_read_list, temp_u32);
+
+    // apply the malformed read filter
+    num_active = parallel<system>::copy_if(pingpong.source().begin(),
+                                           num_active,
+                                           pingpong.dest().begin(),
+                                           malformed_read_filter,
+                                           context.temp_storage);
+    pingpong.swap();
+
+    // copy back into active_read_list if needed
+    if (&(pingpong.source()) != &active_read_list)
+    {
+        active_read_list = pingpong.source();
+    }
+
+    // resize active_read_list
+    active_read_list.resize(num_active);
+
+    // track how many reads we filtered
+    context.stats.filtered_reads += start_count - num_active;
+}
+INSTANTIATE(filter_malformed_reads);
 
 // filter non-regular bases (anything other than A, C, G, T)
 template <target_system system>

@@ -10,6 +10,7 @@ covariates.h
 covariates.cu
 empirical_quality.cu
 empirical_quality.h
+expected_error.h
 firepony_context.cu
 firepony_context.h
 fractional_errors.cu

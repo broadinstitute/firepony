@@ -23,43 +23,24 @@
 
 #include "primitives/parallel.h"
 #include "covariates/packer_quality_score.h"
+#include "expected_error.h"
 
 #include <thrust/reduce.h>
 
 namespace firepony {
 
 template <target_system system>
-struct generate_read_group_table : public lambda_context<system>
+struct remove_quality_from_key : public lambda_context<system>
 {
     LAMBDA_CONTEXT_INHERIT;
 
-    CUDA_HOST_DEVICE double qualToErrorProb(uint8 qual)
-    {
-        return pow(10.0, qual / -10.0);
-    }
-
-    CUDA_HOST_DEVICE double calcExpectedErrors(const covariate_empirical_value& val, uint8 qual)
-    {
-        return val.observations * qualToErrorProb(qual);
-    }
-
     CUDA_HOST_DEVICE void operator() (const uint32 index)
     {
-        typedef covariate_packer_quality_score<system> packer;
-
         auto& rg = ctx.read_group_table.read_group_table;
-
         auto& key = rg.keys[index];
-        auto& value = rg.values[index];
-
-        // decode the quality
-        const auto qual = packer::decode(key, packer::QualityScore);
 
         // remove the quality from the key
-        key &= ~packer::chain::key_mask(packer::QualityScore);
-
-        // compute the expected error rate
-        value.expected_errors = calcExpectedErrors(value, qual);
+        key &= ~covariate_packer_quality_score<system>::chain::key_mask(covariate_packer_quality_score<system>::QualityScore);
     }
 };
 
@@ -77,10 +58,13 @@ void build_read_group_table(firepony_context<system>& context)
 
     // convert the quality table into the read group table
     covariate_observation_to_empirical_table(context, cv.quality, rg);
-    // transform the read group table in place to remove the quality value from the keys and compute the estimated error
+    // compute the expected error for each entry
+    compute_expected_error<system, covariate_packer_quality_score<system> >(context, rg);
+
+    // transform the read group table in place to remove the quality value from the key
     parallel<system>::for_each(thrust::make_counting_iterator(0u),
                                thrust::make_counting_iterator(0u) + cv.quality.size(),
-                               generate_read_group_table<system>(context));
+                               remove_quality_from_key<system>(context));
 
     // sort and pack the read group table
     auto& temp_keys = context.temp_u32;
@@ -90,6 +74,7 @@ void build_read_group_table(firepony_context<system>& context)
     rg.sort(temp_keys, temp_values, temp_storage, covariate_packer_quality_score<system>::chain::bits_used);
     rg.pack(temp_keys, temp_values);
 
+    // finally compute the empirical quality for this table
     compute_empirical_quality(context, rg);
 }
 INSTANTIATE(build_read_group_table);

@@ -21,6 +21,8 @@ ExternalProject_Add(gamgee
                -DINSTALL_DEPENDENCIES=ON
                -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
                -DCMAKE_INSTALL_PREFIX=${gamgee_INSTALL_PREFIX}
+    LOG_DOWNLOAD 1
+    LOG_INSTALL 1
     )
 
 include_directories(${gamgee_INSTALL_PREFIX}/include)

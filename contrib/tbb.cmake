@@ -12,6 +12,7 @@ ExternalProject_Add(tbb
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ${MAKE}
     INSTALL_COMMAND ${PROJECT_SOURCE_DIR}/contrib/tbb-install.sh ${tbb_SRC} ${tbb_INSTALL}
+    LOG_DOWNLOAD 1
     )
 
 include_directories(${tbb_INSTALL}/include)

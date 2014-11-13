@@ -8,6 +8,7 @@ ExternalProject_Add(thrust
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ""
     INSTALL_COMMAND ""
+    LOG_DOWNLOAD 1
     )
 
 set(thrust_INCLUDE ${thrust_PREFIX}/src/thrust)

@@ -6,6 +6,7 @@ ExternalProject_Add(cub
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ""
     INSTALL_COMMAND ""
+    LOG_DOWNLOAD 1
     )
 
 include_directories(${cub_PREFIX}/src/cub)

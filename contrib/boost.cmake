@@ -30,6 +30,8 @@ ExternalProject_Add(boost
         --without-python
 
     INSTALL_DIR ${Boost_INSTALL_PREFIX}
+
+    LOG_DOWNLOAD 1
 )
 
 # update the boost prefix with the actual root of the source tree

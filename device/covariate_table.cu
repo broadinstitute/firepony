@@ -100,4 +100,33 @@ void covariate_table<system, covariate_value>::pack(vector<system, covariate_key
 METHOD_INSTANTIATE(covariate_observation_table, pack);
 METHOD_INSTANTIATE(covariate_empirical_table, pack);
 
+struct convert_observation_to_empirical
+{
+    CUDA_HOST_DEVICE covariate_empirical_value operator() (const covariate_observation_value& in)
+    {
+        return { in.observations,
+                 in.mismatches,
+                 0.0,
+                 0.0,
+                 0.0 };
+   }
+};
+
+template <target_system system>
+void covariate_observation_to_empirical_table(firepony_context<system>& context,
+                                              const covariate_observation_table<system>& observation_table,
+                                              covariate_empirical_table<system>& empirical_table)
+{
+    // resize the output table
+    empirical_table.resize(observation_table.size());
+    // copy the keys
+    empirical_table.keys = observation_table.keys;
+    // transform the values
+    thrust::transform(observation_table.values.begin(),
+                      observation_table.values.end(),
+                      empirical_table.values.begin(),
+                      convert_observation_to_empirical());
+}
+INSTANTIATE(covariate_observation_to_empirical_table);
+
 } // namespace firepony

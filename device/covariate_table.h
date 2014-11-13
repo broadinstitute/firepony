@@ -108,4 +108,8 @@ struct covariate_table
 template <target_system system> using covariate_observation_table = covariate_table<system, covariate_observation_value>;
 template <target_system system> using covariate_empirical_table = covariate_table<system, covariate_empirical_value>;
 
+template <target_system system> void covariate_observation_to_empirical_table(firepony_context<system>& context,
+                                                                              const covariate_observation_table<system>& observation_table,
+                                                                              covariate_empirical_table<system>& empirical_table);
+
 } // namespace firepony

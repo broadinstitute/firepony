@@ -9,7 +9,7 @@ option(USE_SYSTEM_BOOST
 
 option(USE_EXTERNAL_THRUST
        "Build using Thrust from Github (do not use the CUDA toolkit version)"
-       OFF)
+       ON)
 
 option(ENABLE_CUDA_BACKEND
        "Enable the GPU-accelerated CUDA backend"

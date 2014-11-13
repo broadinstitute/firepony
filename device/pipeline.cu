@@ -38,7 +38,7 @@
 namespace firepony {
 
 template <target_system system>
-void debug_read(firepony_context<system>& context, const alignment_batch<system>& batch, int read_id);
+void debug_read(firepony_context<system>& context, const alignment_batch<system>& batch, uint32 read_id);
 
 template <target_system system>
 void firepony_process_batch(firepony_context<system>& context, const alignment_batch<system>& batch)
@@ -159,14 +159,14 @@ void firepony_postprocess(firepony_context<system>& context)
 INSTANTIATE(firepony_postprocess);
 
 template <target_system system>
-void debug_read(firepony_context<system>& context, const alignment_batch<system>& batch, int read_id)
+void debug_read(firepony_context<system>& context, const alignment_batch<system>& batch, uint32 read_id)
 {
     const alignment_batch_host& h_batch = *batch.host;
 
     const uint32 read_index = context.active_read_list[read_id];
     const CRQ_index idx = h_batch.crq_index(read_index);
 
-    fprintf(stderr, "== read %d\n", context.stats.total_reads + read_id);
+    fprintf(stderr, "== read %lu\n", context.stats.total_reads + read_id);
 
     fprintf(stderr, "name = [%s]\n", h_batch.name[read_index].c_str());
 

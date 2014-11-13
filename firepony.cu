@@ -183,12 +183,12 @@ int main(int argc, char **argv)
 
     auto& stats = pipeline->get_statistics();
 
-    fprintf(stderr, "%d reads filtered out of %d (%f%%)\n",
+    fprintf(stderr, "%lu reads filtered out of %lu (%f%%)\n",
             stats.filtered_reads,
             stats.total_reads,
             float(stats.filtered_reads) / float(stats.total_reads) * 100.0);
 
-    fprintf(stderr, "computed base alignment quality for %d reads out of %d (%f%%)\n",
+    fprintf(stderr, "computed base alignment quality for %lu reads out of %lu (%f%%)\n",
             stats.baq_reads,
             stats.total_reads - stats.filtered_reads,
             float(stats.baq_reads) / float(stats.total_reads - stats.filtered_reads) * 100.0);

@@ -38,9 +38,9 @@ namespace firepony {
 
 struct pipeline_statistics // host-only
 {
-    uint32 total_reads;        // total number of reads processed
-    uint32 filtered_reads;     // number of reads filtered out in pre-processing
-    uint32 baq_reads;          // number of reads for which BAQ was computed
+    uint64 total_reads;        // total number of reads processed
+    uint64 filtered_reads;     // number of reads filtered out in pre-processing
+    uint64 baq_reads;          // number of reads for which BAQ was computed
 
     time_series io;
     time_series read_filter;

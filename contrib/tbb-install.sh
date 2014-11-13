@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -e
 
 tbb_SRC=$1
 tbb_INSTALL=$2

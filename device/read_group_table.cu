@@ -38,40 +38,28 @@ struct generate_read_group_table : public lambda_context<system>
         return pow(10.0, qual / -10.0);
     }
 
-    CUDA_HOST_DEVICE double calcExpectedErrors(const covariate_observation_value& val, uint8 qual)
+    CUDA_HOST_DEVICE double calcExpectedErrors(const covariate_empirical_value& val, uint8 qual)
     {
         return val.observations * qualToErrorProb(qual);
     }
 
     CUDA_HOST_DEVICE void operator() (const uint32 index)
     {
-        const auto& key_in = ctx.covariates.quality.keys[index];
-        const auto& value_in = ctx.covariates.quality.values[index];
-        const auto qual = covariate_packer_quality_score<system>::decode(key_in,
-                                                                         covariate_packer_quality_score<system>::QualityScore);
+        typedef covariate_packer_quality_score<system> packer;
 
-        auto& key_out = ctx.read_group_table.read_group_keys[index];
-        auto& value_out = ctx.read_group_table.read_group_values[index];
+        auto& rg = ctx.read_group_table.read_group_table;
+
+        auto& key = rg.keys[index];
+        auto& value = rg.values[index];
+
+        // decode the quality
+        const auto qual = packer::decode(key, packer::QualityScore);
 
         // remove the quality from the key
-        key_out = key_in & ~covariate_packer_quality_score<system>::chain::key_mask(covariate_packer_quality_score<system>::QualityScore);
+        key &= ~packer::chain::key_mask(packer::QualityScore);
 
-        value_out.observations = value_in.observations;
-        value_out.mismatches = value_in.mismatches;
-
-        value_out.expected_errors = calcExpectedErrors(value_in, qual);
-    }
-};
-
-struct covariate_empirical_value_sum
-{
-    CUDA_HOST_DEVICE covariate_empirical_value operator() (const covariate_empirical_value& a, const covariate_empirical_value& b)
-    {
-        return { a.observations + b.observations,
-                 a.mismatches + b.mismatches,
-                 a.expected_errors + b.expected_errors,
-                 0.0f,
-                 0.0f };
+        // compute the expected error rate
+        value.expected_errors = calcExpectedErrors(value, qual);
     }
 };
 
@@ -204,7 +192,7 @@ struct covariate_compute_empirical_quality : public lambda_context<system>
 
     CUDA_HOST_DEVICE void operator() (const uint32 index)
     {
-        covariate_empirical_value& val = ctx.read_group_table.read_group_values[index];
+        covariate_empirical_value& val = ctx.read_group_table.read_group_table.values[index];
 
         val.estimated_quality = double(-10.0 * log10(val.expected_errors / double(val.observations)));
         val.empirical_quality = calcEmpiricalQuality(val);
@@ -215,10 +203,7 @@ template <target_system system>
 void build_read_group_table(firepony_context<system>& context)
 {
     const auto& cv = context.covariates;
-    auto& rg = context.read_group_table;
-
-    auto& rg_keys = rg.read_group_keys;
-    auto& rg_values = rg.read_group_values;
+    auto& rg = context.read_group_table.read_group_table;
 
     if (cv.quality.size() == 0)
     {
@@ -227,46 +212,23 @@ void build_read_group_table(firepony_context<system>& context)
     }
 
     // convert the quality table into the read group table
-    rg_keys.resize(cv.quality.size());
-    rg_values.resize(cv.quality.size());
+    covariate_observation_to_empirical_table(context, cv.quality, rg);
+    // transform the read group table in place to remove the quality value from the keys and compute the estimated error
     parallel<system>::for_each(thrust::make_counting_iterator(0u),
                                thrust::make_counting_iterator(0u) + cv.quality.size(),
                                generate_read_group_table<system>(context));
 
+    // sort and pack the read group table
     auto& temp_keys = context.temp_u32;
     firepony::vector<system, covariate_empirical_value> temp_values;
     auto& temp_storage = context.temp_storage;
 
-    temp_keys.resize(rg_keys.size());
-    temp_values.resize(rg_keys.size());
-
-    parallel<system>::sort_by_key(rg_keys,
-                                  rg_values,
-                                  temp_keys,
-                                  temp_values,
-                                  temp_storage,
-                                  covariate_packer_quality_score<system>::chain::bits_used);
-
-    // reduce the read group table by key
-    auto out = thrust::reduce_by_key(rg_keys.begin(),
-                                     rg_keys.end(),
-                                     rg_values.begin(),
-                                     temp_keys.begin(),
-                                     temp_values.begin(),
-                                     thrust::equal_to<covariate_key>(),
-                                     covariate_empirical_value_sum());
-
-    uint32 new_size = out.first - temp_keys.begin();
-
-    temp_keys.resize(new_size);
-    temp_values.resize(new_size);
-
-    rg_keys = temp_keys;
-    rg_values = temp_values;
+    rg.sort(temp_keys, temp_values, temp_storage, covariate_packer_quality_score<system>::chain::bits_used);
+    rg.pack(temp_keys, temp_values);
 
     // compute empirical qualities
     parallel<system>::for_each(thrust::make_counting_iterator(0u),
-                               thrust::make_counting_iterator(0u) + new_size,
+                               thrust::make_counting_iterator(0u) + rg.size(),
                                covariate_compute_empirical_quality<system>(context));
 }
 INSTANTIATE(build_read_group_table);
@@ -274,26 +236,26 @@ INSTANTIATE(build_read_group_table);
 template <target_system system>
 void output_read_group_table(firepony_context<system>& context)
 {
-    auto& rg = context.read_group_table;
-    auto& rg_keys = rg.read_group_keys;
-    auto& rg_values = rg.read_group_values;
+    typedef covariate_packer_quality_score<system> packer;
+
+    covariate_empirical_table<host> table;
+    table.copyfrom(context.read_group_table.read_group_table);
 
     printf("#:GATKTable:6:3:%%s:%%s:%%.4f:%%.4f:%%d:%%.2f:;\n");
     printf("#:GATKTable:RecalTable0:\n");
     printf("ReadGroup\tEventType\tEmpiricalQuality\tEstimatedQReported\tObservations\tErrors\n");
 
-    for(uint32 i = 0; i < rg_keys.size(); i++)
+    for(uint32 i = 0; i < table.size(); i++)
     {
-        uint32 rg_id = covariate_packer_quality_score<system>::decode(rg_keys[i],
-                                                                      covariate_packer_quality_score<system>::ReadGroup);
+        uint32 rg_id = packer::decode(table.keys[i], packer::ReadGroup);
         const std::string& rg_name = context.bam_header.host.read_groups_db.lookup(rg_id);
 
-        covariate_empirical_value val = rg_values[i];
+        covariate_empirical_value val = table.values[i];
 
         // ReadGroup, EventType, EmpiricalQuality, EstimatedQReported, Observations, Errors
         printf("%s\t%c\t\t%.4f\t\t\t%.4f\t\t\t%d\t\t%.2f\n",
                 rg_name.c_str(),
-                cigar_event::ascii(covariate_packer_quality_score<system>::decode(rg_keys[i], covariate_packer_quality_score<system>::EventTracker)),
+                cigar_event::ascii(packer::decode(table.keys[i], packer::EventTracker)),
                 round_n(val.empirical_quality, 4),
                 round_n(val.estimated_quality, 4),
                 val.observations,

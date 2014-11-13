@@ -26,20 +26,17 @@ namespace firepony {
 template <target_system system>
 struct read_group_table_context
 {
-    firepony::vector<system, covariate_key> read_group_keys;
-    firepony::vector<system, covariate_empirical_value> read_group_values;
+    covariate_empirical_table<system> read_group_table;
 
     struct view
     {
-        typename firepony::vector<system, covariate_key>::view read_group_keys;
-        typename firepony::vector<system, covariate_empirical_value>::view read_group_values;
+        typename covariate_empirical_table<system>::view read_group_table;
     };
 
     operator view()
     {
         view v = {
-            read_group_keys,
-            read_group_values,
+            read_group_table,
         };
 
         return v;

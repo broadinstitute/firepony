@@ -136,7 +136,6 @@ static void build_covariates_table(d_covariate_table<system>& table, firepony_co
 
     // set up a scratch table space with enough room for 3 keys per cigar event
     scratch_table.resize(context.cigar.cigar_events.size() * 3);
-    table.resize(context.cigar.cigar_events.size() * 3);
     flags.resize(context.cigar.cigar_events.size() * 3);
 
     // mark all keys as invalid
@@ -146,8 +145,8 @@ static void build_covariates_table(d_covariate_table<system>& table, firepony_co
 
     // generate keys into the scratch table
     parallel<system>::for_each(thrust::make_counting_iterator(0u),
-                     thrust::make_counting_iterator(0u) + context.cigar.cigar_event_read_coordinates.size(),
-                     covariate_gatherer<system, covariate_table>(context, batch.device));
+                               thrust::make_counting_iterator(0u) + context.cigar.cigar_event_read_coordinates.size(),
+                               covariate_gatherer<system, covariate_table>(context, batch.device));
 
     covariates_gather.stop();
 
@@ -155,8 +154,8 @@ static void build_covariates_table(d_covariate_table<system>& table, firepony_co
 
     // flag valid keys
     parallel<system>::for_each(thrust::make_counting_iterator(0u),
-                     thrust::make_counting_iterator(0u) + cv.scratch_table_space.keys.size(),
-                     flag_valid_keys<system, covariate_table>(context, batch.device, flags));
+                               thrust::make_counting_iterator(0u) + cv.scratch_table_space.keys.size(),
+                               flag_valid_keys<system, covariate_table>(context, batch.device, flags));
 
     // count valid keys
     uint32 valid_keys = thrust::reduce(flags.begin(), flags.end(), uint32(0));
@@ -250,8 +249,8 @@ void gather_covariates(firepony_context<system>& context, const alignment_batch<
     // compute the "high quality" windows (i.e., clip off low quality ends from each read)
     cv.high_quality_window.resize(batch.device.num_reads);
     parallel<system>::for_each(context.active_read_list.begin(),
-                     context.active_read_list.end(),
-                     compute_high_quality_windows<system>(context, batch.device));
+                               context.active_read_list.end(),
+                               compute_high_quality_windows<system>(context, batch.device));
 
     build_covariates_table<covariate_table_quality<system> >(cv.quality, context, batch);
     build_covariates_table<covariate_table_cycle_illumina<system> >(cv.cycle, context, batch);

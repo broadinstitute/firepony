@@ -8,6 +8,8 @@ covariate_table.cu
 covariate_table.h
 covariates.h
 covariates.cu
+empirical_quality.cu
+empirical_quality.h
 firepony_context.cu
 firepony_context.h
 fractional_errors.cu

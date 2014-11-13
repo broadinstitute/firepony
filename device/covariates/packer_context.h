@@ -21,28 +21,46 @@
 #include "bit_packers/read_group.h"
 #include "bit_packers/quality_score.h"
 #include "bit_packers/event_tracker.h"
+#include "bit_packers/context.h"
 
 namespace firepony {
 
-// defines a covariate chain equivalent to GATK's RecalTable1
+// the context portion of GATK's RecalTable2
 template <target_system system>
-struct covariate_table_quality
+struct covariate_packer_context
 {
+    enum {
+        num_bases_mismatch = 2,
+        num_bases_indel = 3,
+
+        // xxxnsubtil: this is duplicated from covariate_Context
+        num_bases_in_context = constexpr_max(num_bases_mismatch, num_bases_indel),
+
+        base_bits = num_bases_in_context * 2,
+        base_bits_mismatch = num_bases_mismatch * 2,
+        base_bits_indel = num_bases_indel * 2,
+
+        length_bits = 4,
+    };
+
     // the type that represents the chain of covariates
     typedef covariate_ReadGroup<system,
              covariate_QualityScore<system,
-              covariate_EventTracker<system> > > chain;
+              covariate_Context<system, num_bases_mismatch, num_bases_indel,
+               covariate_EventTracker<system> > > > chain;
 
     // the index of each covariate in the chain
     // (used when decoding a key)
     // the order is defined by the typedef above
     typedef enum {
-        ReadGroup = 3,
-        QualityScore = 2,
+        ReadGroup = 4,
+        QualityScore = 3,
+        Context = 2,
         EventTracker = 1,
 
-        // target covariate is mostly meaningless for recaltable1
-        TargetCovariate = QualityScore,
+        // defines which covariate is the "target" for this table
+        // used when checking for invalid keys
+        TargetCovariate = Context,
     } CovariateID;
 
     // extract a given covariate value from a key
@@ -51,14 +69,11 @@ struct covariate_table_quality
         return chain::decode(key, id);
     }
 
-    static void dump_table(firepony_context<system>& context, d_covariate_table<system>& d_table)
+    static void dump_table(firepony_context<system>& context, covariate_observation_table<system>& d_table)
     {
-        h_covariate_table table;
+        covariate_observation_table<host> table;
         table.copyfrom(d_table);
 
-        printf("#:GATKTable:6:138:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n");
-        printf("#:GATKTable:RecalTable1:\n");
-        printf("ReadGroup\tQualityScore\tEventType\tEmpiricalQuality\tObservations\tErrors\n");
         for(uint32 i = 0; i < table.size(); i++)
         {
             // skip null entries in the table
@@ -68,15 +83,31 @@ struct covariate_table_quality
             uint32 rg_id = decode(table.keys[i], ReadGroup);
             const std::string& rg_name = context.bam_header.host.read_groups_db.lookup(rg_id);
 
-            printf("%s\t%d\t\t%c\t\t%.4f\t\t\t%d\t\t%.2f\n",
+            // decode the context separately
+            covariate_key raw_context = decode(table.keys[i], Context);
+            int size = (raw_context & BITMASK(length_bits));
+            covariate_key context = raw_context >> length_bits;
+
+            char sequence[size + 1];
+
+            for(int j = 0; j < size; j++)
+            {
+                const int offset = j * 2;
+                sequence[j] = from_nvbio::dna_to_char((context >> offset) & 3);
+            }
+            sequence[size] = 0;
+
+            // ReadGroup, QualityScore, CovariateValue, CovariateName, EventType, EmpiricalQuality, Observations, Errors
+            printf("%s\t%d\t\t%s\t\t%s\t\t%c\t\t%.4f\t\t%d\t\t%.2f\n",
                     rg_name.c_str(),
                     decode(table.keys[i], QualityScore),
+                    sequence,
+                    "Context",
                     cigar_event::ascii(decode(table.keys[i], EventTracker)),
                     round_n(double(decode(table.keys[i], QualityScore)), 4),
                     table.values[i].observations,
                     round_n(table.values[i].mismatches, 2));
         }
-        printf("\n");
     }
 };
 

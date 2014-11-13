@@ -4,9 +4,9 @@ baq.cu
 baq.h
 cigar.cu
 cigar.h
+covariate_table.cu
+covariate_table.h
 covariates.h
-covariates_table.cu
-covariates_table.h
 covariates.cu
 firepony_context.cu
 firepony_context.h
@@ -32,9 +32,9 @@ covariates/bit_packers/cycle_illumina.h
 covariates/bit_packers/event_tracker.h
 covariates/bit_packers/quality_score.h
 covariates/bit_packers/read_group.h
-covariates/table_context.h
-covariates/table_cycle_illumina.h
-covariates/table_quality_scores.h
+covariates/packer_context.h
+covariates/packer_cycle_illumina.h
+covariates/packer_quality_score.h
 
 from_nvbio/alphabet_inl.h
 from_nvbio/alphabet.h

@@ -19,18 +19,9 @@
 #pragma once
 
 #include "device_types.h"
-#include "covariates_table.h"
+#include "covariate_table.h"
 
 namespace firepony {
-
-struct covariate_empirical_value
-{
-    uint32 observations;
-    double mismatches;
-    double expected_errors;
-    double estimated_quality;
-    double empirical_quality;
-};
 
 template <target_system system>
 struct read_group_table_context

@@ -17,12 +17,12 @@
  */
 
 #include "firepony_context.h"
-#include "covariates_table.h"
+#include "covariate_table.h"
 #include "read_group_table.h"
 
 #include "primitives/parallel.h"
 
-#include "covariates/table_quality_scores.h"
+#include "covariates/packer_quality_score.h"
 
 #include <thrust/reduce.h>
 
@@ -38,7 +38,7 @@ struct generate_read_group_table : public lambda_context<system>
         return pow(10.0, qual / -10.0);
     }
 
-    CUDA_HOST_DEVICE double calcExpectedErrors(const covariate_value& val, uint8 qual)
+    CUDA_HOST_DEVICE double calcExpectedErrors(const covariate_observation_value& val, uint8 qual)
     {
         return val.observations * qualToErrorProb(qual);
     }
@@ -47,13 +47,14 @@ struct generate_read_group_table : public lambda_context<system>
     {
         const auto& key_in = ctx.covariates.quality.keys[index];
         const auto& value_in = ctx.covariates.quality.values[index];
-        const auto qual = covariate_table_quality<system>::decode(key_in, covariate_table_quality<system>::QualityScore);
+        const auto qual = covariate_packer_quality_score<system>::decode(key_in,
+                                                                         covariate_packer_quality_score<system>::QualityScore);
 
         auto& key_out = ctx.read_group_table.read_group_keys[index];
         auto& value_out = ctx.read_group_table.read_group_values[index];
 
         // remove the quality from the key
-        key_out = key_in & ~covariate_table_quality<system>::chain::key_mask(covariate_table_quality<system>::QualityScore);
+        key_out = key_in & ~covariate_packer_quality_score<system>::chain::key_mask(covariate_packer_quality_score<system>::QualityScore);
 
         value_out.observations = value_in.observations;
         value_out.mismatches = value_in.mismatches;
@@ -229,8 +230,8 @@ void build_read_group_table(firepony_context<system>& context)
     rg_keys.resize(cv.quality.size());
     rg_values.resize(cv.quality.size());
     parallel<system>::for_each(thrust::make_counting_iterator(0u),
-                     thrust::make_counting_iterator(0u) + cv.quality.size(),
-                     generate_read_group_table<system>(context));
+                               thrust::make_counting_iterator(0u) + cv.quality.size(),
+                               generate_read_group_table<system>(context));
 
     auto& temp_keys = context.temp_u32;
     firepony::vector<system, covariate_empirical_value> temp_values;
@@ -239,7 +240,12 @@ void build_read_group_table(firepony_context<system>& context)
     temp_keys.resize(rg_keys.size());
     temp_values.resize(rg_keys.size());
 
-    parallel<system>::sort_by_key(rg_keys, rg_values, temp_keys, temp_values, temp_storage, covariate_table_quality<system>::chain::bits_used);
+    parallel<system>::sort_by_key(rg_keys,
+                                  rg_values,
+                                  temp_keys,
+                                  temp_values,
+                                  temp_storage,
+                                  covariate_packer_quality_score<system>::chain::bits_used);
 
     // reduce the read group table by key
     auto out = thrust::reduce_by_key(rg_keys.begin(),
@@ -260,8 +266,8 @@ void build_read_group_table(firepony_context<system>& context)
 
     // compute empirical qualities
     parallel<system>::for_each(thrust::make_counting_iterator(0u),
-                     thrust::make_counting_iterator(0u) + new_size,
-                     covariate_compute_empirical_quality<system>(context));
+                               thrust::make_counting_iterator(0u) + new_size,
+                               covariate_compute_empirical_quality<system>(context));
 }
 INSTANTIATE(build_read_group_table);
 
@@ -278,7 +284,8 @@ void output_read_group_table(firepony_context<system>& context)
 
     for(uint32 i = 0; i < rg_keys.size(); i++)
     {
-        uint32 rg_id = covariate_table_quality<system>::decode(rg_keys[i], covariate_table_quality<system>::ReadGroup);
+        uint32 rg_id = covariate_packer_quality_score<system>::decode(rg_keys[i],
+                                                                      covariate_packer_quality_score<system>::ReadGroup);
         const std::string& rg_name = context.bam_header.host.read_groups_db.lookup(rg_id);
 
         covariate_empirical_value val = rg_values[i];
@@ -286,7 +293,7 @@ void output_read_group_table(firepony_context<system>& context)
         // ReadGroup, EventType, EmpiricalQuality, EstimatedQReported, Observations, Errors
         printf("%s\t%c\t\t%.4f\t\t\t%.4f\t\t\t%d\t\t%.2f\n",
                 rg_name.c_str(),
-                cigar_event::ascii(covariate_table_quality<system>::decode(rg_keys[i], covariate_table_quality<system>::EventTracker)),
+                cigar_event::ascii(covariate_packer_quality_score<system>::decode(rg_keys[i], covariate_packer_quality_score<system>::EventTracker)),
                 round_n(val.empirical_quality, 4),
                 round_n(val.estimated_quality, 4),
                 val.observations,

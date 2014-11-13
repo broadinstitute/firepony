@@ -21,32 +21,18 @@
 #include "bit_packers/read_group.h"
 #include "bit_packers/quality_score.h"
 #include "bit_packers/event_tracker.h"
-#include "bit_packers/context.h"
+#include "bit_packers/cycle_illumina.h"
 
 namespace firepony {
 
-// the context portion of GATK's RecalTable2
+// the cycle portion of GATK's RecalTable2
 template <target_system system>
-struct covariate_table_context
+struct covariate_packer_cycle_illumina
 {
-    enum {
-        num_bases_mismatch = 2,
-        num_bases_indel = 3,
-
-        // xxxnsubtil: this is duplicated from covariate_Context
-        num_bases_in_context = constexpr_max(num_bases_mismatch, num_bases_indel),
-
-        base_bits = num_bases_in_context * 2,
-        base_bits_mismatch = num_bases_mismatch * 2,
-        base_bits_indel = num_bases_indel * 2,
-
-        length_bits = 4,
-    };
-
     // the type that represents the chain of covariates
     typedef covariate_ReadGroup<system,
              covariate_QualityScore<system,
-              covariate_Context<system, num_bases_mismatch, num_bases_indel,
+              covariate_Cycle_Illumina<system,
                covariate_EventTracker<system> > > > chain;
 
     // the index of each covariate in the chain
@@ -55,12 +41,12 @@ struct covariate_table_context
     typedef enum {
         ReadGroup = 4,
         QualityScore = 3,
-        Context = 2,
+        Cycle = 2,
         EventTracker = 1,
 
         // defines which covariate is the "target" for this table
         // used when checking for invalid keys
-        TargetCovariate = Context,
+        TargetCovariate = Cycle,
     } CovariateID;
 
     // extract a given covariate value from a key
@@ -69,9 +55,9 @@ struct covariate_table_context
         return chain::decode(key, id);
     }
 
-    static void dump_table(firepony_context<system>& context, d_covariate_table<system>& d_table)
+    static void dump_table(firepony_context<system>& context, covariate_observation_table<system>& d_table)
     {
-        h_covariate_table table;
+        covariate_observation_table<host> table;
         table.copyfrom(d_table);
 
         for(uint32 i = 0; i < table.size(); i++)
@@ -83,26 +69,20 @@ struct covariate_table_context
             uint32 rg_id = decode(table.keys[i], ReadGroup);
             const std::string& rg_name = context.bam_header.host.read_groups_db.lookup(rg_id);
 
-            // decode the context separately
-            covariate_key raw_context = decode(table.keys[i], Context);
-            int size = (raw_context & BITMASK(length_bits));
-            covariate_key context = raw_context >> length_bits;
+            // decode the group separately
+            uint32 raw_group = decode(table.keys[i], Cycle);
+            int group = raw_group >> 1;
 
-            char sequence[size + 1];
-
-            for(int j = 0; j < size; j++)
-            {
-                const int offset = j * 2;
-                sequence[j] = from_nvbio::dna_to_char((context >> offset) & 3);
-            }
-            sequence[size] = 0;
+            // apply the "sign" bit
+            if (raw_group & 1)
+                group = -group;
 
             // ReadGroup, QualityScore, CovariateValue, CovariateName, EventType, EmpiricalQuality, Observations, Errors
-            printf("%s\t%d\t\t%s\t\t%s\t\t%c\t\t%.4f\t\t%d\t\t%.2f\n",
+            printf("%s\t%d\t\t%d\t\t%s\t\t%c\t\t%.4f\t\t%d\t\t%.2f\n",
                     rg_name.c_str(),
                     decode(table.keys[i], QualityScore),
-                    sequence,
-                    "Context",
+                    group,
+                    "Cycle",
                     cigar_event::ascii(decode(table.keys[i], EventTracker)),
                     round_n(double(decode(table.keys[i], QualityScore)), 4),
                     table.values[i].observations,

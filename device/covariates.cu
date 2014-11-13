@@ -22,9 +22,9 @@
 #include "firepony_context.h"
 #include "covariates.h"
 
-#include "covariates/table_context.h"
-#include "covariates/table_cycle_illumina.h"
-#include "covariates/table_quality_scores.h"
+#include "covariates/packer_context.h"
+#include "covariates/packer_cycle_illumina.h"
+#include "covariates/packer_quality_score.h"
 
 #include "primitives/util.h"
 #include "primitives/parallel.h"
@@ -34,7 +34,7 @@
 namespace firepony {
 
 // accumulates events from a read batch into a given covariate table
-template <target_system system, typename covariate_table>
+template <target_system system, typename covariate_packer>
 struct covariate_gatherer : public lambda<system>
 {
     LAMBDA_INHERIT;
@@ -72,7 +72,7 @@ struct covariate_gatherer : public lambda<system>
             return;
         }
 
-        covariate_key_set keys = covariate_table::chain::encode(ctx, batch, read_index, read_bp_offset, cigar_event_index, covariate_key_set{0, 0, 0});
+        covariate_key_set keys = covariate_packer::chain::encode(ctx, batch, read_index, read_bp_offset, cigar_event_index, covariate_key_set{0, 0, 0});
 
         ctx.covariates.scratch_table_space.keys  [cigar_event_index * 3 + 0] = keys.M;
         ctx.covariates.scratch_table_space.values[cigar_event_index * 3 + 0].observations = 1;
@@ -89,7 +89,7 @@ struct covariate_gatherer : public lambda<system>
 };
 
 // functor used for filtering out invalid keys in a table
-template <target_system system, typename covariate_table>
+template <target_system system, typename covariate_packer>
 struct flag_valid_keys : public lambda<system>
 {
     LAMBDA_INHERIT_MEMBERS;
@@ -104,12 +104,12 @@ struct flag_valid_keys : public lambda<system>
 
     CUDA_HOST_DEVICE void operator() (const uint32 key_index)
     {
-        constexpr bool sparse = covariate_table::chain::is_sparse(covariate_table::TargetCovariate);
+        constexpr bool sparse = covariate_packer::chain::is_sparse(covariate_packer::TargetCovariate);
 
         const covariate_key& key = ctx.covariates.scratch_table_space.keys[key_index];
 
         if (key == covariate_key(-1) ||
-            (sparse && covariate_table::decode(key, covariate_table::TargetCovariate) == covariate_table::chain::invalid_key(covariate_table::TargetCovariate)))
+            (sparse && covariate_packer::decode(key, covariate_packer::TargetCovariate) == covariate_packer::chain::invalid_key(covariate_packer::TargetCovariate)))
         {
             flags[key_index] = 0;
         } else {
@@ -119,15 +119,15 @@ struct flag_valid_keys : public lambda<system>
 };
 
 // processes a batch of reads and updates covariate table data for a given table
-template <typename covariate_table, target_system system>
-static void build_covariates_table(d_covariate_table<system>& table, firepony_context<system>& context, const alignment_batch<system>& batch)
+template <typename covariate_packer, target_system system>
+static void build_covariates_table(covariate_observation_table<system>& table, firepony_context<system>& context, const alignment_batch<system>& batch)
 {
     auto& cv = context.covariates;
     auto& scratch_table = cv.scratch_table_space;
 
     auto& flags = context.temp_u8;
 
-    firepony::vector<system, covariate_value> temp_values;
+    firepony::vector<system, covariate_observation_value> temp_values;
     firepony::vector<system, covariate_key> temp_keys;
 
     timer<system> covariates_gather, covariates_filter, covariates_sort, covariates_pack;
@@ -146,7 +146,7 @@ static void build_covariates_table(d_covariate_table<system>& table, firepony_co
     // generate keys into the scratch table
     parallel<system>::for_each(thrust::make_counting_iterator(0u),
                                thrust::make_counting_iterator(0u) + context.cigar.cigar_event_read_coordinates.size(),
-                               covariate_gatherer<system, covariate_table>(context, batch.device));
+                               covariate_gatherer<system, covariate_packer>(context, batch.device));
 
     covariates_gather.stop();
 
@@ -155,7 +155,7 @@ static void build_covariates_table(d_covariate_table<system>& table, firepony_co
     // flag valid keys
     parallel<system>::for_each(thrust::make_counting_iterator(0u),
                                thrust::make_counting_iterator(0u) + cv.scratch_table_space.keys.size(),
-                               flag_valid_keys<system, covariate_table>(context, batch.device, flags));
+                               flag_valid_keys<system, covariate_packer>(context, batch.device, flags));
 
     // count valid keys
     uint32 valid_keys = thrust::reduce(flags.begin(), flags.end(), uint32(0));
@@ -185,7 +185,7 @@ static void build_covariates_table(d_covariate_table<system>& table, firepony_co
     {
         // sort and reduce the table by key
         covariates_sort.start();
-        table.sort(temp_keys, temp_values, context.temp_storage, covariate_table::chain::bits_used);
+        table.sort(temp_keys, temp_values, context.temp_storage, covariate_packer::chain::bits_used);
         covariates_sort.stop();
 
         covariates_pack.start();
@@ -252,22 +252,22 @@ void gather_covariates(firepony_context<system>& context, const alignment_batch<
                                context.active_read_list.end(),
                                compute_high_quality_windows<system>(context, batch.device));
 
-    build_covariates_table<covariate_table_quality<system> >(cv.quality, context, batch);
-    build_covariates_table<covariate_table_cycle_illumina<system> >(cv.cycle, context, batch);
-    build_covariates_table<covariate_table_context<system> >(cv.context, context, batch);
+    build_covariates_table<covariate_packer_quality_score<system> >(cv.quality, context, batch);
+    build_covariates_table<covariate_packer_cycle_illumina<system> >(cv.cycle, context, batch);
+    build_covariates_table<covariate_packer_context<system> >(cv.context, context, batch);
 }
 INSTANTIATE(gather_covariates);
 
 template <target_system system>
 void output_covariates(firepony_context<system>& context)
 {
-    covariate_table_quality<system>::dump_table(context, context.covariates.quality);
+    covariate_packer_quality_score<system>::dump_table(context, context.covariates.quality);
 
     printf("#:GATKTable:8:2386:%%s:%%s:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n");
     printf("#:GATKTable:RecalTable2:\n");
     printf("ReadGroup\tQualityScore\tCovariateValue\tCovariateName\tEventType\tEmpiricalQuality\tObservations\tErrors\n");
-    covariate_table_context<system>::dump_table(context, context.covariates.context);
-    covariate_table_cycle_illumina<system>::dump_table(context, context.covariates.cycle);
+    covariate_packer_context<system>::dump_table(context, context.covariates.context);
+    covariate_packer_cycle_illumina<system>::dump_table(context, context.covariates.cycle);
     printf("\n");
 }
 INSTANTIATE(output_covariates);

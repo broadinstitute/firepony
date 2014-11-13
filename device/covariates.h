@@ -19,7 +19,7 @@
 #pragma once
 
 #include "../types.h"
-#include "covariates_table.h"
+#include "covariate_table.h"
 
 namespace firepony {
 
@@ -29,17 +29,17 @@ struct covariates_context
     // read window after clipping low quality ends
     d_vector_u16_2<system> high_quality_window;
 
-    d_covariate_table<system> scratch_table_space;
+    covariate_observation_table<system> scratch_table_space;
 
-    d_covariate_table<system> quality;
-    d_covariate_table<system> cycle;
-    d_covariate_table<system> context;
+    covariate_observation_table<system> quality;
+    covariate_observation_table<system> cycle;
+    covariate_observation_table<system> context;
 
     struct view
     {
         typename d_vector_u16_2<system>::view high_quality_window;
-        typename d_covariate_table<system>::view scratch_table_space;
-        typename d_covariate_table<system>::view quality;
+        typename covariate_observation_table<system>::view scratch_table_space;
+        typename covariate_observation_table<system>::view quality;
     };
 
     operator view()

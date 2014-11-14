@@ -21,6 +21,8 @@
 #include "alignment_data_device.h"
 #include "firepony_context.h"
 #include "covariates.h"
+#include "expected_error.h"
+#include "empirical_quality.h"
 
 #include "covariates/packer_context.h"
 #include "covariates/packer_cycle_illumina.h"
@@ -261,7 +263,7 @@ INSTANTIATE(gather_covariates);
 template <target_system system>
 void output_covariates(firepony_context<system>& context)
 {
-    covariate_packer_quality_score<system>::dump_table(context, context.covariates.quality);
+    covariate_packer_quality_score<system>::dump_table(context, context.covariates.empirical_quality);
 
     printf("#:GATKTable:8:2386:%%s:%%s:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n");
     printf("#:GATKTable:RecalTable2:\n");
@@ -271,6 +273,27 @@ void output_covariates(firepony_context<system>& context)
     printf("\n");
 }
 INSTANTIATE(output_covariates);
+
+template <target_system system>
+void build_empirical_quality_score_table(firepony_context<system>& context)
+{
+    auto& cv = context.covariates;
+    auto& table = cv.empirical_quality;
+
+    if (cv.quality.size() == 0)
+    {
+        // if we didn't gather any entries in the table, there's nothing to do
+        return;
+    }
+
+    // convert the quality table into the read group table
+    covariate_observation_to_empirical_table(context, cv.quality, table);
+    // compute the expected error for each entry
+    compute_expected_error<system, covariate_packer_quality_score<system> >(context, table);
+    // finally compute the empirical quality for this table
+    compute_empirical_quality(context, table);
+}
+INSTANTIATE(build_empirical_quality_score_table);
 
 } // namespace firepony
 

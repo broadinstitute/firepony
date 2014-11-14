@@ -51,9 +51,9 @@ struct covariate_packer_quality_score
         return chain::decode(key, id);
     }
 
-    static void dump_table(firepony_context<system>& context, covariate_observation_table<system>& d_table)
+    static void dump_table(firepony_context<system>& context, covariate_empirical_table<system>& d_table)
     {
-        covariate_observation_table<host> table;
+        covariate_empirical_table<host> table;
         table.copyfrom(d_table);
 
         printf("#:GATKTable:6:138:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n");
@@ -72,7 +72,7 @@ struct covariate_packer_quality_score
                     rg_name.c_str(),
                     decode(table.keys[i], QualityScore),
                     cigar_event::ascii(decode(table.keys[i], EventTracker)),
-                    round_n(double(decode(table.keys[i], QualityScore)), 4),
+                    table.values[i].empirical_quality,
                     table.values[i].observations,
                     round_n(table.values[i].mismatches, 2));
         }

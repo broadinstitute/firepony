@@ -291,7 +291,7 @@ void build_empirical_quality_score_table(firepony_context<system>& context)
     // compute the expected error for each entry
     compute_expected_error<system, covariate_packer_quality_score<system> >(context, table);
     // finally compute the empirical quality for this table
-    compute_empirical_quality(context, table);
+    compute_empirical_quality(context, table, true);
 }
 INSTANTIATE(build_empirical_quality_score_table);
 

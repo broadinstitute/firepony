@@ -74,7 +74,7 @@ void build_read_group_table(firepony_context<system>& context)
     cv.read_group.pack(temp_keys, temp_values);
 
     // finally compute the empirical quality for this table
-    compute_empirical_quality(context, cv.read_group);
+    compute_empirical_quality(context, cv.read_group, false);
 }
 INSTANTIATE(build_read_group_table);
 

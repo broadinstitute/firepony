@@ -40,9 +40,15 @@ static CUDA_HOST_DEVICE double gaussian(double value)
     return GF_a + GF_b * pow(double(M_E), -(pow(value - GF_c, 2.0) / (2 * GF_d * GF_d)));
 }
 
-static CUDA_HOST_DEVICE double log10QempPrior(const double Qempirical, const double Qreported)
+static CUDA_HOST_DEVICE double log10QempPrior(const double Qempirical, const double Qreported, bool need_rounding)
 {
-    int difference = min(abs(int(Qempirical - Qreported)), MAX_GATK_USABLE_Q_SCORE);
+    double delta = Qempirical - Qreported;
+    if (need_rounding)
+    {
+        delta = round(delta);
+    }
+
+    int difference = min(abs(int(delta)), MAX_GATK_USABLE_Q_SCORE);
     return log10(gaussian(double(difference)));
 }
 
@@ -108,7 +114,7 @@ static CUDA_HOST_DEVICE void normalizeFromLog10(double *normalized, const double
     }
 }
 
-static CUDA_HOST_DEVICE double bayesianEstimateOfEmpiricalQuality(const uint32 nObservations, const uint32 nErrors, const double QReported)
+static CUDA_HOST_DEVICE double bayesianEstimateOfEmpiricalQuality(const uint32 nObservations, const uint32 nErrors, const double QReported, bool need_rounding)
 {
     constexpr int numBins = (MAX_REASONABLE_Q_SCORE + 1) * int(RESOLUTION_BINS_PER_QUAL);
     double log10Posteriors[numBins];
@@ -116,7 +122,7 @@ static CUDA_HOST_DEVICE double bayesianEstimateOfEmpiricalQuality(const uint32 n
     for(int bin = 0; bin < numBins; bin++)
     {
         const double QEmpOfBin = bin / RESOLUTION_BINS_PER_QUAL;
-        log10Posteriors[bin] = log10QempPrior(QEmpOfBin, QReported) + log10QempLikelihood(QEmpOfBin, nObservations, nErrors);
+        log10Posteriors[bin] = log10QempPrior(QEmpOfBin, QReported, need_rounding) + log10QempLikelihood(QEmpOfBin, nObservations, nErrors);
     }
 
     double normalizedPosteriors[numBins];
@@ -133,13 +139,13 @@ static CUDA_HOST_DEVICE double bayesianEstimateOfEmpiricalQuality(const uint32 n
     return Qemp;
 }
 
-CUDA_HOST_DEVICE double calcEmpiricalQuality(const covariate_empirical_value& val)
+CUDA_HOST_DEVICE double calcEmpiricalQuality(const covariate_empirical_value& val, bool need_rounding)
 {
     // smoothing is one error and one non-error observation
     const uint32 mismatches = uint32(val.mismatches + 0.5) + SMOOTHING_CONSTANT;
     const uint32 observations = val.observations + SMOOTHING_CONSTANT + SMOOTHING_CONSTANT;
 
-    double empiricalQual = bayesianEstimateOfEmpiricalQuality(observations, mismatches, val.estimated_quality);
+    double empiricalQual = bayesianEstimateOfEmpiricalQuality(observations, mismatches, val.estimated_quality, need_rounding);
     return min(empiricalQual, double(MAX_RECALIBRATED_Q_SCORE));
 }
 
@@ -147,9 +153,10 @@ template <target_system system>
 struct calc_empirical_quality
 {
     typename covariate_empirical_table<system>::view table;
+    bool need_rounding;
 
-    calc_empirical_quality(typename covariate_empirical_table<system>::view table)
-        : table(table)
+    calc_empirical_quality(typename covariate_empirical_table<system>::view table, bool need_rounding)
+        : table(table), need_rounding(need_rounding)
     { }
 
     CUDA_HOST_DEVICE void operator() (const uint32 index)
@@ -157,16 +164,16 @@ struct calc_empirical_quality
         covariate_empirical_value& val = table.values[index];
 
         val.estimated_quality = double(-10.0 * log10(val.expected_errors / double(val.observations)));
-        val.empirical_quality = calcEmpiricalQuality(val);
+        val.empirical_quality = calcEmpiricalQuality(val, need_rounding);
     }
 };
 
 template <target_system system>
-void compute_empirical_quality(firepony_context<system>& context, covariate_empirical_table<system>& table)
+void compute_empirical_quality(firepony_context<system>& context, covariate_empirical_table<system>& table, bool need_rounding)
 {
     parallel<system>::for_each(thrust::make_counting_iterator(0u),
                                thrust::make_counting_iterator(0u) + table.size(),
-                               calc_empirical_quality<system>(table));
+                               calc_empirical_quality<system>(table, need_rounding));
 }
 INSTANTIATE(compute_empirical_quality)
 

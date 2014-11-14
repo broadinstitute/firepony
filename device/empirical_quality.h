@@ -24,6 +24,6 @@
 
 namespace firepony {
 
-template <target_system system> void compute_empirical_quality(firepony_context<system>& context, covariate_empirical_table<system>& table);
+template <target_system system> void compute_empirical_quality(firepony_context<system>& context, covariate_empirical_table<system>& table, bool need_rounding);
 
 } // namespace firepony

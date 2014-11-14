@@ -136,3 +136,5 @@ target_link_libraries(firepony firepony-common firepony-device ${tbb_LIB} ${gamg
 
 cuda_add_executable(firepony-loader firepony-loader.cu)
 target_link_libraries(firepony-loader firepony-common firepony-device ${tbb_LIB} ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+
+cuda_build_clean_target()

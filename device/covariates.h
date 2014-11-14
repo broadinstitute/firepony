@@ -35,11 +35,14 @@ struct covariates_context
     covariate_observation_table<system> cycle;
     covariate_observation_table<system> context;
 
+    covariate_empirical_table<system> read_group;
+
     struct view
     {
         typename d_vector_u16_2<system>::view high_quality_window;
         typename covariate_observation_table<system>::view scratch_table_space;
         typename covariate_observation_table<system>::view quality;
+        typename covariate_empirical_table<system>::view read_group;
     };
 
     operator view()
@@ -48,6 +51,7 @@ struct covariates_context
             high_quality_window,
             scratch_table_space,
             quality,
+            read_group,
         };
 
         return v;

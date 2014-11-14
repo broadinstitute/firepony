@@ -36,19 +36,18 @@ struct remove_quality_from_key : public lambda_context<system>
 
     CUDA_HOST_DEVICE void operator() (const uint32 index)
     {
-        auto& rg = ctx.read_group_table.read_group_table;
-        auto& key = rg.keys[index];
+        auto& key = ctx.covariates.read_group.keys[index];
 
         // remove the quality from the key
         key &= ~covariate_packer_quality_score<system>::chain::key_mask(covariate_packer_quality_score<system>::QualityScore);
     }
 };
 
+// computes the read group table based on the quality score table
 template <target_system system>
 void build_read_group_table(firepony_context<system>& context)
 {
-    const auto& cv = context.covariates;
-    auto& rg = context.read_group_table.read_group_table;
+    auto& cv = context.covariates;
 
     if (cv.quality.size() == 0)
     {
@@ -57,9 +56,9 @@ void build_read_group_table(firepony_context<system>& context)
     }
 
     // convert the quality table into the read group table
-    covariate_observation_to_empirical_table(context, cv.quality, rg);
+    covariate_observation_to_empirical_table(context, cv.quality, cv.read_group);
     // compute the expected error for each entry
-    compute_expected_error<system, covariate_packer_quality_score<system> >(context, rg);
+    compute_expected_error<system, covariate_packer_quality_score<system> >(context, cv.read_group);
 
     // transform the read group table in place to remove the quality value from the key
     parallel<system>::for_each(thrust::make_counting_iterator(0u),
@@ -71,11 +70,11 @@ void build_read_group_table(firepony_context<system>& context)
     firepony::vector<system, covariate_empirical_value> temp_values;
     auto& temp_storage = context.temp_storage;
 
-    rg.sort(temp_keys, temp_values, temp_storage, covariate_packer_quality_score<system>::chain::bits_used);
-    rg.pack(temp_keys, temp_values);
+    cv.read_group.sort(temp_keys, temp_values, temp_storage, covariate_packer_quality_score<system>::chain::bits_used);
+    cv.read_group.pack(temp_keys, temp_values);
 
     // finally compute the empirical quality for this table
-    compute_empirical_quality(context, rg);
+    compute_empirical_quality(context, cv.read_group);
 }
 INSTANTIATE(build_read_group_table);
 
@@ -85,7 +84,7 @@ void output_read_group_table(firepony_context<system>& context)
     typedef covariate_packer_quality_score<system> packer;
 
     covariate_empirical_table<host> table;
-    table.copyfrom(context.read_group_table.read_group_table);
+    table.copyfrom(context.covariates.read_group);
 
     printf("#:GATKTable:6:3:%%s:%%s:%%.4f:%%.4f:%%d:%%.2f:;\n");
     printf("#:GATKTable:RecalTable0:\n");

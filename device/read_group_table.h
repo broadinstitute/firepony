@@ -23,26 +23,6 @@
 
 namespace firepony {
 
-template <target_system system>
-struct read_group_table_context
-{
-    covariate_empirical_table<system> read_group_table;
-
-    struct view
-    {
-        typename covariate_empirical_table<system>::view read_group_table;
-    };
-
-    operator view()
-    {
-        view v = {
-            read_group_table,
-        };
-
-        return v;
-    }
-};
-
 template <target_system system> void build_read_group_table(firepony_context<system>& context);
 template <target_system system> void output_read_group_table(firepony_context<system>& context);
 

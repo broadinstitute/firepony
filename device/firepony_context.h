@@ -29,7 +29,6 @@
 #include "cigar.h"
 #include "baq.h"
 #include "fractional_errors.h"
-#include "read_group_table.h"
 #include "util.h"
 
 #include "device/primitives/timer.h"
@@ -108,7 +107,6 @@ struct firepony_context
     baq_context<system> baq;
     covariates_context<system> covariates;
     fractional_error_context<system> fractional_error;
-    read_group_table_context<system> read_group_table;
 
     // --- everything below this line is host-only and not available on the device
     pipeline_statistics stats;
@@ -144,7 +142,6 @@ struct firepony_context
         typename baq_context<system>::view                      baq;
         typename covariates_context<system>::view               covariates;
         typename fractional_error_context<system>::view         fractional_error;
-        typename read_group_table_context<system>::view         read_group_table;
     };
 
     operator view()
@@ -169,7 +166,6 @@ struct firepony_context
             baq,
             covariates,
             fractional_error,
-            read_group_table,
         };
 
         return v;

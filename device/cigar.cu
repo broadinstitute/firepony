@@ -183,7 +183,30 @@ struct remove_adapters : public lambda<system>
         {
             if (batch.alignment_start[read_index] + ctx.cigar.cigar_event_reference_coordinates[ev] == ref_coord)
             {
-                return ctx.cigar.cigar_event_read_coordinates[ev];
+                uint16 read_coord = ctx.cigar.cigar_event_read_coordinates[ev];
+
+                if (read_coord == uint16(-1))
+                {
+                    // if there is no read coordinate, we must be in a deletion
+                    // this can (in theory) only happen for the right tail
+                    // move forward until we find a valid clipping point
+                    while(ev < cigar_stop)
+                    {
+                        read_coord = ctx.cigar.cigar_event_read_coordinates[ev];
+
+                        if (read_coord != uint16(-1))
+                            break;
+
+                        ev++;
+                    }
+
+                    // if we get here, then we failed to find a clipping coordinate
+                    // this should not happen unless the read is malformed
+                    if (ev == cigar_stop)
+                        return -1;
+                }
+
+                return read_coord;
             }
         }
 

@@ -264,12 +264,12 @@ public:
 
                 if (ref_coord != uint16(-1) && int(ref_coord) >= feature_start)
                 {
-                    // if the feature starts inside a deletion, move ev forward until we find a read base
+                    // if the feature starts inside a deletion, move ev backward until we find a read base
                     // (note that we preserve ev since the next loop relies on it being accurate --- moving ev back could land us in an insertion!)
                     uint32 ev_read = ev;
-                    while(ev_read < cigar_end && ctx.cigar.cigar_event_read_coordinates[ev_read] == uint16(-1))
+                    while(ev_read >= cigar_start && ctx.cigar.cigar_event_read_coordinates[ev_read] == uint16(-1))
                     {
-                        ev_read++;
+                        ev_read--;
                     }
 
                     read_start = ctx.cigar.cigar_event_read_coordinates[ev_read];

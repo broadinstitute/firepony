@@ -173,6 +173,8 @@ int main(int argc, char **argv)
             fprintf(stderr, ".");
             fflush(stderr);
         }
+
+        pipeline->statistics().io.add(io);
     }
 
     fprintf(stderr, "\n");
@@ -181,7 +183,7 @@ int main(int argc, char **argv)
 
     pipeline->finish();
 
-    auto& stats = pipeline->get_statistics();
+    auto& stats = pipeline->statistics();
 
     fprintf(stderr, "%lu reads filtered out of %lu (%f%%)\n",
             stats.filtered_reads,

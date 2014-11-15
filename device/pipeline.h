@@ -41,7 +41,7 @@ struct firepony_pipeline
     virtual void process_batch(const alignment_batch_host *batch) = 0;
     virtual void finish(void) = 0;
 
-    virtual const pipeline_statistics& get_statistics(void) = 0;
+    virtual pipeline_statistics& statistics(void) = 0;
 
     static firepony_pipeline *create(target_system system);
 };

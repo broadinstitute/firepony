@@ -85,7 +85,7 @@ struct firepony_device_pipeline : public firepony_pipeline
         firepony_postprocess(*context);
     }
 
-    virtual const pipeline_statistics& get_statistics(void) override
+    virtual pipeline_statistics& statistics(void) override
     {
         return context->stats;
     }

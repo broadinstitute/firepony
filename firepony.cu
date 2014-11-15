@@ -144,7 +144,7 @@ int main(int argc, char **argv)
                              AlignmentDataMask::MAPQ |
                              AlignmentDataMask::READ_GROUP;
 
-    io_thread bam_thread(command_line_options.input, data_mask);
+    io_thread bam_thread(command_line_options.input, data_mask, 1);
     bam_thread.start();
 
     pipeline->setup(&command_line_options,
@@ -159,14 +159,19 @@ int main(int argc, char **argv)
 
     wall_clock.start();
 
-    while(!bam_thread.done())
+    for(;;)
     {
         io.start();
         // fetch the next batch
-        alignment_batch_host& h_batch = bam_thread.next_buffer();
+        alignment_batch_host *h_batch = bam_thread.get_batch();
+        if (h_batch == nullptr)
+            // we're done
+            break;
         io.stop();
 
-        pipeline->process_batch(&h_batch);
+        pipeline->process_batch(h_batch);
+
+        bam_thread.retire_batch(h_batch);
 
         if (!command_line_options.debug)
         {

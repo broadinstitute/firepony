@@ -24,6 +24,8 @@
 
 #include "device/primitives/backends.h"
 
+#include <thread>
+
 #if ENABLE_TBB_BACKEND
 #include <tbb/task_scheduler_init.h>
 #endif
@@ -43,14 +45,21 @@ struct firepony_device_pipeline : public firepony_pipeline
     firepony_context<system> *context;
     alignment_batch<system> *batch;
 
+    io_thread *reader;
+
+    std::thread thread;
+
     virtual std::string get_name(void) override;
 
-    virtual void setup(const runtime_options *options,
+    virtual void setup(io_thread *reader,
+                       const runtime_options *options,
                        alignment_header_host *h_header,
                        sequence_data_host *h_reference,
                        variant_database_host *h_dbsnp) override
     {
         size_t num_bytes;
+
+        this->reader = reader;
 
         header = new alignment_header<system>(*h_header);
         reference = new sequence_data<system>(*h_reference);
@@ -74,13 +83,17 @@ struct firepony_device_pipeline : public firepony_pipeline
         batch = new alignment_batch<system>();
     }
 
-    virtual void process_batch(const alignment_batch_host *h_batch) override
+    virtual void start(void) override
     {
-        batch->download(h_batch);
-        firepony_process_batch(*context, *batch);
+        thread = std::thread(&firepony_device_pipeline<system>::run, this);
     }
 
-    virtual void finish(void) override
+    virtual void join(void) override
+    {
+        thread.join();
+    }
+
+    virtual void postprocess(void) override
     {
         firepony_postprocess(*context);
     }
@@ -90,6 +103,42 @@ struct firepony_device_pipeline : public firepony_pipeline
         return context->stats;
     }
 
+private:
+    void run(void)
+    {
+        timer<host> io_timer;
+        alignment_batch_host *h_batch;
+
+        for(;;)
+        {
+            // try to get a batch to work on
+            io_timer.start();
+            h_batch = reader->get_batch();
+            io_timer.stop();
+            statistics().io.add(io_timer);
+
+            if (h_batch == nullptr)
+            {
+                // no more data, we're done
+                break;
+            }
+
+            // download to the device
+            batch->download(h_batch);
+
+            // process the batch
+            firepony_process_batch(*context, *batch);
+
+            // return it to the reader for reuse
+            reader->retire_batch(h_batch);
+
+            if (!context->options.debug)
+            {
+                fprintf(stderr, ".");
+                fflush(stderr);
+            }
+        }
+    }
 };
 
 #if ENABLE_CUDA_BACKEND

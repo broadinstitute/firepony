@@ -144,49 +144,29 @@ int main(int argc, char **argv)
                              AlignmentDataMask::MAPQ |
                              AlignmentDataMask::READ_GROUP;
 
-    io_thread bam_thread(command_line_options.input, data_mask, 1);
-    bam_thread.start();
+    io_thread reader(command_line_options.input, data_mask, 1);
+    reader.start();
 
-    pipeline->setup(&command_line_options,
-                    &bam_thread.file.header,
+    pipeline->setup(&reader,
+                    &command_line_options,
+                    &reader.file.header,
                     &h_reference,
                     &h_dbsnp);
 
     fprintf(stderr, "processing file %s...\n", command_line_options.input);
 
     timer<host> wall_clock;
-    timer<host> io;
 
     wall_clock.start();
 
-    for(;;)
-    {
-        io.start();
-        // fetch the next batch
-        alignment_batch_host *h_batch = bam_thread.get_batch();
-        if (h_batch == nullptr)
-            // we're done
-            break;
-        io.stop();
-
-        pipeline->process_batch(h_batch);
-
-        bam_thread.retire_batch(h_batch);
-
-        if (!command_line_options.debug)
-        {
-            fprintf(stderr, ".");
-            fflush(stderr);
-        }
-
-        pipeline->statistics().io.add(io);
-    }
+    pipeline->start();
+    pipeline->join();
 
     fprintf(stderr, "\n");
 
     wall_clock.stop();
 
-    pipeline->finish();
+    pipeline->postprocess();
 
     auto& stats = pipeline->statistics();
 
@@ -221,7 +201,7 @@ int main(int argc, char **argv)
     fprintf(stderr, "  post-processing: %.4f (%.2f%%)\n", stats.postprocessing.elapsed_time, stats.postprocessing.elapsed_time / wall_clock.elapsed_time() * 100.0);
     fprintf(stderr, "  output: %.4f (%.2f%%)\n", stats.output.elapsed_time, stats.output.elapsed_time / wall_clock.elapsed_time() * 100.0);
 
-    bam_thread.join();
+    reader.join();
 
     return 0;
 }

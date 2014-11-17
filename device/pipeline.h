@@ -47,6 +47,7 @@ struct firepony_pipeline
     virtual void start(void) = 0;
     virtual void join(void) = 0;
 
+    virtual void gather_intermediates(firepony_pipeline *other) = 0;
     virtual void postprocess(void) = 0;
 
     // the meaning of device depends on the target system:

@@ -260,6 +260,26 @@ void gather_covariates(firepony_context<system>& context, const alignment_batch<
 }
 INSTANTIATE(gather_covariates);
 
+template <target_system system> void postprocess_covariates(firepony_context<system>& context)
+{
+    auto& cv = context.covariates;
+
+    // sort and pack all tables
+    // this is required because we may have collected results from different devices
+    vector<system, covariate_observation_value> temp_values;
+    vector<system, covariate_key> temp_keys;
+
+    cv.quality.sort(temp_keys, temp_values, context.temp_storage, covariate_packer_quality_score<system>::chain::bits_used);
+    cv.quality.pack(temp_keys, temp_values);
+
+    cv.cycle.sort(temp_keys, temp_values, context.temp_storage, covariate_packer_cycle_illumina<system>::chain::bits_used);
+    cv.cycle.pack(temp_keys, temp_values);
+
+    cv.context.sort(temp_keys, temp_values, context.temp_storage, covariate_packer_context<system>::chain::bits_used);
+    cv.context.pack(temp_keys, temp_values);
+}
+INSTANTIATE(postprocess_covariates);
+
 template <target_system system>
 void output_covariates(firepony_context<system>& context)
 {

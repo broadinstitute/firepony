@@ -35,6 +35,14 @@ namespace firepony {
 template <target_system system> void firepony_process_batch(firepony_context<system>& context, const alignment_batch<system>& batch);
 template <target_system system> void firepony_postprocess(firepony_context<system>& context);
 
+template <target_system system_dst, target_system system_src>
+void firepony_gather_intermediates(firepony_context<system_dst>& context, firepony_context<system_src>& other)
+{
+    context.covariates.quality.concat(context.compute_device, other.compute_device, other.covariates.quality);
+    context.covariates.cycle.concat(context.compute_device, other.compute_device, other.covariates.cycle);
+    context.covariates.context.concat(context.compute_device, other.compute_device, other.covariates.context);
+}
+
 template <target_system system>
 struct firepony_device_pipeline : public firepony_pipeline
 {
@@ -77,7 +85,6 @@ struct firepony_device_pipeline : public firepony_pipeline
                        sequence_data_host *h_reference,
                        variant_database_host *h_dbsnp) override
     {
-        size_t num_bytes;
         if (system == cuda)
         {
             cudaSetDevice(compute_device);
@@ -90,18 +97,8 @@ struct firepony_device_pipeline : public firepony_pipeline
         dbsnp = new variant_database<system>(*h_dbsnp);
 
         header->download();
-
-        num_bytes = reference->download();
-        if (system == firepony::cuda)
-        {
-            fprintf(stderr, "downloaded %lu MB of reference data\n", num_bytes / (1024 * 1024));
-        }
-
-        num_bytes = dbsnp->download();
-        if (system == firepony::cuda)
-        {
-            fprintf(stderr, "downloaded %lu MB of variant data\n", num_bytes / (1024 * 1024));
-        }
+        reference->download();
+        dbsnp->download();
 
         context = new firepony_context<system>(compute_device, *options, *header, *reference, *dbsnp);
         batch = new alignment_batch<system>();
@@ -117,7 +114,33 @@ struct firepony_device_pipeline : public firepony_pipeline
         thread.join();
     }
 
+    virtual void gather_intermediates(firepony_pipeline *other) override
     {
+        switch(other->get_system())
+        {
+#if ENABLE_CUDA_BACKEND
+        case firepony::cuda:
+        {
+            cudaSetDevice(compute_device);
+
+            firepony_device_pipeline<firepony::cuda> *other_cuda = (firepony_device_pipeline<firepony::cuda> *) other;
+            firepony_gather_intermediates(*context, *other_cuda->context);
+            break;
+        }
+#endif
+
+#if ENABLE_TBB_BACKEND
+        case firepony::intel_tbb:
+        {
+            firepony_device_pipeline<firepony::intel_tbb> *other_tbb = (firepony_device_pipeline<firepony::intel_tbb> *) other;
+            firepony_gather_intermediates(*context, *other_tbb->context);
+            break;
+        }
+#endif
+
+        default:
+            assert(!"can't happen");
+        }
     }
 
     virtual void postprocess(void) override
@@ -178,17 +201,14 @@ template<>
 std::string firepony_device_pipeline<firepony::cuda>::get_name(void)
 {
     cudaDeviceProp prop;
-    int runtime_version;
 
-    cudaRuntimeGetVersion(&runtime_version);
     cudaSetDevice(compute_device);
     cudaGetDeviceProperties(&prop, compute_device);
 
     char buf[1024];
     snprintf(buf, sizeof(buf),
-             "%s (%lu MB, CUDA %d.%d)",
-             prop.name, prop.totalGlobalMem / (1024 * 1024),
-             runtime_version / 1000, runtime_version % 100);
+             "%s (%lu MB, CUDA device %d)",
+             prop.name, prop.totalGlobalMem / (1024 * 1024), compute_device);
 
     return std::string(buf);
 }

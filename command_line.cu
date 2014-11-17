@@ -30,6 +30,7 @@ struct runtime_options command_line_options;
 
 static void usage(void)
 {
+    fprintf(stderr, "\n");
     fprintf(stderr, "usage: firepony <options> <input-file-name>\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "  -r, --reference <genome-file-name>    Use <genome-file-name> as reference (required, fasta format)\n");

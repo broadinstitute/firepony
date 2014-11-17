@@ -40,6 +40,7 @@ struct pipeline_statistics // host-only
     uint64 total_reads;        // total number of reads processed
     uint64 filtered_reads;     // number of reads filtered out in pre-processing
     uint64 baq_reads;          // number of reads for which BAQ was computed
+    uint64 num_batches;        // number of batches processed
 
     time_series io;
     time_series read_filter;
@@ -65,8 +66,40 @@ struct pipeline_statistics // host-only
     pipeline_statistics()
         : total_reads(0),
           filtered_reads(0),
-          baq_reads(0)
+          baq_reads(0),
+          num_batches(0)
     { }
+
+    pipeline_statistics& operator+=(const pipeline_statistics& other)
+    {
+        total_reads += other.total_reads;
+        filtered_reads += other.filtered_reads;
+        baq_reads += other.baq_reads;
+        num_batches += other.num_batches;
+
+        io += other.io;
+        read_filter += other.read_filter;
+        snp_filter += other.snp_filter;
+        bp_filter += other.bp_filter;
+        cigar_expansion += other.cigar_expansion;
+        baq += other.baq;
+        fractional_error += other.fractional_error;
+        covariates += other.covariates;
+
+        baq_setup += other.baq_setup;
+        baq_hmm += other.baq_hmm;
+        baq_postprocess += other.baq_postprocess;
+
+        covariates_gather += other.covariates_gather;
+        covariates_filter += other.covariates_filter;
+        covariates_sort += other.covariates_sort;
+        covariates_pack += other.covariates_pack;
+
+        postprocessing += other.postprocessing;
+        output += other.output;
+
+        return *this;
+    }
 };
 
 template <target_system system>

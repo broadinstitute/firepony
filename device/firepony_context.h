@@ -72,6 +72,10 @@ struct pipeline_statistics // host-only
 template <target_system system>
 struct firepony_context
 {
+    // identifies the compute device we're using on this context
+    // note that the meaning depends on the target system
+    const int compute_device;
+
     const runtime_options& options;
 
     const alignment_header<system>& bam_header;
@@ -111,11 +115,13 @@ struct firepony_context
     // --- everything below this line is host-only and not available on the device
     pipeline_statistics stats;
 
-    firepony_context(const runtime_options& options,
+    firepony_context(const int compute_device,
+                     const runtime_options& options,
                      const alignment_header<system>& bam_header,
                      const sequence_data<system>& reference,
                      const variant_database<system>& variant_db)
-        : options(options),
+        : compute_device(compute_device),
+          options(options),
           bam_header(bam_header),
           reference(reference),
           variant_db(variant_db)

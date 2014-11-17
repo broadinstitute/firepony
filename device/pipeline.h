@@ -34,6 +34,9 @@ struct firepony_pipeline
 {
     // returns a string with the name of the current pipeline
     virtual std::string get_name(void) = 0;
+    virtual int get_compute_device(void) = 0;
+    virtual target_system get_system(void) = 0;
+    virtual pipeline_statistics& statistics(void) = 0;
 
     virtual void setup(io_thread *reader,
                        const runtime_options *options,
@@ -46,9 +49,10 @@ struct firepony_pipeline
 
     virtual void postprocess(void) = 0;
 
-    virtual pipeline_statistics& statistics(void) = 0;
-
-    static firepony_pipeline *create(target_system system);
+    // the meaning of device depends on the target system:
+    // for cuda, it identifies the device to use
+    // for tbb, it contains the number of threads that we've reserved for other devices and IO
+    static firepony_pipeline *create(target_system system, uint32 device);
 };
 
 } // namespace firepony

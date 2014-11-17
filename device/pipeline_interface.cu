@@ -214,22 +214,6 @@ std::string firepony_device_pipeline<firepony::cuda>::get_name(void)
 }
 #endif
 
-#if ENABLE_CPP_BACKEND
-template<>
-std::string firepony_device_pipeline<firepony::cpp>::get_name(void)
-{
-    return std::string("CPU (C++ threads)");
-}
-#endif
-
-#if ENABLE_OMP_BACKEND
-template<>
-std::string firepony_device_pipeline<firepony::omp>::get_name(void)
-{
-    return std::string("CPU (OpenMP)");
-}
-#endif
-
 #if ENABLE_TBB_BACKEND
 tbb::task_scheduler_init tbb_scheduler_init(tbb::task_scheduler_init::deferred);
 static int num_tbb_threads = -1;
@@ -238,7 +222,7 @@ template<>
 std::string firepony_device_pipeline<firepony::intel_tbb>::get_name(void)
 {
     char buf[256];
-    snprintf(buf, sizeof(buf), "CPU (Intel TBB, %d threads)", num_tbb_threads);
+    snprintf(buf, sizeof(buf), "CPU (Intel Threading Building Blocks, %d threads)", num_tbb_threads);
     return std::string(buf);
 }
 
@@ -251,16 +235,6 @@ firepony_pipeline *firepony_pipeline::create(target_system system, uint32 device
 #if ENABLE_CUDA_BACKEND
     case firepony::cuda:
         return new firepony_device_pipeline<firepony::cuda>(device);
-#endif
-
-#if ENABLE_CPP_BACKEND
-    case firepony::cpp:
-        return new firepony_device_pipeline<firepony::cpp>();
-#endif
-
-#if ENABLE_OMP_BACKEND
-    case firepony::omp:
-        return new firepony_device_pipeline<firepony::omp>();
 #endif
 
 #if ENABLE_TBB_BACKEND

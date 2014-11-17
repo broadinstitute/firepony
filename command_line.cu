@@ -42,14 +42,8 @@ static void usage(void)
 #if ENABLE_CUDA_BACKEND
     fprintf(stderr, "  --gpu-only                            Use only the CUDA GPU-accelerated backend\n");
 #endif
-#if ENABLE_CPP_BACKEND
-    fprintf(stderr, "  --cpp-only                            Use only the CPP threads CPU backend\n");
-#endif
-#if ENABLE_OMP_BACKEND
-    fprintf(stderr, "  --openmp-only                         Use only the OpenMP CPU backend\n");
-#endif
 #if ENABLE_TBB_BACKEND
-    fprintf(stderr, "  --tbb-only                            Use only the Threading Building Blocks CPU backend\n");
+    fprintf(stderr, "  --cpu-only                            Use only the CPU backend\n");
 #endif
     fprintf(stderr, "\n");
 
@@ -82,24 +76,8 @@ static void parse_env_vars(void)
         }
 #endif
 
-#if ENABLE_CPP_BACKEND
-        if (!strcmp(backend, "cpp"))
-        {
-            command_line_options.disable_all_backends();
-            command_line_options.enable_cpp = true;
-        }
-#endif
-
-#if ENABLE_OMP_BACKEND
-        if (!strcmp(backend, "omp"))
-        {
-            command_line_options.disable_all_backends();
-            command_line_options.enable_omp = true;
-        }
-#endif
-
 #if ENABLE_TBB_BACKEND
-        if (!strcmp(backend, "tbb"))
+        if (!strcmp(backend, "cpu"))
         {
             command_line_options.disable_all_backends();
             command_line_options.enable_tbb = true;
@@ -121,14 +99,8 @@ void parse_command_line(int argc, char **argv)
 #if ENABLE_CUDA_BACKEND
             { "gpu-only", no_argument, NULL, 'g' },
 #endif
-#if ENABLE_CPP_BACKEND
-            { "cpp-only", no_argument, NULL, 'c' },
-#endif
-#if ENABLE_OMP_BACKEND
-            { "omp-only", no_argument, NULL, 'm' },
-#endif
 #if ENABLE_TBB_BACKEND
-            { "tbb-only", no_argument, NULL, 't' },
+            { "cpu-only", no_argument, NULL, 'c' },
 #endif
             { 0 },
     };
@@ -185,25 +157,9 @@ void parse_command_line(int argc, char **argv)
             break;
 #endif
 
-#if ENABLE_CPP_BACKEND
-        case 'c':
-            // --cpp-only
-            command_line_options.disable_all_backends();
-            command_line_options.enable_cpp = true;
-            break;
-#endif
-
-#if ENABLE_OMP_BACKEND
-        case 'm':
-            // --omp-only
-            command_line_options.disable_all_backends();
-            command_line_options.enable_omp = true;
-            break;
-#endif
-
 #if ENABLE_TBB_BACKEND
-        case 't':
-            // --tbb-only
+        case 'c':
+            // --cpu-only
             command_line_options.disable_all_backends();
             command_line_options.enable_tbb = true;
             break;

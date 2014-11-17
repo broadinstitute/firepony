@@ -22,14 +22,6 @@
 #define ENABLE_CUDA_BACKEND 0
 #endif
 
-#ifndef ENABLE_CPP_BACKEND
-#define ENABLE_CPP_BACKEND 0
-#endif
-
-#ifndef ENABLE_OMP_BACKEND
-#define ENABLE_OMP_BACKEND 0
-#endif
-
 #ifndef ENABLE_TBB_BACKEND
 #define ENABLE_TBB_BACKEND 0
 #endif
@@ -38,14 +30,6 @@
 
 #if ENABLE_CUDA_BACKEND
 #include <thrust/system/cuda/vector.h>
-#endif
-
-#if ENABLE_OMP_BACKEND
-#include <thrust/system/omp/vector.h>
-#endif
-
-#if ENABLE_CPP_BACKEND
-#include <thrust/system/cpp/vector.h>
 #endif
 
 #if ENABLE_TBB_BACKEND
@@ -64,12 +48,6 @@ enum target_system
     host,
 #if ENABLE_CUDA_BACKEND
     cuda,
-#endif
-#if ENABLE_CPP_BACKEND
-    cpp,
-#endif
-#if ENABLE_OMP_BACKEND
-    omp,
 #endif
 #if ENABLE_TBB_BACKEND
     intel_tbb,
@@ -111,44 +89,6 @@ struct backend_policy<cuda>
 };
 #endif
 
-// cpp threads backend
-#if ENABLE_CPP_BACKEND
-template <typename T>
-struct backend_vector_type<cpp, T>
-{
-    typedef thrust::system::cpp::vector<T> vector_type;
-};
-
-template <>
-struct backend_policy<cpp>
-{
-    static inline decltype(thrust::cpp::par)& execution_policy(void)
-    {
-        return thrust::cpp::par;
-    }
-};
-#endif
-
-
-// openmp backend
-#if ENABLE_OMP_BACKEND
-template <typename T>
-struct backend_vector_type<omp, T>
-{
-    typedef thrust::system::omp::vector<T> vector_type;
-};
-
-template <>
-struct backend_policy<omp>
-{
-    static inline decltype(thrust::omp::par)& execution_policy(void)
-    {
-        return thrust::omp::par;
-    }
-};
-#endif
-
-
 // threading building blocks backend
 #if ENABLE_TBB_BACKEND
 template <typename T>
@@ -179,22 +119,6 @@ struct backend_policy<intel_tbb>
 #define __METHOD_CUDA(base, method) ;
 #endif
 
-#if ENABLE_CPP_BACKEND
-#define __FUNC_CPP(fun) auto *ptr_cpp = fun<firepony::cpp>;
-#define __METHOD_CPP(base, method) auto ptr_cpp = &base<firepony::cpp>::method;
-#else
-#define __FUNC_CPP(fun) ;
-#define __METHOD_CPP(base, method) ;
-#endif
-
-#if ENABLE_OMP_BACKEND
-#define __FUNC_OMP(fun) auto *ptr_omp= fun<firepony::omp>;
-#define __METHOD_OMP(base, method) auto ptr_omp = &base<firepony::omp>::method;
-#else
-#define __FUNC_OMP(fun) ;
-#define __METHOD_OMP(base, method) ;
-#endif
-
 #if ENABLE_TBB_BACKEND
 #define __FUNC_TBB(fun) auto *ptr_TBB= fun<firepony::intel_tbb>;
 #define __METHOD_TBB(base, method) auto ptr_TBB = &base<firepony::intel_tbb>::method;
@@ -207,8 +131,6 @@ struct backend_policy<intel_tbb>
 #define INSTANTIATE(fun) \
         namespace __ ## fun ## __instantiation {    \
             __FUNC_CUDA(fun);                       \
-            __FUNC_CPP(fun);                        \
-            __FUNC_OMP(fun);                        \
             __FUNC_TBB(fun);                        \
     }
 
@@ -216,7 +138,5 @@ struct backend_policy<intel_tbb>
 #define METHOD_INSTANTIATE(base, method) \
         namespace __ ## base ## __ ## method ## __instantiation {   \
             __METHOD_CUDA(base, method);                            \
-            __METHOD_CPP(base, method);                             \
-            __METHOD_OMP(base, method);                             \
             __METHOD_TBB(base, method);                             \
     }

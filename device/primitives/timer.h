@@ -95,6 +95,12 @@ struct time_series
         : elapsed_time(0.0)
     { }
 
+    time_series& operator+=(const time_series& other)
+    {
+        elapsed_time += other.elapsed_time;
+        return *this;
+    }
+
     template <typename Timer>
     void add(const Timer& timer)
     {

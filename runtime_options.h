@@ -41,15 +41,11 @@ struct runtime_options
 
     // enable/disable the various backends
     bool enable_cuda;
-    bool enable_cpp;
-    bool enable_omp;
     bool enable_tbb;
 
     void disable_all_backends(void)
     {
         enable_cuda = false;
-        enable_cpp = false;
-        enable_omp = false;
         enable_tbb = false;
     }
 
@@ -66,8 +62,6 @@ struct runtime_options
         debug = false;
 
         enable_cuda = true;
-        enable_cpp = true;
-        enable_omp = true;
         enable_tbb = true;
     }
 };

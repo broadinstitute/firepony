@@ -140,6 +140,7 @@ void firepony_postprocess(firepony_context<system>& context)
     timer<host> output;
 
     postprocessing.start();
+    postprocess_covariates(context);
     build_read_group_table(context);
     build_empirical_quality_score_table(context);
     postprocessing.stop();

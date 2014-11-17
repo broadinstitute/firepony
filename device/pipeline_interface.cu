@@ -24,6 +24,8 @@
 
 #include "device/primitives/backends.h"
 
+#include <thread>
+
 #if ENABLE_TBB_BACKEND
 #include <tbb/task_scheduler_init.h>
 #endif
@@ -32,6 +34,14 @@ namespace firepony {
 
 template <target_system system> void firepony_process_batch(firepony_context<system>& context, const alignment_batch<system>& batch);
 template <target_system system> void firepony_postprocess(firepony_context<system>& context);
+
+template <target_system system_dst, target_system system_src>
+void firepony_gather_intermediates(firepony_context<system_dst>& context, firepony_context<system_src>& other)
+{
+    context.covariates.quality.concat(context.compute_device, other.compute_device, other.covariates.quality);
+    context.covariates.cycle.concat(context.compute_device, other.compute_device, other.covariates.cycle);
+    context.covariates.context.concat(context.compute_device, other.compute_device, other.covariates.context);
+}
 
 template <target_system system>
 struct firepony_device_pipeline : public firepony_pipeline
@@ -43,46 +53,25 @@ struct firepony_device_pipeline : public firepony_pipeline
     firepony_context<system> *context;
     alignment_batch<system> *batch;
 
+    io_thread *reader;
+
+    std::thread thread;
+    uint32 compute_device;
+
+    firepony_device_pipeline(uint32 compute_device)
+        : compute_device(compute_device)
+    { }
+
     virtual std::string get_name(void) override;
 
-    virtual void setup(const runtime_options *options,
-                       alignment_header_host *h_header,
-                       sequence_data_host *h_reference,
-                       variant_database_host *h_dbsnp) override
+    virtual target_system get_system(void) override
     {
-        size_t num_bytes;
-
-        header = new alignment_header<system>(*h_header);
-        reference = new sequence_data<system>(*h_reference);
-        dbsnp = new variant_database<system>(*h_dbsnp);
-
-        header->download();
-
-        num_bytes = reference->download();
-        if (system == firepony::cuda)
-        {
-            fprintf(stderr, "downloaded %lu MB of reference data\n", num_bytes / (1024 * 1024));
-        }
-
-        num_bytes = dbsnp->download();
-        if (system == firepony::cuda)
-        {
-            fprintf(stderr, "downloaded %lu MB of variant data\n", num_bytes / (1024 * 1024));
-        }
-
-        context = new firepony_context<system>(*options, *header, *reference, *dbsnp);
-        batch = new alignment_batch<system>();
+        return system;
     }
 
-    virtual void process_batch(const alignment_batch_host *h_batch) override
+    virtual int get_compute_device(void) override
     {
-        batch->download(h_batch);
-        firepony_process_batch(*context, *batch);
-    }
-
-    virtual void finish(void) override
-    {
-        firepony_postprocess(*context);
+        return compute_device;
     }
 
     virtual pipeline_statistics& statistics(void) override
@@ -90,6 +79,121 @@ struct firepony_device_pipeline : public firepony_pipeline
         return context->stats;
     }
 
+    virtual void setup(io_thread *reader,
+                       const runtime_options *options,
+                       alignment_header_host *h_header,
+                       sequence_data_host *h_reference,
+                       variant_database_host *h_dbsnp) override
+    {
+        if (system == cuda)
+        {
+            cudaSetDevice(compute_device);
+        }
+
+        this->reader = reader;
+
+        header = new alignment_header<system>(*h_header);
+        reference = new sequence_data<system>(*h_reference);
+        dbsnp = new variant_database<system>(*h_dbsnp);
+
+        header->download();
+        reference->download();
+        dbsnp->download();
+
+        context = new firepony_context<system>(compute_device, *options, *header, *reference, *dbsnp);
+        batch = new alignment_batch<system>();
+    }
+
+    virtual void start(void) override
+    {
+        thread = std::thread(&firepony_device_pipeline<system>::run, this);
+    }
+
+    virtual void join(void) override
+    {
+        thread.join();
+    }
+
+    virtual void gather_intermediates(firepony_pipeline *other) override
+    {
+        switch(other->get_system())
+        {
+#if ENABLE_CUDA_BACKEND
+        case firepony::cuda:
+        {
+            cudaSetDevice(compute_device);
+
+            firepony_device_pipeline<firepony::cuda> *other_cuda = (firepony_device_pipeline<firepony::cuda> *) other;
+            firepony_gather_intermediates(*context, *other_cuda->context);
+            break;
+        }
+#endif
+
+#if ENABLE_TBB_BACKEND
+        case firepony::intel_tbb:
+        {
+            firepony_device_pipeline<firepony::intel_tbb> *other_tbb = (firepony_device_pipeline<firepony::intel_tbb> *) other;
+            firepony_gather_intermediates(*context, *other_tbb->context);
+            break;
+        }
+#endif
+
+        default:
+            assert(!"can't happen");
+        }
+    }
+
+    virtual void postprocess(void) override
+    {
+        if (system == cuda)
+        {
+            cudaSetDevice(compute_device);
+        }
+
+        firepony_postprocess(*context);
+    }
+
+private:
+    void run(void)
+    {
+        if (system == cuda)
+        {
+            cudaSetDevice(compute_device);
+        }
+
+        timer<host> io_timer;
+        alignment_batch_host *h_batch;
+
+        for(;;)
+        {
+            // try to get a batch to work on
+            io_timer.start();
+            h_batch = reader->get_batch();
+            io_timer.stop();
+            statistics().io.add(io_timer);
+
+            if (h_batch == nullptr)
+            {
+                // no more data, we're done
+                break;
+            }
+
+            // download to the device
+            batch->download(h_batch);
+
+            // process the batch
+            firepony_process_batch(*context, *batch);
+
+            // return it to the reader for reuse
+            reader->retire_batch(h_batch);
+
+            if (!context->options.debug)
+            {
+                fprintf(stderr, ".");
+                fflush(stderr);
+            }
+        }
+    }
 };
 
 #if ENABLE_CUDA_BACKEND
@@ -97,36 +201,16 @@ template<>
 std::string firepony_device_pipeline<firepony::cuda>::get_name(void)
 {
     cudaDeviceProp prop;
-    int dev;
-    int runtime_version;
 
-    cudaRuntimeGetVersion(&runtime_version);
-    cudaGetDevice(&dev);
-    cudaGetDeviceProperties(&prop, dev);
+    cudaSetDevice(compute_device);
+    cudaGetDeviceProperties(&prop, compute_device);
 
     char buf[1024];
     snprintf(buf, sizeof(buf),
-             "%s (%lu MB, CUDA %d.%d)",
-             prop.name, prop.totalGlobalMem / (1024 * 1024),
-             runtime_version / 1000, runtime_version % 100);
+             "%s (%lu MB, CUDA device %d)",
+             prop.name, prop.totalGlobalMem / (1024 * 1024), compute_device);
 
     return std::string(buf);
-}
-#endif
-
-#if ENABLE_CPP_BACKEND
-template<>
-std::string firepony_device_pipeline<firepony::cpp>::get_name(void)
-{
-    return std::string("CPU (C++ threads)");
-}
-#endif
-
-#if ENABLE_OMP_BACKEND
-template<>
-std::string firepony_device_pipeline<firepony::omp>::get_name(void)
-{
-    return std::string("CPU (OpenMP)");
 }
 #endif
 
@@ -138,37 +222,27 @@ template<>
 std::string firepony_device_pipeline<firepony::intel_tbb>::get_name(void)
 {
     char buf[256];
-    snprintf(buf, sizeof(buf), "CPU (Intel TBB, %d threads)", num_tbb_threads);
+    snprintf(buf, sizeof(buf), "CPU (Intel Threading Building Blocks, %d threads)", num_tbb_threads);
     return std::string(buf);
 }
 
 #endif
 
-firepony_pipeline *firepony_pipeline::create(target_system system)
+firepony_pipeline *firepony_pipeline::create(target_system system, uint32 device)
 {
     switch(system)
     {
 #if ENABLE_CUDA_BACKEND
     case firepony::cuda:
-        return new firepony_device_pipeline<firepony::cuda>();
-#endif
-
-#if ENABLE_CPP_BACKEND
-    case firepony::cpp:
-        return new firepony_device_pipeline<firepony::cpp>();
-#endif
-
-#if ENABLE_OMP_BACKEND
-    case firepony::omp:
-        return new firepony_device_pipeline<firepony::omp>();
+        return new firepony_device_pipeline<firepony::cuda>(device);
 #endif
 
 #if ENABLE_TBB_BACKEND
     case firepony::intel_tbb:
-        // reserve one thread for I/O
-        num_tbb_threads = tbb::task_scheduler_init::default_num_threads() - 1;
+        // reserve device threads for other devices and I/O
+        num_tbb_threads = tbb::task_scheduler_init::default_num_threads() - device - 1;
         tbb_scheduler_init.initialize(num_tbb_threads);
-        return new firepony_device_pipeline<firepony::intel_tbb>();
+        return new firepony_device_pipeline<firepony::intel_tbb>(num_tbb_threads);
 #endif
 
     default:

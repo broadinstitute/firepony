@@ -80,6 +80,23 @@ struct covariate_table
         thrust::copy(other.values.begin(), other.values.end(), values.begin());
     }
 
+    // cross-device table concatenation
+    template <target_system other_system>
+    void concat(int my_device, int other_device, covariate_table<other_system, covariate_value>& other)
+    {
+        size_t off = size();
+
+        keys.resize(keys.size() + other.keys.size());
+        values.resize(values.size() + other.values.size());
+
+        cross_device_copy(my_device, keys, off,
+                          other_device, other.keys, 0,
+                          other.keys.size());
+        cross_device_copy(my_device, values, off,
+                          other_device, other.values, 0,
+                          other.values.size());
+    }
+
     void sort(vector<system, covariate_key>& temp_keys,
               vector<system, covariate_value>& temp_values,
               vector<system, uint8>& temp_storage,

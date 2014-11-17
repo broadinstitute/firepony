@@ -15,31 +15,15 @@ option(ENABLE_CUDA_BACKEND
        "Enable the GPU-accelerated CUDA backend"
        ON)
 
-option(ENABLE_CPP_BACKEND
-       "Enable the CPP threads CPU backend"
-       OFF)
-
-option(ENABLE_OPENMP_BACKEND
-       "Enable the OpenMP CPU backend"
-       OFF)
-
-option(ENABLE_TBB_BACKEND
-       "Enable the Threading Building Blocks backend"
+option(ENABLE_CPU_BACKEND
+       "Enable the CPU backend based on Intel Threading Building Blocks"
        ON)
 
 if (ENABLE_CUDA_BACKEND)
     add_definitions(-DENABLE_CUDA_BACKEND=1)
 endif()
 
-if (ENABLE_CPP_BACKEND)
-    add_definitions(-DENABLE_CPP_BACKEND=1)
-endif()
-
-if (ENABLE_OPENMP_BACKEND)
-    add_definitions(-DENABLE_OMP_BACKEND=1)
-endif()
-
-if (ENABLE_TBB_BACKEND)
+if (ENABLE_CPU_BACKEND)
     add_definitions(-DENABLE_TBB_BACKEND=1)
 endif()
 
@@ -64,7 +48,7 @@ include("contrib/gamgee.cmake")
 include("contrib/zlib.cmake")
 include("contrib/cub.cmake")
 
-if (ENABLE_TBB_BACKEND)
+if (ENABLE_CPU_BACKEND)
     include("contrib/tbb.cmake")
     set(SYSTEM_LINK_LIBRARIES ${SYSTEM_LINK_LIBRARIES} ${tbb_LIB})
 endif()
@@ -124,7 +108,7 @@ set(firepony_common_sources
 
 cuda_add_library(firepony-common ${firepony_common_sources})
 add_dependencies(firepony-common gamgee zlib)
-if (ENABLE_TBB_BACKEND)
+if (ENABLE_CPU_BACKEND)
     add_dependencies(firepony-common tbb)
 endif()
 if (USE_EXTERNAL_THRUST)

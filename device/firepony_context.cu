@@ -43,6 +43,7 @@ template <target_system system>
 void firepony_context<system>::end_batch(const alignment_batch<system>& batch)
 {
     stats.total_reads += batch.host->num_reads;
+    stats.num_batches++;
 }
 METHOD_INSTANTIATE(firepony_context, end_batch);
 

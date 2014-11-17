@@ -21,81 +21,100 @@
 #include "gamgee_loader.h"
 #include "command_line.h"
 
+#include <mutex>
+#include <condition_variable>
+
 namespace firepony {
 
-io_thread::io_thread(const char *fname, uint32 data_mask)
-    : put(1),
-      get(0),
-      eof(false),
+io_thread::io_thread(const char *fname, uint32 data_mask, const int consumers)
+    : NUM_BUFFERS(consumers + 1),
       file(fname),
       data_mask(data_mask)
-{ }
+{
+    for(int i = 0; i < NUM_BUFFERS; i++)
+    {
+        empty_batches.push(new alignment_batch_host);
+    }
+}
+
+io_thread::~io_thread()
+{
+    while(empty_batches.size())
+    {
+        alignment_batch_host *buf = empty_batches.pop();
+        if (buf)
+            delete buf;
+    }
+}
 
 void io_thread::start(void)
 {
-    if (!DISABLE_THREADING)
-    {
-        thread = std::thread(&io_thread::run, this);
-    }
+    thread = std::thread(&io_thread::run, this);
 }
 
 void io_thread::join(void)
 {
-    if (!DISABLE_THREADING)
-    {
-        thread.join();
-    }
+    thread.join();
 }
 
-int io_thread::wrap(int val)
+alignment_batch_host *io_thread::get_batch(void)
 {
-    return val % NUM_BUFFERS;
+    // wait for a buffer to become available
+    sem_consumer.wait();
+
+    return batches.pop();
 }
 
-alignment_batch_host& io_thread::next_buffer(void)
+void io_thread::retire_batch(alignment_batch_host *buffer)
 {
-    if (DISABLE_THREADING)
-    {
-        return batches[0];
-    } else {
-        while(wrap(get + 1) == put)
-            std::this_thread::yield();
+    empty_batches.push(buffer);
 
-        get = wrap(get + 1);
-        return batches[get];
-    }
-}
-
-bool io_thread::done(void)
-{
-    if (DISABLE_THREADING)
-    {
-        eof = !(file.next_batch(&batches[0], data_mask, command_line_options.batch_size));
-        return eof;
-    } else {
-        if (!eof)
-            return false;
-
-        if (wrap(get + 1) != put)
-            return false;
-
-        return true;
-    }
+    // notify the producer
+    sem_producer.post();
 }
 
 void io_thread::run(void)
 {
+    alignment_batch_host *buf;
+    bool eof;
+
+    // prime the buffer queue
+    for(int i = 0; i < NUM_BUFFERS; i++)
+    {
+        assert(empty_batches.size());
+        buf = empty_batches.pop();
+
+        eof = !(file.next_batch(buf, data_mask, command_line_options.batch_size));
+        if (eof)
+        {
+            break;
+        }
+
+        batches.push(buf);
+        sem_consumer.post();
+    }
+
     while(!eof)
     {
         // wait for a slot
-        while (put == get)
-            std::this_thread::yield();
+        sem_producer.wait();
 
-        eof = !(file.next_batch(&batches[put], data_mask, command_line_options.batch_size));
+        assert(empty_batches.size());
+        buf = empty_batches.pop();
+
+        eof = !(file.next_batch(buf, data_mask, command_line_options.batch_size));
         if (!eof)
         {
-            put = wrap(put + 1);
+            batches.push(buf);
+            sem_consumer.post();
         }
+    }
+
+    // push null pointers into the queue to signal consumers we're done
+    for(int i = 0; i < NUM_BUFFERS; i++)
+    {
+        batches.push(nullptr);
+        sem_consumer.post();
     }
 }
 

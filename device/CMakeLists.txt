@@ -56,6 +56,6 @@ primitives/vector.h
 
 cuda_add_library(firepony-device ${firepony_sources})
 add_dependencies(firepony-device gamgee zlib cub)
-if (ENABLE_TBB_BACKEND)
+if (ENABLE_CPU_BACKEND)
     add_dependencies(firepony-device tbb)
 endif()

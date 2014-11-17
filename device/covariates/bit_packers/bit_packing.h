@@ -87,10 +87,9 @@ protected:
                                                         uint32 read_index, uint16 bp_offset, uint32 cigar_event_index)
     {
         // add in our bits
-        // xxxnsubtil: the bitwise AND is in theory not necessary here, investigate removing it
-        input_key.M = input_key.M | (((data.M) & BITMASK(num_bits)) << offset);
-        input_key.I = input_key.I | (((data.I) & BITMASK(num_bits)) << offset);
-        input_key.D = input_key.D | (((data.D) & BITMASK(num_bits)) << offset);
+        input_key.M = input_key.M | (data.M << offset);
+        input_key.I = input_key.I | (data.I << offset);
+        input_key.D = input_key.D | (data.D << offset);
 
         // pass along to next in chain
         return PreviousCovariate::encode(ctx, batch, read_index, bp_offset, cigar_event_index, input_key);

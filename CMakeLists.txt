@@ -99,12 +99,13 @@ set(firepony_common_sources
     io_thread.h
     mmap.cu
     mmap.h
+    runtime_options.h
     serialization.h
     serialization_inl.h
     string_database.cu
     string_database.h
     types.h
-    runtime_options.h)
+    version.h)
 
 cuda_add_library(firepony-common ${firepony_common_sources})
 add_dependencies(firepony-common gamgee zlib)

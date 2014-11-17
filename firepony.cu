@@ -30,6 +30,8 @@
 
 #include "device/pipeline.h"
 
+#include "version.h"
+
 using namespace firepony;
 
 #if ENABLE_CUDA_BACKEND
@@ -146,7 +148,7 @@ int main(int argc, char **argv)
     variant_database_host h_dbsnp;
     bool ret;
 
-    fprintf(stderr, "Firepony v0.5.0\n");
+    fprintf(stderr, "Firepony v%d.%d.%d\n", FIREPONY_VERSION_MAJOR, FIREPONY_VERSION_MINOR, FIREPONY_VERSION_REV);
     parse_command_line(argc, argv);
 
 #if ENABLE_CUDA_BACKEND

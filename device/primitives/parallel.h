@@ -114,6 +114,9 @@ struct parallel_thrust
     {
         thrust::sort_by_key(keys.begin(), keys.end(), values.begin());
     }
+
+    static inline void synchronize()
+    { }
 };
 
 // default to thrust
@@ -126,8 +129,10 @@ struct parallel : public parallel_thrust<system>
     using parallel_thrust<system>::copy_flagged;
     using parallel_thrust<system>::sum;
     using parallel_thrust<system>::sort_by_key;
+    using parallel_thrust<system>::synchronize;
 };
 
+#if ENABLE_CUDA_BACKEND
 // specialization for the cuda backend based on CUB primitives
 template <>
 struct parallel<cuda> : public parallel_thrust<cuda>
@@ -287,7 +292,13 @@ struct parallel<cuda> : public parallel_thrust<cuda>
             cudaMemcpy(thrust::raw_pointer_cast(values.data()), d_values.Current(), sizeof(Value) * len, cudaMemcpyDeviceToDevice);
         }
     }
+
+    static inline void synchronize(void)
+    {
+        cudaDeviceSynchronize();
+    }
 };
+#endif
 
 } // namespace firepony
 

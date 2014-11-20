@@ -20,6 +20,7 @@
 
 #include "device/primitives/backends.h"
 #include "device/primitives/timer.h"
+#include "device/primitives/parallel.h"
 
 #include "alignment_data_device.h"
 #include "sequence_data_device.h"
@@ -114,10 +115,7 @@ void firepony_process_batch(firepony_context<system>& context, const alignment_b
 
     context.end_batch(batch);
 
-    if (system == firepony::cuda)
-    {
-        cudaDeviceSynchronize();
-    }
+    parallel<system>::synchronize();
 
     context.stats.read_filter.add(read_filter);
 
@@ -150,10 +148,7 @@ void firepony_postprocess(firepony_context<system>& context)
     output_covariates(context);
     output.stop();
 
-    if (system == firepony::cuda)
-    {
-        cudaDeviceSynchronize();
-    }
+    parallel<system>::synchronize();
 
     context.stats.postprocessing.add(postprocessing);
     context.stats.output.add(output);

@@ -195,10 +195,7 @@ static void build_covariates_table(covariate_observation_table<system>& table, f
         covariates_pack.stop();
     }
 
-    if (system == cuda)
-    {
-        cudaDeviceSynchronize();
-    }
+    parallel<system>::synchronize();
 
     context.stats.covariates_gather.add(covariates_gather);
     context.stats.covariates_filter.add(covariates_filter);

@@ -85,10 +85,12 @@ struct firepony_device_pipeline : public firepony_pipeline
                        sequence_data_host *h_reference,
                        variant_database_host *h_dbsnp) override
     {
+#if ENABLE_CUDA_BACKEND
         if (system == cuda)
         {
             cudaSetDevice(compute_device);
         }
+#endif
 
         this->reader = reader;
 
@@ -145,10 +147,12 @@ struct firepony_device_pipeline : public firepony_pipeline
 
     virtual void postprocess(void) override
     {
+#if ENABLE_CUDA_BACKEND
         if (system == cuda)
         {
             cudaSetDevice(compute_device);
         }
+#endif
 
         firepony_postprocess(*context);
     }
@@ -156,10 +160,12 @@ struct firepony_device_pipeline : public firepony_pipeline
 private:
     void run(void)
     {
+#if ENABLE_CUDA_BACKEND
         if (system == cuda)
         {
             cudaSetDevice(compute_device);
         }
+#endif
 
         timer<host> io_timer;
         alignment_batch_host *h_batch;

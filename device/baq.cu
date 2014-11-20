@@ -1353,7 +1353,7 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
 
     context.stats.baq_reads += num_active;
 
-    cudaDeviceSynchronize();
+    parallel<system>::synchronize();
     context.stats.baq_setup.add(baq_setup);
     context.stats.baq_hmm.add(baq_hmm);
     context.stats.baq_postprocess.add(baq_postprocess);

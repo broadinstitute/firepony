@@ -581,9 +581,17 @@ struct compute_error_vectors : public lambda<system>
 
                 if (!negative_strand)
                 {
-                    ctx.cigar.is_insertion[idx.read_start + current_bp_idx - 1] = 1;
+                    int off = current_bp_idx - 1;
+                    if (off >= 0)
+                    {
+                        ctx.cigar.is_insertion[idx.read_start + off] = 1;
+                    }
                 } else {
-                    ctx.cigar.is_insertion[idx.read_start + current_bp_idx + batch.cigars[event].len - 1] = 1;
+                    int off = current_bp_idx + batch.cigars[event].len - 1;
+                    if (off >= 0)
+                    {
+                        ctx.cigar.is_insertion[idx.read_start + off] = 1;
+                    }
                 }
 
                 // if we are inside the clipped read window, count this error
@@ -600,7 +608,11 @@ struct compute_error_vectors : public lambda<system>
                 {
                     ctx.cigar.is_deletion[idx.read_start + current_bp_idx] = 1;
                 } else {
-                    ctx.cigar.is_deletion[idx.read_start + current_bp_idx + 1] = 1;
+                    uint16 off = current_bp_idx + 1;
+                    if (off < idx.read_len)
+                    {
+                        ctx.cigar.is_deletion[idx.read_start + off] = 1;
+                    }
                 }
 
                 // if we are inside the clipped read window, count this error
@@ -757,39 +769,39 @@ void expand_cigars(firepony_context<system>& context, const alignment_batch<syst
     // now expand the coordinates per read
     // this avoids having to deal with boundary conditions within reads
     parallel<system>::for_each(context.active_read_list.begin(),
-                     context.active_read_list.end(),
-                     cigar_coordinates_expand<system>(context, batch.device));
+                               context.active_read_list.end(),
+                               cigar_coordinates_expand<system>(context, batch.device));
 
     // initialize read windows
     parallel<system>::for_each(context.active_read_list.begin(),
-                     context.active_read_list.end(),
-                     read_window_init<system>(context, batch.device));
+                               context.active_read_list.end(),
+                               read_window_init<system>(context, batch.device));
 
     // remove sequencing adapters
     parallel<system>::for_each(context.active_read_list.begin(),
-                     context.active_read_list.end(),
-                     remove_adapters<system>(context, batch.device));
+                               context.active_read_list.end(),
+                               remove_adapters<system>(context, batch.device));
 
     // remove soft clip regions
     parallel<system>::for_each(context.active_read_list.begin(),
-                     context.active_read_list.end(),
-                     remove_soft_clips<system>(context, batch.device));
+                               context.active_read_list.end(),
+                               remove_soft_clips<system>(context, batch.device));
 
     // compute the no insertions window based on the clipping window
     parallel<system>::for_each(context.active_read_list.begin(),
-                     context.active_read_list.end(),
-                     compute_no_insertions_window<system>(context, batch.device));
+                               context.active_read_list.end(),
+                               compute_no_insertions_window<system>(context, batch.device));
 
     // finally, compute the reference window (using the no insertions window)
     parallel<system>::for_each(context.active_read_list.begin(),
-                     context.active_read_list.end(),
-                     compute_reference_window<system>(context, batch.device));
+                               context.active_read_list.end(),
+                               compute_reference_window<system>(context, batch.device));
 
-    // compute the error bit vectors
+    // compute the error bit vectors        -- XXXNSUBTIL ACCESS VIOLATION HERE
     // this also counts the number of errors in each read
     parallel<system>::for_each(context.active_read_list.begin(),
-                     context.active_read_list.end(),
-                     compute_error_vectors<system>(context, batch.device));
+                               context.active_read_list.end(),
+                               compute_error_vectors<system>(context, batch.device));
 }
 INSTANTIATE(expand_cigars);
 

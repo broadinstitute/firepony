@@ -18,7 +18,7 @@ TARGET_INC_DIRECTORY="$tbb_INSTALL/include"
 
 # install binaries
 mkdir -p $TARGET_LIB_DIRECTORY || true
-cp -a $tbb_SRC/build/$BUILD_DIRECTORY/*.so* $TARGET_LIB_DIRECTORY/
+cp -a $tbb_SRC/build/$BUILD_DIRECTORY/* $TARGET_LIB_DIRECTORY/
 
 # install headers
 mkdir -p $TARGET_INC_DIRECTORY || true

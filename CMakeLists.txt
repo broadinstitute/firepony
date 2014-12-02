@@ -38,6 +38,7 @@ include("gcc.cmake")
 # build dependencies
 if (NOT USE_SYSTEM_BOOST)
     include("contrib/boost.cmake")
+    include_directories(${Boost_INCLUDE_DIR})
 endif()
 
 if (USE_EXTERNAL_THRUST)

@@ -286,7 +286,7 @@ struct remove_soft_clips : public lambda<system>
 
         // iterate forward through the leading clip region
         while(cigar_index < idx.cigar_start + idx.cigar_len &&
-                read_offset < idx.read_len)
+              read_offset < idx.read_len)
         {
             const auto& op = batch.cigars[cigar_index];
 
@@ -306,10 +306,10 @@ struct remove_soft_clips : public lambda<system>
 
         // iterate backward through the trailing clip region
         cigar_index = idx.cigar_start + idx.cigar_len - 1;
-        read_offset = read_window_clipped.y;
+        read_offset = idx.read_len - 1;
 
         while(cigar_index >= idx.cigar_start &&
-                read_offset > read_window_clipped.x)
+              read_offset > read_window_clipped.x)
         {
             const auto& op = batch.cigars[cigar_index];
 

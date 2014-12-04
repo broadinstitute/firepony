@@ -197,13 +197,49 @@ struct compute_vcf_ranges : public lambda<system>
             vcf_range.x--;
         }
 
-        // check for overlap at the edges of the range
-        if (db.reference_window_start[vcf_range.x] < alignment_window.x &&
-                db.reference_window_start[vcf_range.y] + db.alignment_window_len[vcf_range.y] > alignment_window.y)
+        // figure out the (reference) interval that our set of features covers
+        const uint32 feature_start = db.reference_window_start[vcf_range.x];
+        const uint32 feature_end = db.reference_window_start[vcf_range.y] + db.alignment_window_len[vcf_range.y];
+
+        // figure out which "side" of the read alignment window (in reference coordinates) these features lie on
+        enum {
+            left,
+            inside,
+            right
+        } loc_start, loc_end;
+
+        if (feature_start < alignment_window.x)
         {
-            // emit an empty VCF range
+            loc_start = left;
+        } else if (feature_start >= alignment_window.x &&
+                   feature_start <= alignment_window.y)
+        {
+            loc_start = inside;
+        } else {
+            assert(feature_start > alignment_window.y);
+            loc_start = right;
+        }
+
+        if (feature_end < alignment_window.x)
+        {
+            loc_end = left;
+        } else if (feature_end >= alignment_window.x &&
+                   feature_end <= alignment_window.y)
+        {
+            loc_end = inside;
+        } else {
+            assert(feature_end > alignment_window.y);
+            loc_end = right;
+        }
+
+        // check for overlap
+        if (loc_start == loc_end && loc_start != inside)
+        {
+            // both start and end are on the same side and they're not inside, we don't overlap the read
+            // emit an empty vcf range
             ctx.snp_filter.active_vcf_ranges[read_index] = make_uint2(uint32(-1), uint32(-1));
         } else {
+            // start and end are on different sides (or are both inside the read), emit a valid vcf range
             ctx.snp_filter.active_vcf_ranges[read_index] = vcf_range;
         }
     }
@@ -244,12 +280,12 @@ public:
 
         uint2 vcf_db_range = ctx.snp_filter.active_vcf_ranges[read_index];
 
+        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
+        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
+
         // traverse the VCF range and mark corresponding read BPs as inactive
         for(uint32 feature = vcf_db_range.x; feature <= vcf_db_range.y; feature++)
         {
-            const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
-            const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
-
             // compute the feature range as offset from alignment start
             const int feature_start = db.reference_window_start[feature] - ref_sequence_offset;
             const int feature_end = db.reference_window_start[feature] + db.alignment_window_len[feature] - ref_sequence_offset;
@@ -341,8 +377,8 @@ void filter_known_snps(firepony_context<system>& context, const alignment_batch<
     // finally apply the VCF filter
     // this will create zeros in the active location list for each BP that matches a known variant
     parallel<system>::for_each(snp.active_read_ids.begin(),
-                     snp.active_read_ids.end(),
-                     filter_bps<system>(context, batch.device));
+                               snp.active_read_ids.end(),
+                               filter_bps<system>(context, batch.device));
 }
 INSTANTIATE(filter_known_snps);
 

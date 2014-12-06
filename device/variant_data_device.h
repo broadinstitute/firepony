@@ -29,15 +29,15 @@ struct variant_database_device : public variant_database_storage<system>
     size_t download(const variant_database_host& host)
     {
         size_t num_bytes = 0;
-    #define TRACK_VECTOR_SIZE(f) num_bytes += sizeof(host.view.f[0]) * this->f.size();
+    #define TRACK_VECTOR_SIZE(f) num_bytes += sizeof(host.f[0]) * this->f.size();
     #define TRACK_PACKED_VECTOR_SIZE(f) num_bytes += sizeof(uint32) * this->f.m_storage.size();
 
-        this->data_mask = host.view.data_mask;
-        this->num_variants = host.view.num_variants;
+        this->data_mask = host.data_mask;
+        this->num_variants = host.num_variants;
 
         if (this->data_mask & VariantDataMask::ID)
         {
-            this->id.copy_from_view(host.view.id);
+            this->id = host.id;
             TRACK_VECTOR_SIZE(id);
         } else {
             this->id.clear();
@@ -45,7 +45,7 @@ struct variant_database_device : public variant_database_storage<system>
 
         if (this->data_mask & VariantDataMask::CHROMOSOME)
         {
-            this->chromosome.copy_from_view(host.view.chromosome);
+            this->chromosome = host.chromosome;
             TRACK_VECTOR_SIZE(chromosome);
         } else {
             this->chromosome.clear();
@@ -53,9 +53,9 @@ struct variant_database_device : public variant_database_storage<system>
 
         if (this->data_mask & VariantDataMask::ALIGNMENT)
         {
-            this->chromosome_window_start.copy_from_view(host.view.chromosome_window_start);
-            this->reference_window_start.copy_from_view(host.view.reference_window_start);
-            this->alignment_window_len.copy_from_view(host.view.alignment_window_len);
+            this->chromosome_window_start = host.chromosome_window_start;
+            this->reference_window_start = host.reference_window_start;
+            this->alignment_window_len = host.alignment_window_len;
 
             TRACK_VECTOR_SIZE(chromosome_window_start);
             TRACK_VECTOR_SIZE(reference_window_start);
@@ -68,7 +68,7 @@ struct variant_database_device : public variant_database_storage<system>
 
         if (this->data_mask & VariantDataMask::QUAL)
         {
-            this->qual.copy_from_view(host.view.qual);
+            this->qual = host.qual;
             TRACK_VECTOR_SIZE(qual);
         } else {
             this->qual.clear();
@@ -76,7 +76,7 @@ struct variant_database_device : public variant_database_storage<system>
 
         if (this->data_mask & VariantDataMask::N_SAMPLES)
         {
-            this->n_samples.copy_from_view(host.view.n_samples);
+            this->n_samples = host.n_samples;
             TRACK_VECTOR_SIZE(n_samples);
         } else {
             this->n_samples.clear();
@@ -84,7 +84,7 @@ struct variant_database_device : public variant_database_storage<system>
 
         if (this->data_mask & VariantDataMask::N_ALLELES)
         {
-            this->n_alleles.copy_from_view(host.view.n_alleles);
+            this->n_alleles = host.n_alleles;
             TRACK_VECTOR_SIZE(n_alleles);
         } else {
             this->n_alleles.clear();
@@ -92,9 +92,9 @@ struct variant_database_device : public variant_database_storage<system>
 
         if (this->data_mask & VariantDataMask::REFERENCE)
         {
-            this->reference_sequence.copy_from_view(host.view.reference_sequence);
-            this->reference_sequence_start.copy_from_view(host.view.reference_sequence_start);
-            this->reference_sequence_len.copy_from_view(host.view.reference_sequence_len);
+            this->reference_sequence = host.reference_sequence;
+            this->reference_sequence_start = host.reference_sequence_start;
+            this->reference_sequence_len = host.reference_sequence_len;
 
             TRACK_PACKED_VECTOR_SIZE(reference_sequence);
             TRACK_VECTOR_SIZE(reference_sequence_start);
@@ -107,9 +107,9 @@ struct variant_database_device : public variant_database_storage<system>
 
         if (this->data_mask & VariantDataMask::ALTERNATE)
         {
-            this->alternate_sequence.copy_from_view(host.view.alternate_sequence);
-            this->alternate_sequence_start.copy_from_view(host.view.alternate_sequence_start);
-            this->alternate_sequence_len.copy_from_view(host.view.alternate_sequence_len);
+            this->alternate_sequence = host.alternate_sequence;
+            this->alternate_sequence_start = host.alternate_sequence_start;
+            this->alternate_sequence_len = host.alternate_sequence_len;
 
             TRACK_PACKED_VECTOR_SIZE(alternate_sequence);
             TRACK_VECTOR_SIZE(alternate_sequence_start);

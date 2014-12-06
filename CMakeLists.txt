@@ -98,11 +98,7 @@ set(firepony_common_sources
     gamgee_loader.h
     io_thread.cu
     io_thread.h
-    mmap.cu
-    mmap.h
     runtime_options.h
-    serialization.h
-    serialization_inl.h
     string_database.cu
     string_database.h
     types.h
@@ -119,8 +115,5 @@ endif()
 
 cuda_add_executable(firepony firepony.cu)
 target_link_libraries(firepony firepony-common firepony-device ${tbb_LIB} ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
-
-cuda_add_executable(firepony-loader firepony-loader.cu)
-target_link_libraries(firepony-loader firepony-common firepony-device ${tbb_LIB} ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
 
 cuda_build_clean_target()

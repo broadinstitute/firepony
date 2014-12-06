@@ -30,17 +30,17 @@ struct sequence_data_device : public sequence_data_storage<system>
     size_t download(const sequence_data_host& host)
     {
         size_t num_bytes = 0;
-#define TRACK_VECTOR_SIZE(f) num_bytes += sizeof(host.view.f[0]) * this->f.size();
+#define TRACK_VECTOR_SIZE(f) num_bytes += sizeof(host.f[0]) * this->f.size();
 #define TRACK_PACKED_VECTOR_SIZE(f) num_bytes += sizeof(uint32) * this->f.m_storage.size();
 
-        this->num_sequences = host.view.num_sequences;
-        this->data_mask = host.view.data_mask;
+        this->num_sequences = host.num_sequences;
+        this->data_mask = host.data_mask;
 
         if (this->data_mask & SequenceDataMask::BASES)
         {
-            this->bases.copy_from_view(host.view.bases);
-            this->sequence_bp_start.copy_from_view(host.view.sequence_bp_start);
-            this->sequence_bp_len.copy_from_view(host.view.sequence_bp_len);
+            this->bases = host.bases;
+            this->sequence_bp_start = host.sequence_bp_start;
+            this->sequence_bp_len = host.sequence_bp_len;
 
             TRACK_PACKED_VECTOR_SIZE(bases);
             TRACK_VECTOR_SIZE(sequence_bp_start);
@@ -49,9 +49,9 @@ struct sequence_data_device : public sequence_data_storage<system>
 
         if (this->data_mask & SequenceDataMask::QUALITIES)
         {
-            this->qualities.copy_from_view(host.view.qualities);
-            this->sequence_qual_start.copy_from_view(host.view.sequence_qual_start);
-            this->sequence_qual_len.copy_from_view(host.view.sequence_qual_len);
+            this->qualities = host.qualities;
+            this->sequence_qual_start = host.sequence_qual_start;
+            this->sequence_qual_len = host.sequence_qual_len;
 
             TRACK_VECTOR_SIZE(qualities);
             TRACK_VECTOR_SIZE(sequence_qual_start);
@@ -60,7 +60,7 @@ struct sequence_data_device : public sequence_data_storage<system>
 
         if (this->data_mask & SequenceDataMask::NAMES)
         {
-            this->sequence_id.copy_from_view(host.view.sequence_id);
+            this->sequence_id = host.sequence_id;
             TRACK_VECTOR_SIZE(sequence_id);
         }
 

@@ -20,7 +20,6 @@
 
 #include "types.h"
 #include "string_database.h"
-#include "mmap.h"
 
 #include <vector>
 
@@ -124,93 +123,9 @@ struct variant_database_storage
     }
 };
 
-struct variant_database_host
+struct variant_database_host : public variant_database_storage<host>
 {
-    uint32 data_mask;
-
     string_database id_db;
-
-    variant_database_storage<host>::const_view view;
-    variant_database_storage<host> host_malloc_container;
-    shared_memory_file host_mmap_container;
-
-    size_t serialized_size(void)
-    {
-        size_t ret = 0;
-
-        ret += serialization::serialized_size(host_malloc_container.data_mask);
-        ret += id_db.serialized_size();
-        ret += serialization::serialized_size(host_malloc_container.num_variants);
-        ret += serialization::serialized_size(host_malloc_container.chromosome);
-        ret += serialization::serialized_size(host_malloc_container.chromosome_window_start);
-        ret += serialization::serialized_size(host_malloc_container.reference_window_start);
-        ret += serialization::serialized_size(host_malloc_container.alignment_window_len);
-        ret += serialization::serialized_size(host_malloc_container.id);
-        ret += serialization::serialized_size(host_malloc_container.qual);
-        ret += serialization::serialized_size(host_malloc_container.n_samples);
-        ret += serialization::serialized_size(host_malloc_container.n_alleles);
-        // xxxnsubtil: need to fix packed vector serialization!
-        ret += serialization::serialized_size(host_malloc_container.reference_sequence.m_size);
-        ret += serialization::serialized_size(host_malloc_container.reference_sequence.m_storage);
-        ret += serialization::serialized_size(host_malloc_container.reference_sequence_start);
-        ret += serialization::serialized_size(host_malloc_container.reference_sequence_len);
-        ret += serialization::serialized_size(host_malloc_container.alternate_sequence.m_size);
-        ret += serialization::serialized_size(host_malloc_container.alternate_sequence.m_storage);
-        ret += serialization::serialized_size(host_malloc_container.alternate_sequence_start);
-        ret += serialization::serialized_size(host_malloc_container.alternate_sequence_len);
-
-        return ret;
-    }
-
-    void *serialize(void *out)
-    {
-        out = serialization::encode(out, &host_malloc_container.data_mask);
-        out = id_db.serialize(out);
-        out = serialization::encode(out, &host_malloc_container.num_variants);
-        out = serialization::encode(out, &host_malloc_container.chromosome);
-        out = serialization::encode(out, &host_malloc_container.chromosome_window_start);
-        out = serialization::encode(out, &host_malloc_container.reference_window_start);
-        out = serialization::encode(out, &host_malloc_container.alignment_window_len);
-        out = serialization::encode(out, &host_malloc_container.id);
-        out = serialization::encode(out, &host_malloc_container.qual);
-        out = serialization::encode(out, &host_malloc_container.n_samples);
-        out = serialization::encode(out, &host_malloc_container.n_alleles);
-        out = serialization::encode(out, &host_malloc_container.reference_sequence.m_size);
-        out = serialization::encode(out, &host_malloc_container.reference_sequence.m_storage);
-        out = serialization::encode(out, &host_malloc_container.reference_sequence_start);
-        out = serialization::encode(out, &host_malloc_container.reference_sequence_len);
-        out = serialization::encode(out, &host_malloc_container.alternate_sequence.m_size);
-        out = serialization::encode(out, &host_malloc_container.alternate_sequence.m_storage);
-        out = serialization::encode(out, &host_malloc_container.alternate_sequence_start);
-        out = serialization::encode(out, &host_malloc_container.alternate_sequence_len);
-
-        return out;
-    }
-
-    void unserialize(shared_memory_file& shm)
-    {
-        void *in = shm.data;
-
-        in = serialization::decode(&view.data_mask, in);
-        in = id_db.unserialize(in);
-        in = serialization::decode(&view.num_variants, in);
-        in = serialization::unwrap_vector_view(view.chromosome, in);
-        in = serialization::unwrap_vector_view(view.chromosome_window_start, in);
-        in = serialization::unwrap_vector_view(view.reference_window_start, in);
-        in = serialization::unwrap_vector_view(view.alignment_window_len, in);
-        in = serialization::unwrap_vector_view(view.id, in);
-        in = serialization::unwrap_vector_view(view.qual, in);
-        in = serialization::unwrap_vector_view(view.n_samples, in);
-        in = serialization::unwrap_vector_view(view.n_alleles, in);
-        in = serialization::unwrap_packed_vector_view(view.reference_sequence, in);
-        in = serialization::unwrap_vector_view(view.reference_sequence_start, in);
-        in = serialization::unwrap_vector_view(view.reference_sequence_len, in);
-        in = serialization::unwrap_packed_vector_view(view.alternate_sequence, in);
-        in = serialization::unwrap_vector_view(view.alternate_sequence_start, in);
-        in = serialization::unwrap_vector_view(view.alternate_sequence_len, in);
-
-        host_mmap_container = shm;
-    }
 };
 
 } // namespace firepony

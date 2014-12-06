@@ -84,31 +84,4 @@ uint32 string_database::hash(const std::string& s)
     return hash(s.c_str());
 }
 
-size_t string_database::serialized_size(void)
-{
-    return serialization::serialized_size(string_identifiers);
-}
-
-void *string_database::serialize(void *out)
-{
-    return serialization::encode(out, &string_identifiers);
-}
-
-void *string_database::unserialize(void *in)
-{
-    in = serialization::decode(&string_identifiers, in);
-
-    string_hash_to_id.clear();
-
-    for(uint32 i = 0; i < string_identifiers.size(); i++)
-    {
-        const std::string& str = string_identifiers[i];
-        const uint32 h = hash(str);
-
-        string_hash_to_id[h] = i;
-    }
-
-    return in;
-}
-
 } // namespace firepony

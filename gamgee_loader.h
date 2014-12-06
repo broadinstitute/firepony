@@ -46,8 +46,8 @@ public:
     const char *get_sequence_name(uint32 id);
 };
 
-bool gamgee_load_sequences(sequence_data_host *output, const char *filename, uint32 data_mask, bool try_mmap = true);
-bool gamgee_load_vcf(variant_database_host *output, const sequence_data_host& reference, const char *filename, uint32 data_mask, bool try_mmap = true);
+bool gamgee_load_sequences(sequence_data_host *output, const char *filename, uint32 data_mask);
+bool gamgee_load_vcf(variant_database_host *output, const sequence_data_host& reference, const char *filename, uint32 data_mask);
 
 } // namespace firepony
 

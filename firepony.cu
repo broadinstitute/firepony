@@ -117,27 +117,27 @@ static std::vector<firepony_pipeline *> enumerate_compute_devices(void)
     return ret;
 }
 
-static void print_statistics(const timer<host>& wall_clock, const pipeline_statistics& stats)
+static void print_statistics(const timer<host>& wall_clock, const pipeline_statistics& stats, int num_devices = 1)
 {
-    fprintf(stderr, "   blocked on io: %.4f (%.2f%%)\n", stats.io.elapsed_time, stats.io.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   read filtering: %.4f (%.2f%%)\n", stats.read_filter.elapsed_time, stats.read_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   cigar expansion: %.4f (%.2f%%)\n", stats.cigar_expansion.elapsed_time, stats.cigar_expansion.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   bp filtering: %.4f (%.2f%%)\n", stats.bp_filter.elapsed_time, stats.bp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   snp filtering: %.4f (%.2f%%)\n", stats.snp_filter.elapsed_time, stats.snp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   baq: %.4f (%.2f%%)\n", stats.baq.elapsed_time, stats.baq.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "     setup: %.4f (%.2f%%)\n", stats.baq_setup.elapsed_time, stats.baq_setup.elapsed_time / stats.baq.elapsed_time * 100.0);
-    fprintf(stderr, "     hmm: %.4f (%.2f%%)\n", stats.baq_hmm.elapsed_time, stats.baq_hmm.elapsed_time / stats.baq.elapsed_time * 100.0);
-    fprintf(stderr, "     post: %.4f (%.2f%%)\n", stats.baq_postprocess.elapsed_time, stats.baq_postprocess.elapsed_time / stats.baq.elapsed_time * 100.0);
-    fprintf(stderr, "   fractional error: %.4f (%.2f%%)\n", stats.fractional_error.elapsed_time, stats.fractional_error.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   covariates: %.4f (%.2f%%)\n", stats.covariates.elapsed_time, stats.covariates.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "     gather: %.4f (%.2f%%)\n", stats.covariates_gather.elapsed_time, stats.covariates_gather.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "     filter: %.4f (%.2f%%)\n", stats.covariates_filter.elapsed_time, stats.covariates_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "     sort: %.4f (%.2f%%)\n", stats.covariates_sort.elapsed_time, stats.covariates_sort.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "     pack: %.4f (%.2f%%)\n", stats.covariates_pack.elapsed_time, stats.covariates_pack.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   post-processing: %.4f (%.2f%%)\n", stats.postprocessing.elapsed_time, stats.postprocessing.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   output: %.4f (%.2f%%)\n", stats.output.elapsed_time, stats.output.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "   blocked on io: %.4f (%.2f%%)\n", stats.io.elapsed_time, stats.io.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   read filtering: %.4f (%.2f%%)\n", stats.read_filter.elapsed_time, stats.read_filter.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   cigar expansion: %.4f (%.2f%%)\n", stats.cigar_expansion.elapsed_time, stats.cigar_expansion.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   bp filtering: %.4f (%.2f%%)\n", stats.bp_filter.elapsed_time, stats.bp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   snp filtering: %.4f (%.2f%%)\n", stats.snp_filter.elapsed_time, stats.snp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   baq: %.4f (%.2f%%)\n", stats.baq.elapsed_time, stats.baq.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "     setup: %.4f (%.2f%%)\n", stats.baq_setup.elapsed_time, stats.baq_setup.elapsed_time / stats.baq.elapsed_time * 100.0 / num_devices);
+    fprintf(stderr, "     hmm: %.4f (%.2f%%)\n", stats.baq_hmm.elapsed_time, stats.baq_hmm.elapsed_time / stats.baq.elapsed_time * 100.0 / num_devices);
+    fprintf(stderr, "     post: %.4f (%.2f%%)\n", stats.baq_postprocess.elapsed_time, stats.baq_postprocess.elapsed_time / stats.baq.elapsed_time * 100.0 / num_devices);
+    fprintf(stderr, "   fractional error: %.4f (%.2f%%)\n", stats.fractional_error.elapsed_time, stats.fractional_error.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   covariates: %.4f (%.2f%%)\n", stats.covariates.elapsed_time, stats.covariates.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "     gather: %.4f (%.2f%%)\n", stats.covariates_gather.elapsed_time, stats.covariates_gather.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "     filter: %.4f (%.2f%%)\n", stats.covariates_filter.elapsed_time, stats.covariates_filter.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "     sort: %.4f (%.2f%%)\n", stats.covariates_sort.elapsed_time, stats.covariates_sort.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "     pack: %.4f (%.2f%%)\n", stats.covariates_pack.elapsed_time, stats.covariates_pack.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   post-processing: %.4f (%.2f%%)\n", stats.postprocessing.elapsed_time, stats.postprocessing.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   output: %.4f (%.2f%%)\n", stats.output.elapsed_time, stats.output.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
     fprintf(stderr, "   batches: %lu (%.2f batches/sec)\n", stats.num_batches, stats.num_batches / wall_clock.elapsed_time());
-    fprintf(stderr, "   reads: %lu (%.2fM reads/sec)\n", stats.total_reads, stats.total_reads / 1000000.0 / wall_clock.elapsed_time());
+    fprintf(stderr, "   reads: %lu (%.2fK reads/sec)\n", stats.total_reads, stats.total_reads / 1000.0 / wall_clock.elapsed_time());
 }
 
 int main(int argc, char **argv)
@@ -279,7 +279,8 @@ int main(int argc, char **argv)
     if (compute_devices.size() > 1)
         fprintf(stderr, "aggregate statistics:\n");
 
-    print_statistics(wall_clock, aggregate_stats);
+    print_statistics(wall_clock, aggregate_stats, compute_devices.size());
+
     if (compute_devices.size() > 1)
     {
         fprintf(stderr, "\n");

@@ -176,8 +176,7 @@ struct compute_vcf_ranges : public lambda<system>
                                               db.reference_window_start.size());
 
         // compute the initial vcf range
-        uint2 vcf_range = make_uint2(vcf_start - db.reference_window_start.begin(),
-                                     vcf_start - db.reference_window_start.begin());
+        uint2 vcf_range;
 
         vcf_range.x = vcf_start - db.reference_window_start.begin();
         vcf_range.y = vcf_range.x;
@@ -191,7 +190,7 @@ struct compute_vcf_ranges : public lambda<system>
         }
 
         // expand the start of the range backwards to find the first feature that overlaps with our alignment window
-        while(vcf_range.x != 0 &&
+        while(vcf_range.x >= 1 &&
               db.reference_window_start[vcf_range.x - 1] + db.alignment_window_len[vcf_range.x - 1] >= alignment_window.x)
         {
             vcf_range.x--;
@@ -216,7 +215,6 @@ struct compute_vcf_ranges : public lambda<system>
         {
             loc_start = inside;
         } else {
-            assert(feature_start > alignment_window.y);
             loc_start = right;
         }
 
@@ -228,7 +226,6 @@ struct compute_vcf_ranges : public lambda<system>
         {
             loc_end = inside;
         } else {
-            assert(feature_end > alignment_window.y);
             loc_end = right;
         }
 

@@ -19,13 +19,12 @@
 #pragma once
 
 #include <gamgee/sam_reader.h>
-#include "alignment_data.h"
-#include "sequence_data.h"
-#include "variant_data.h"
+#include "../alignment_data.h"
+#include "reference.h"
 
 namespace firepony {
 
-struct gamgee_alignment_file
+struct alignment_file
 {
 private:
     gamgee::SamReader<gamgee::SamIterator> file;
@@ -39,15 +38,12 @@ private:
 public:
     alignment_header_host header;
 
-    gamgee_alignment_file(const char *fname);
-    ~gamgee_alignment_file();
+    alignment_file(const char *fname);
+    ~alignment_file();
 
-    bool next_batch(alignment_batch_host *batch, uint32 data_mask, const uint32 batch_size = 100000);
+    bool next_batch(alignment_batch_host *batch, uint32 data_mask, reference_file_handle *reference, const uint32 batch_size = 100000);
     const char *get_sequence_name(uint32 id);
 };
-
-bool gamgee_load_sequences(sequence_data_host *output, const char *filename, uint32 data_mask);
-bool gamgee_load_vcf(variant_database_host *output, const sequence_data_host& reference, const char *filename, uint32 data_mask);
 
 } // namespace firepony
 

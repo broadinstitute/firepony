@@ -18,7 +18,7 @@
 
 #include "io_thread.h"
 #include "alignment_data.h"
-#include "gamgee_loader.h"
+#include "loader/alignments.h"
 #include "command_line.h"
 
 #include <mutex>
@@ -26,10 +26,11 @@
 
 namespace firepony {
 
-io_thread::io_thread(const char *fname, uint32 data_mask, const int consumers)
+io_thread::io_thread(const char *fname, uint32 data_mask, const int consumers, reference_file_handle *reference)
     : NUM_BUFFERS(consumers + 1),
       file(fname),
-      data_mask(data_mask)
+      data_mask(data_mask),
+      reference(reference)
 {
     for(int i = 0; i < NUM_BUFFERS; i++)
     {
@@ -84,7 +85,7 @@ void io_thread::run(void)
         assert(empty_batches.size());
         buf = empty_batches.pop();
 
-        eof = !(file.next_batch(buf, data_mask, command_line_options.batch_size));
+        eof = !(file.next_batch(buf, data_mask, reference, command_line_options.batch_size));
         if (eof)
         {
             break;
@@ -102,7 +103,7 @@ void io_thread::run(void)
         assert(empty_batches.size());
         buf = empty_batches.pop();
 
-        eof = !(file.next_batch(buf, data_mask, command_line_options.batch_size));
+        eof = !(file.next_batch(buf, data_mask, reference, command_line_options.batch_size));
         if (!eof)
         {
             batches.push(buf);

@@ -94,15 +94,21 @@ set(firepony_common_sources
     alignment_data.h
     command_line.cu
     command_line.h
-    gamgee_loader.cu
-    gamgee_loader.h
     io_thread.cu
     io_thread.h
     runtime_options.h
     string_database.cu
     string_database.h
     types.h
-    version.h)
+    version.h
+
+    loader/alignments.cu
+    loader/alignments.h
+    loader/reference.cu
+    loader/reference.h
+    loader/variants.cu
+    loader/variants.h
+    )
 
 cuda_add_library(firepony-common ${firepony_common_sources})
 add_dependencies(firepony-common gamgee zlib)

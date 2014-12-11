@@ -21,7 +21,8 @@
 #include <thread>
 
 #include "alignment_data.h"
-#include "gamgee_loader.h"
+#include "loader/alignments.h"
+#include "loader/reference.h"
 
 #include <queue>
 #include <mutex>
@@ -99,12 +100,15 @@ struct io_thread
     // a queue containing processed batches for reuse
     locked_queue<alignment_batch_host *> empty_batches;
 
-    gamgee_alignment_file file;
+    // the reference file handle on which we'll load reference sequences
+    reference_file_handle *reference;
+
+    alignment_file file;
     uint32 data_mask;
 
     std::thread thread;
 
-    io_thread(const char *fname, uint32 data_mask, const int consumers);
+    io_thread(const char *fname, uint32 data_mask, const int consumers, reference_file_handle *reference);
     ~io_thread();
 
     void start(void);

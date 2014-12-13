@@ -34,6 +34,8 @@ bool load_vcf(variant_database_host *output, reference_file_handle *reference_ha
     auto& h = *output;
     h.data_mask = data_mask;
 
+    std::vector<std::string> gamgee_chromosomes(0);
+
     for(auto& record : gamgee::VariantReader<gamgee::VariantIterator>{std::string(filename)})
     {
         // collect all the common variant data
@@ -51,8 +53,16 @@ bool load_vcf(variant_database_host *output, reference_file_handle *reference_ha
             uint32 n_alleles;
         } variant_data;
 
-        uint32 gamgee_chromosome_id = record.chromosome();
-        std::string chromosome_name = record.header().chromosomes()[gamgee_chromosome_id];
+        // header.chromosomes() and record.chromosome_name() are *very* slow
+        // unfortunately, gamgee does not really expose a better way of implementing this
+        auto gamgee_chromosome_id = record.chromosome();
+        if (gamgee_chromosome_id >= gamgee_chromosomes.size())
+        {
+            // reload the list of chromosomes from gamgee
+            gamgee_chromosomes = record.header().chromosomes();
+        }
+
+        const std::string& chromosome_name = gamgee_chromosomes[gamgee_chromosome_id];
         reference_handle->make_sequence_available(chromosome_name);
 
         if (data_mask & VariantDataMask::CHROMOSOME)
@@ -83,7 +93,7 @@ bool load_vcf(variant_database_host *output, reference_file_handle *reference_ha
 
         // for each possible alternate, add one entry to the variant database
         // xxxnsubtil: this is wrong if alternate data is masked out in data_mask!
-        for(std::string& alt : record.alt())
+        for(const std::string& alt : record.alt())
         {
             h.num_variants++;
 

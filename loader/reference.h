@@ -31,7 +31,8 @@ struct reference_file_handle
     const std::string filename;
     std::ifstream file_handle;
 
-    std::map<const std::string, size_t> reference_index;
+    // maps a string hash to an index in the reference file
+    std::map<uint32, size_t> reference_index;
     bool index_available;
 
     sequence_data_host sequence_data;

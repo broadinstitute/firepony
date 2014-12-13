@@ -26,6 +26,7 @@
 #include <algorithm>
 
 #include "../sequence_data.h"
+#include "../string_database.h"
 
 #include "reference.h"
 #include "../command_line.h"
@@ -142,7 +143,7 @@ bool reference_file_handle::load_index()
         ss >> len;
         ss >> offset;
 
-        reference_index[name] = offset;
+        reference_index[string_database::hash(name)] = offset;
     }
 
     index_available = true;
@@ -182,7 +183,7 @@ bool reference_file_handle::make_sequence_available(const std::string& sequence_
         if (sequence_data.sequence_names.lookup(sequence_name) == uint32(-1))
         {
 
-            auto it = reference_index.find(sequence_name);
+            auto it = reference_index.find(string_database::hash(sequence_name));
             if (it == reference_index.end())
             {
                 fprintf(stderr, "ERROR: sequence %s not found in reference index\n", sequence_name.c_str());

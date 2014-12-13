@@ -29,6 +29,16 @@
 
 namespace firepony {
 
+#include <thrust/iterator/transform_iterator.h>
+
+struct iupac16 : public thrust::unary_function<char, uint8>
+{
+    uint8 operator() (char in)
+    {
+        return from_nvbio::char_to_iupac16(in);
+    }
+};
+
 bool load_vcf(variant_database_host *output, reference_file_handle *reference_handle, const char *filename, uint32 data_mask)
 {
     auto& h = *output;
@@ -127,10 +137,9 @@ bool load_vcf(variant_database_host *output, reference_file_handle *reference_ha
                 // xxxnsubtil: we don't pad reference data to a dword multiple since variants are
                 // meant to be read-only, so RMW hazards should never happen
                 h.reference_sequence.resize(ref_start + ref_len);
-                for(uint32 i = 0; i < ref_len; i++)
-                {
-                    h.reference_sequence[ref_start + i] = from_nvbio::char_to_iupac16(ref[i]);
-                }
+                assign(ref_len,
+                       thrust::make_transform_iterator(ref.begin(), iupac16()),
+                       h.reference_sequence.stream_at_index(ref_start));
             }
 
             if (data_mask & VariantDataMask::ALTERNATE)
@@ -143,10 +152,9 @@ bool load_vcf(variant_database_host *output, reference_file_handle *reference_ha
 
                 // xxxnsubtil: same as above, this is not padded to dword size
                 h.alternate_sequence.resize(alt_start + alt_len);
-                for(uint32 i = 0; i < alt_len; i++)
-                {
-                    h.alternate_sequence[alt_start + i] = from_nvbio::char_to_iupac16(alt[i]);
-                }
+                assign(alt_len,
+                       thrust::make_transform_iterator(alt.begin(), iupac16()),
+                       h.alternate_sequence.stream_at_index(alt_start));
             }
 
             if (data_mask & VariantDataMask::QUAL)

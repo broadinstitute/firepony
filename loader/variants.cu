@@ -16,7 +16,7 @@
  *
  */
 
-#include <gamgee/variant_reader.h>
+#include <gamgee/variant/variant_reader.h>
 
 #include <string>
 

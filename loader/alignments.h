@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <gamgee/sam_reader.h>
+#include <gamgee/sam/sam_reader.h>
 #include "../alignment_data.h"
 #include "reference.h"
 

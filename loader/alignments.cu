@@ -16,9 +16,9 @@
  *
  */
 
-#include <gamgee/sam.h>
-#include <gamgee/sam_iterator.h>
-#include <gamgee/sam_tag.h>
+#include <gamgee/sam/sam.h>
+#include <gamgee/sam/sam_iterator.h>
+#include <gamgee/sam/sam_tag.h>
 
 #include <string>
 

@@ -178,6 +178,8 @@ struct alignment_batch_host : public alignment_batch_storage<host>
 {
     // data that never gets copied to the device
     h_vector<std::string> name;
+    // which generation of the reference data does this batch require?
+    uint32 reference_generation;
 
     const CRQ_index crq_index(uint32 read_id) const
     {
@@ -194,6 +196,7 @@ struct alignment_batch_host : public alignment_batch_storage<host>
         num_reads = 0;
         max_read_size = 0;
         this->data_mask = data_mask;
+        reference_generation = uint32(-1);
 
         name.clear();
         chromosome.clear();

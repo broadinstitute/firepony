@@ -24,9 +24,11 @@
 
 #include "types.h"
 #include "command_line.h"
-#include "gamgee_loader.h"
 #include "io_thread.h"
 #include "string_database.h"
+#include "loader/alignments.h"
+#include "loader/reference.h"
+#include "loader/variants.h"
 
 #include "device/pipeline.h"
 
@@ -144,7 +146,7 @@ int main(int argc, char **argv)
 {
     std::vector<firepony_pipeline *> compute_devices;
 
-    sequence_data_host h_reference;
+    reference_file_handle *ref_h;
     variant_database_host h_dbsnp;
     bool ret;
 
@@ -177,26 +179,31 @@ int main(int argc, char **argv)
     }
     fprintf(stderr, "\n");
 
+    timer<host> data_io;
+    data_io.start();
+
     // load the reference genome
-    fprintf(stderr, "loading reference from %s...\n", command_line_options.reference);
-    ret = gamgee_load_sequences(&h_reference, command_line_options.reference,
-                                SequenceDataMask::BASES |
-                                SequenceDataMask::NAMES);
-    if (ret == false)
+    ref_h = reference_file_handle::open(command_line_options.reference, SequenceDataMask::BASES | SequenceDataMask::NAMES, compute_devices.size());
+
+    if (ref_h == nullptr)
     {
         fprintf(stderr, "failed to load reference %s\n", command_line_options.reference);
         exit(1);
     }
 
-    fprintf(stderr, "loading variant database %s...\n", command_line_options.snp_database);
-    ret = gamgee_load_vcf(&h_dbsnp, h_reference, command_line_options.snp_database,
-                          VariantDataMask::CHROMOSOME | VariantDataMask::ALIGNMENT);
+    fprintf(stderr, "loading variant database %s...", command_line_options.snp_database);
+    fflush(stderr);
+    ret = load_vcf(&h_dbsnp, ref_h, command_line_options.snp_database,
+                   VariantDataMask::CHROMOSOME | VariantDataMask::ALIGNMENT);
+    fprintf(stderr, "\n");
 
     if (ret == false)
     {
         fprintf(stderr, "failed to load variant database %s\n", command_line_options.snp_database);
         exit(1);
     }
+
+    data_io.stop();
 
     const uint32 data_mask = AlignmentDataMask::NAME |
                              AlignmentDataMask::CHROMOSOME |
@@ -211,7 +218,7 @@ int main(int argc, char **argv)
                              AlignmentDataMask::MAPQ |
                              AlignmentDataMask::READ_GROUP;
 
-    io_thread reader(command_line_options.input, data_mask, compute_devices.size());
+    io_thread reader(command_line_options.input, data_mask, compute_devices.size(), ref_h);
     reader.start();
 
     for(auto d : compute_devices)
@@ -219,7 +226,7 @@ int main(int argc, char **argv)
         d->setup(&reader,
                  &command_line_options,
                  &reader.file.header,
-                 &h_reference,
+                 &ref_h->sequence_data,
                  &h_dbsnp);
     }
 
@@ -274,7 +281,10 @@ int main(int argc, char **argv)
 
     fprintf(stderr, "\n");
 
-    fprintf(stderr, "wall clock time: %f\n", wall_clock.elapsed_time());
+    fprintf(stderr, "wall clock times:\n");
+    fprintf(stderr, " data I/O (reference + dbSNP): %f\n", data_io.elapsed_time());
+    fprintf(stderr, " compute: %f\n", wall_clock.elapsed_time());
+    fprintf(stderr, "\n");
 
     if (compute_devices.size() > 1)
         fprintf(stderr, "aggregate statistics:\n");

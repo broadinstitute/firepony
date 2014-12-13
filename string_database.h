@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include "device_types.h"
-#include "serialization.h"
+#include "types.h"
 
 #include <vector>
 #include <string>
@@ -44,11 +43,6 @@ struct string_database
     // computes a hash of a string
     static uint32 hash(const char* s);
     static uint32 hash(const std::string& s);
-
-    // serialization
-    size_t serialized_size(void);
-    void *serialize(void *out);
-    void *unserialize(void *in);
 
 private:
     std::vector<std::string> string_identifiers;

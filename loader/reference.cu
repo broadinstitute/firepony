@@ -82,6 +82,7 @@ static bool load_record(sequence_data_host *output, const gamgee::Fastq& record,
         h.sequence_id.push_back(seq_id);
     }
 
+    h.generation++;
     return true;
 }
 
@@ -109,6 +110,22 @@ static bool load_one_sequence(sequence_data_host *output, const std::string file
     gamgee::Fastq record = *(reader.begin());
 
     return load_record(output, record, data_mask);
+}
+
+reference_file_handle::reference_file_handle(const std::string filename, uint32 data_mask, uint32 consumers)
+  : filename(filename), data_mask(data_mask), consumers(consumers)
+{
+    sequence_mutexes.resize(consumers);
+}
+
+void reference_file_handle::consumer_lock(const uint32 consumer_id)
+{
+    sequence_mutexes[consumer_id].lock();
+}
+
+void reference_file_handle::consumer_unlock(const uint32 consumer_id)
+{
+    sequence_mutexes[consumer_id].unlock();
 }
 
 bool reference_file_handle::load_index()
@@ -150,9 +167,9 @@ bool reference_file_handle::load_index()
     return true;
 }
 
-reference_file_handle *reference_file_handle::open(const std::string filename, uint32 data_mask)
+reference_file_handle *reference_file_handle::open(const std::string filename, uint32 data_mask, uint32 consumers)
 {
-    reference_file_handle *handle = new reference_file_handle(filename, data_mask);
+    reference_file_handle *handle = new reference_file_handle(filename, data_mask, consumers);
 
     if (!handle->load_index())
     {
@@ -174,6 +191,18 @@ reference_file_handle *reference_file_handle::open(const std::string filename, u
     return handle;
 }
 
+void reference_file_handle::producer_lock(void)
+{
+    for(uint32 id = 0; id < sequence_mutexes.size(); id++)
+        consumer_lock(id);
+}
+
+void reference_file_handle::producer_unlock(void)
+{
+    for(uint32 id = 0; id < sequence_mutexes.size(); id++)
+        consumer_unlock(id);
+}
+
 bool reference_file_handle::make_sequence_available(const std::string& sequence_name)
 {
     if (!index_available)
@@ -190,8 +219,6 @@ bool reference_file_handle::make_sequence_available(const std::string& sequence_
                 return false;
             }
 
-            fprintf(stderr, "loading reference sequence %s...", sequence_name.c_str());
-            fflush(stderr);
             size_t offset = it->second;
 
             // we must seek backwards to the beginning of the header
@@ -206,11 +233,12 @@ bool reference_file_handle::make_sequence_available(const std::string& sequence_
                     offset--;
             } while(c != '>');
 
+            producer_lock();
             bool ret = load_one_sequence(&sequence_data, filename, offset, data_mask);
-            if (ret == true)
-            {
-                fprintf(stderr, " done\n");
-            }
+            producer_unlock();
+
+            fprintf(stderr, "+");
+            fflush(stderr);
 
             return ret;
         } else {

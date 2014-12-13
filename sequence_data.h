@@ -36,6 +36,9 @@ namespace SequenceDataMask
 template <target_system system>
 struct sequence_data_storage
 {
+    // the generation counter is used to check if the GPU vs CPU versions are out of date
+    uint32 generation;
+
     uint32 data_mask;
     uint32 num_sequences;
 
@@ -50,7 +53,8 @@ struct sequence_data_storage
     vector<system, uint64> sequence_qual_len;
 
     CUDA_HOST sequence_data_storage()
-        : num_sequences(0)
+        : generation(0),
+          num_sequences(0)
     { }
 
     struct const_view

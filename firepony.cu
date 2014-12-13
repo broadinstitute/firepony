@@ -183,7 +183,7 @@ int main(int argc, char **argv)
     data_io.start();
 
     // load the reference genome
-    ref_h = reference_file_handle::open(command_line_options.reference, SequenceDataMask::BASES | SequenceDataMask::NAMES);
+    ref_h = reference_file_handle::open(command_line_options.reference, SequenceDataMask::BASES | SequenceDataMask::NAMES, compute_devices.size());
 
     if (ref_h == nullptr)
     {
@@ -191,9 +191,11 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    fprintf(stderr, "loading variant database %s...\n", command_line_options.snp_database);
+    fprintf(stderr, "loading variant database %s...", command_line_options.snp_database);
+    fflush(stderr);
     ret = load_vcf(&h_dbsnp, ref_h, command_line_options.snp_database,
                    VariantDataMask::CHROMOSOME | VariantDataMask::ALIGNMENT);
+    fprintf(stderr, "\n");
 
     if (ret == false)
     {

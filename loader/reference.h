@@ -23,6 +23,8 @@
 
 #include <fstream>
 #include <map>
+#include <mutex>
+#include <deque>
 
 namespace firepony {
 
@@ -37,15 +39,23 @@ struct reference_file_handle
 
     sequence_data_host sequence_data;
     uint32 data_mask;
+    // list of mutexes that protect sequence_data, one per consumer thread
+    std::deque<std::mutex> sequence_mutexes;
+    // number of consumer threads
+    const uint32 consumers;
 
     bool make_sequence_available(const std::string& sequence_name);
 
-    static reference_file_handle *open(const std::string filename, uint32 data_mask);
+    static reference_file_handle *open(const std::string filename, uint32 data_mask, uint32 consumers);
+
+    void consumer_lock(const uint32 consumer_id);
+    void consumer_unlock(const uint32 consumer_id);
 
 private:
-    reference_file_handle(const std::string filename, uint32 data_mask)
-        : filename(filename), data_mask(data_mask)
-    { }
+    reference_file_handle(const std::string filename, uint32 data_mask, uint32 consumers);
+
+    void producer_lock(void);
+    void producer_unlock(void);
 
     bool load_index(void);
     void load_whole_reference(void);

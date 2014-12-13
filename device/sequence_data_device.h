@@ -64,6 +64,8 @@ struct sequence_data_device : public sequence_data_storage<system>
             TRACK_VECTOR_SIZE(sequence_id);
         }
 
+        this->generation = host.generation;
+
         return num_bytes;
     #undef TRACK_VECTOR_SIZE
     #undef TRACK_PACKED_VECTOR_SIZE

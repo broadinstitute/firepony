@@ -46,6 +46,8 @@ void firepony_gather_intermediates(firepony_context<system_dst>& context, firepo
 template <target_system system>
 struct firepony_device_pipeline : public firepony_pipeline
 {
+    uint32 consumer_id;
+
     alignment_header<system> *header;
     sequence_data<system> *reference;
     variant_database<system> *dbsnp;
@@ -58,8 +60,8 @@ struct firepony_device_pipeline : public firepony_pipeline
     std::thread thread;
     uint32 compute_device;
 
-    firepony_device_pipeline(uint32 compute_device)
-        : compute_device(compute_device)
+    firepony_device_pipeline(uint32 consumer_id, uint32 compute_device)
+        : consumer_id(consumer_id), compute_device(compute_device)
     { }
 
     virtual std::string get_name(void) override;
@@ -184,6 +186,15 @@ private:
                 break;
             }
 
+            // make sure our reference is up to date
+            if (h_batch->reference_generation > reference->device.generation)
+            {
+                // reload the reference
+                reader->reference->consumer_lock(consumer_id);
+                reference->download();
+                reader->reference->consumer_unlock(consumer_id);
+            }
+
             // download to the device
             batch->download(h_batch);
 
@@ -236,11 +247,15 @@ std::string firepony_device_pipeline<firepony::intel_tbb>::get_name(void)
 
 firepony_pipeline *firepony_pipeline::create(target_system system, uint32 device)
 {
+    static uint32 current_consumer_id = 0;
+    uint32 consumer_id = current_consumer_id;
+    current_consumer_id++;
+
     switch(system)
     {
 #if ENABLE_CUDA_BACKEND
     case firepony::cuda:
-        return new firepony_device_pipeline<firepony::cuda>(device);
+        return new firepony_device_pipeline<firepony::cuda>(consumer_id, device);
 #endif
 
 #if ENABLE_TBB_BACKEND
@@ -248,10 +263,11 @@ firepony_pipeline *firepony_pipeline::create(target_system system, uint32 device
         // reserve device threads for other devices and I/O
         num_tbb_threads = tbb::task_scheduler_init::default_num_threads() - device - 1;
         tbb_scheduler_init.initialize(num_tbb_threads);
-        return new firepony_device_pipeline<firepony::intel_tbb>(num_tbb_threads);
+        return new firepony_device_pipeline<firepony::intel_tbb>(consumer_id, num_tbb_threads);
 #endif
 
     default:
+        current_consumer_id--;  // we didn't actually create anything
         return nullptr;
     }
 }

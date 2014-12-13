@@ -266,6 +266,7 @@ bool alignment_file::next_batch(alignment_batch_host *batch, uint32 data_mask, r
     if (read_id == 0)
         return false;
 
+    batch->reference_generation = reference->sequence_data.generation;
     return true;
 }
 

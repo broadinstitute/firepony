@@ -53,7 +53,7 @@ namespace firepony {
 
 // maximum read size for the lmem kernel
 #define LMEM_MAX_READ_LEN 151
-#define LMEM_MAT_SIZE ((LMEM_MAX_READ_LEN + 1) * 6 * (2 * MAX_BAND_WIDTH + 1))
+#define LMEM_MAT_SIZE ((LMEM_MAX_READ_LEN + 1) * 3 * (2 * MAX_BAND_WIDTH + 1))
 
 template <target_system system>
 struct compute_hmm_windows : public lambda<system>
@@ -220,13 +220,13 @@ struct hmm_glocal_lmem : public lambda<system>
     // computes a matrix offset for forwardMatrix or backwardMatrix
     CUDA_HOST_DEVICE int off(int i, int j = 0)
     {
-        return i * 6 * (2 * MAX_BAND_WIDTH + 1) + j;
+        return i * 3 * (2 * MAX_BAND_WIDTH + 1) + j;
     }
 
     // computes the required HMM matrix size for the given read length
     CUDA_HOST_DEVICE static uint32 matrix_size(const uint32 read_len)
     {
-        return (read_len + 1) * 6 * (2 * MAX_BAND_WIDTH + 1);
+        return (read_len + 1) * 3 * (2 * MAX_BAND_WIDTH + 1);
     }
 
     CUDA_HOST_DEVICE static double qual2prob(uint8 q)

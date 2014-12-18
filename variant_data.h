@@ -46,9 +46,14 @@ struct variant_database_storage
     uint32 data_mask;
     uint32 num_variants;
 
+    // variant data is sorted by the start position of the feature in the reference
+    // (this is implicit due to the fact that VCF files are sorted by chromosome,
+    // then by sequence position --- we assume that the reference chromosomes are sorted
+    // in the same order)
+
     vector<system, uint32> chromosome;              // chromosome identifier
     vector<system, uint32> feature_start;           // feature start position in the reference
-    vector<system, uint32> feature_stop;            // feature feature_stop position in the reference
+    vector<system, uint32> feature_stop;            // feature stop position in the reference
 
     vector<system, uint32> id;
     vector<system, float> qual;

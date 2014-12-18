@@ -170,15 +170,22 @@ struct compute_vcf_ranges : public lambda<system>
         const uint2 alignment_window = make_uint2(ref_sequence_offset + uint32(reference_window_clipped.x),
                                                   ref_sequence_offset + uint32(reference_window_clipped.y));
 
-        // do a binary search for a feature that starts inside our read
-        const uint32 *vcf_start = lower_bound(alignment_window.x,
-                                              db.feature_start.begin(),
-                                              db.feature_start.size());
+        // do a binary search along the start and stop arrays to find first overlap
+        const uint32 vcf_start_idx = lower_bound(alignment_window.x,
+                                                 db.feature_start.begin(),
+                                                 db.feature_start.size()) - db.feature_start.begin();
+
+        auto permuted_stop_iter = thrust::make_permutation_iterator(db.feature_stop.begin(), ctx.snp_filter.feature_stop_sort_order.begin());
+        auto stop_iter = lower_bound(alignment_window.x,
+                                     permuted_stop_iter,
+                                     db.feature_stop.size());
+
+        const uint32 vcf_stop_idx = &(*stop_iter) - db.feature_stop.begin();
 
         // compute the initial vcf range
         uint2 vcf_range;
 
-        vcf_range.x = vcf_start - db.feature_start.begin();
+        vcf_range.x = min(vcf_start_idx, vcf_stop_idx);
         vcf_range.y = vcf_range.x;
 
         // do a linear search to find the end of the VCF range
@@ -188,10 +195,9 @@ struct compute_vcf_ranges : public lambda<system>
             vcf_range.y++;
         }
 
-        // expand the start of the range backwards to find the first feature that overlaps with our alignment window
-        while(vcf_range.x >= 1 && db.feature_stop[vcf_range.x - 1] >= alignment_window.x)
+        while(vcf_range.y < db.feature_stop.size() - 1 && permuted_stop_iter[vcf_range.y + 1] <= alignment_window.y)
         {
-            vcf_range.x--;
+            vcf_range.y++;
         }
 
         // figure out the (reference) interval that our set of features covers
@@ -349,12 +355,33 @@ template <target_system system>
 void filter_known_snps(firepony_context<system>& context, const alignment_batch<system>& batch)
 {
     auto& snp = context.snp_filter;
+    auto& snp_db = context.variant_db.device;
+
+    if (snp.feature_stop_sort_order.size() != snp_db.feature_stop.size())
+    {
+        vector<system, uint32> temp_keys, temp_values;
+        vector<system, uint32> input_keys;
+
+        // generate sort order for feature_stop
+        snp.feature_stop_sort_order.resize(snp_db.feature_stop.size());
+        thrust::sequence(snp.feature_stop_sort_order.begin(),
+                         snp.feature_stop_sort_order.end());
+
+        input_keys = snp_db.feature_stop;
+
+        // sort indices by ascending value of feature_stop
+        parallel<system>::sort_by_key(input_keys,
+                                      snp.feature_stop_sort_order,
+                                      temp_keys,
+                                      temp_values,
+                                      context.temp_storage);
+    }
 
     // compute the VCF ranges for each read
     snp.active_vcf_ranges.resize(batch.device.num_reads);
     parallel<system>::for_each(context.active_read_list.begin(),
-                     context.active_read_list.end(),
-                     compute_vcf_ranges<system>(context, batch.device));
+                               context.active_read_list.end(),
+                               compute_vcf_ranges<system>(context, batch.device));
 
     // build a list of reads with active VCF ranges
     snp.active_read_ids.resize(context.active_read_list.size());

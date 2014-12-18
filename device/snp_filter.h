@@ -29,6 +29,8 @@ namespace firepony {
 template <target_system system>
 struct snp_filter_context
 {
+    vector<system, uint32> feature_stop_sort_order; // sorted order for feature_stop
+
     // active reads for the VCF search
     d_vector_u32<system> active_read_ids;
     // active VCF range for each read
@@ -36,6 +38,8 @@ struct snp_filter_context
 
     struct view
     {
+        typename vector<system, uint32>::view feature_stop_sort_order;
+
         typename d_vector_u32<system>::view active_read_ids;
         typename d_vector_u32_2<system>::view active_vcf_ranges;
     };
@@ -43,6 +47,8 @@ struct snp_filter_context
     operator view()
     {
         view v = {
+            feature_stop_sort_order,
+
             active_read_ids,
             active_vcf_ranges
         };

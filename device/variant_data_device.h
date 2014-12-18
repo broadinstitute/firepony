@@ -53,17 +53,14 @@ struct variant_database_device : public variant_database_storage<system>
 
         if (this->data_mask & VariantDataMask::ALIGNMENT)
         {
-            this->chromosome_window_start = host.chromosome_window_start;
-            this->reference_window_start = host.reference_window_start;
-            this->alignment_window_len = host.alignment_window_len;
+            this->feature_start = host.feature_start;
+            this->feature_stop = host.feature_stop;
 
-            TRACK_VECTOR_SIZE(chromosome_window_start);
-            TRACK_VECTOR_SIZE(reference_window_start);
-            TRACK_VECTOR_SIZE(alignment_window_len);
+            TRACK_VECTOR_SIZE(feature_start);
+            TRACK_VECTOR_SIZE(feature_stop);
         } else {
-            this->chromosome_window_start.clear();
-            this->reference_window_start.clear();
-            this->alignment_window_len.clear();
+            this->feature_start.clear();
+            this->feature_stop.clear();
         }
 
         if (this->data_mask & VariantDataMask::QUAL)

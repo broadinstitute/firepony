@@ -172,33 +172,31 @@ struct compute_vcf_ranges : public lambda<system>
 
         // do a binary search for a feature that starts inside our read
         const uint32 *vcf_start = lower_bound(alignment_window.x,
-                                              db.reference_window_start.begin(),
-                                              db.reference_window_start.size());
+                                              db.feature_start.begin(),
+                                              db.feature_start.size());
 
         // compute the initial vcf range
         uint2 vcf_range;
 
-        vcf_range.x = vcf_start - db.reference_window_start.begin();
+        vcf_range.x = vcf_start - db.feature_start.begin();
         vcf_range.y = vcf_range.x;
 
         // do a linear search to find the end of the VCF range
         // (there are generally very few VCF entries for an average read length --- and often none --- so this is expected to be faster than a binary search)
-        while(vcf_range.y < db.reference_window_start.size() - 1 &&
-                db.reference_window_start[vcf_range.y + 1] <= alignment_window.y)
+        while(vcf_range.y < db.feature_start.size() - 1 && db.feature_start[vcf_range.y + 1] <= alignment_window.y)
         {
             vcf_range.y++;
         }
 
         // expand the start of the range backwards to find the first feature that overlaps with our alignment window
-        while(vcf_range.x >= 1 &&
-              db.reference_window_start[vcf_range.x - 1] + db.alignment_window_len[vcf_range.x - 1] >= alignment_window.x)
+        while(vcf_range.x >= 1 && db.feature_stop[vcf_range.x - 1] >= alignment_window.x)
         {
             vcf_range.x--;
         }
 
         // figure out the (reference) interval that our set of features covers
-        const uint32 feature_start = db.reference_window_start[vcf_range.x];
-        const uint32 feature_end = db.reference_window_start[vcf_range.y] + db.alignment_window_len[vcf_range.y];
+        const uint32 feature_start = db.feature_start[vcf_range.x];
+        const uint32 feature_end = db.feature_stop[vcf_range.y];
 
         // figure out which "side" of the read alignment window (in reference coordinates) these features lie on
         enum {
@@ -284,8 +282,8 @@ public:
         for(uint32 feature = vcf_db_range.x; feature <= vcf_db_range.y; feature++)
         {
             // compute the feature range as offset from alignment start
-            const int feature_start = db.reference_window_start[feature] - ref_sequence_offset;
-            const int feature_end = db.reference_window_start[feature] + db.alignment_window_len[feature] - ref_sequence_offset;
+            const int feature_start = db.feature_start[feature] - ref_sequence_offset;
+            const int feature_end = db.feature_stop[feature] - ref_sequence_offset;
 
             // convert start and end to read coordinates
             uint32 read_start = 0xffffffff, read_end = 0xffffffff;

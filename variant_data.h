@@ -46,10 +46,9 @@ struct variant_database_storage
     uint32 data_mask;
     uint32 num_variants;
 
-    vector<system, uint32> chromosome;
-    vector<system, uint32> chromosome_window_start; // start position relative to the sequence
-    vector<system, uint32> reference_window_start;  // global genome start position
-    vector<system, uint32> alignment_window_len;    // length of the alignment window
+    vector<system, uint32> chromosome;              // chromosome identifier
+    vector<system, uint32> feature_start;           // feature start position in the reference
+    vector<system, uint32> feature_stop;            // feature feature_stop position in the reference
 
     vector<system, uint32> id;
     vector<system, float> qual;
@@ -78,9 +77,8 @@ struct variant_database_storage
         uint32 num_variants;
 
         typename vector<system, uint32>::const_view chromosome;
-        typename vector<system, uint32>::const_view chromosome_window_start;
-        typename vector<system, uint32>::const_view reference_window_start;
-        typename vector<system, uint32>::const_view alignment_window_len;
+        typename vector<system, uint32>::const_view feature_start;
+        typename vector<system, uint32>::const_view feature_stop;
 
         typename vector<system, uint32>::const_view id;
         typename vector<system, float>::const_view qual;
@@ -103,9 +101,8 @@ struct variant_database_storage
                 num_variants,
 
                 chromosome,
-                chromosome_window_start,
-                reference_window_start,
-                alignment_window_len,
+                feature_start,
+                feature_stop,
 
                 id,
                 qual,

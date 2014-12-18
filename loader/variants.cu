@@ -52,9 +52,8 @@ bool load_vcf(variant_database_host *output, reference_file_handle *reference_ha
         struct
         {
             uint32 chromosome;
-            uint32 chromosome_window_start;
-            uint32 reference_window_start;
-            uint32 alignment_window_len;
+            uint32 feature_start;
+            uint32 feature_stop;
             uint32 reference_sequence_start;
             uint32 reference_sequence_len;
             uint32 id;
@@ -87,10 +86,9 @@ bool load_vcf(variant_database_host *output, reference_file_handle *reference_ha
             variant_data.chromosome = id;
         }
 
-        variant_data.chromosome_window_start = record.alignment_start();
-        // note: VCF positions are 1-based, but we convert to 0-based in the reference window
-        variant_data.reference_window_start = record.alignment_start() + reference_handle->sequence_data.sequence_bp_start[variant_data.chromosome] - 1;
-        variant_data.alignment_window_len = record.alignment_stop() - record.alignment_start();
+        // note: VCF positions are 1-based, but we convert to 0-based
+        variant_data.feature_start = record.alignment_start() + reference_handle->sequence_data.sequence_bp_start[variant_data.chromosome] - 1;
+        variant_data.feature_stop = record.alignment_stop() + reference_handle->sequence_data.sequence_bp_start[variant_data.chromosome] - 1;
 
         if (data_mask & VariantDataMask::ID)
         {
@@ -114,9 +112,8 @@ bool load_vcf(variant_database_host *output, reference_file_handle *reference_ha
 
             if (data_mask & VariantDataMask::ALIGNMENT)
             {
-                h.chromosome_window_start.push_back(variant_data.chromosome_window_start);
-                h.reference_window_start.push_back(variant_data.reference_window_start);
-                h.alignment_window_len.push_back(variant_data.alignment_window_len);
+                h.feature_start.push_back(variant_data.feature_start);
+                h.feature_stop.push_back(variant_data.feature_stop);
             }
 
             if (data_mask & VariantDataMask::ID)

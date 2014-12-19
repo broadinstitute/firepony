@@ -43,7 +43,7 @@ namespace firepony {
 #define EI 0.25
 
 #define MAX_BAND_WIDTH 7
-#define MAX_BAND_WIDTH2 (MAX_BAND_WIDTH * 2)
+#define MAX_BAND_WIDTH2 (MAX_BAND_WIDTH * 2 + 1)
 #define MIN_BASE_QUAL 4
 
 // all bases with q < minBaseQual are up'd to this value
@@ -54,10 +54,11 @@ namespace firepony {
 
 // maximum read size for the lmem kernel
 #define LMEM_MAX_READ_LEN 151
-#define LMEM_MAT_SIZE ((LMEM_MAX_READ_LEN + 1) * 3 * (2 * MAX_BAND_WIDTH + 1))
+#define LMEM_MAT_ROW_SIZE (3 * MAX_BAND_WIDTH2 + 6)
+#define LMEM_MAT_SIZE ((LMEM_MAX_READ_LEN + 1) * LMEM_MAT_ROW_SIZE)
 
-#define GUARD_BAND(z) ((z) > 0 ? (z) : 0)
-//#define GUARD_BAND(z) (z)
+//#define GUARD_BAND(z) ((z) > 0 ? (z) : 0)
+#define GUARD_BAND(z) (z)
 
 template <target_system system>
 struct compute_hmm_windows : public lambda<system>
@@ -225,13 +226,13 @@ struct hmm_glocal_lmem : public lambda<system>
     // computes a matrix offset for forwardMatrix or backwardMatrix
     CUDA_HOST_DEVICE int off(int i, int j = 0)
     {
-        return i * (3 * MAX_BAND_WIDTH2 + 6) + j;
+        return i * LMEM_MAT_ROW_SIZE + j;
     }
 
     // computes the required HMM matrix size for the given read length
     CUDA_HOST_DEVICE static uint32 matrix_size(const uint32 read_len)
     {
-        return (read_len + 1) * (3 * MAX_BAND_WIDTH2 + 6);
+        return (read_len + 1) * LMEM_MAT_ROW_SIZE;
     }
 
     CUDA_HOST_DEVICE static double qual2prob(uint8 q)
@@ -327,7 +328,7 @@ struct hmm_glocal_lmem : public lambda<system>
                 fi[k] /= sum;
         }
 
-        double F[3*MAX_BAND_WIDTH2+6];
+        double F[LMEM_MAT_ROW_SIZE];
 
         // From now on, we mantain the one-to-one correspondence:
         //   F[u] <-> fi[u]
@@ -336,7 +337,7 @@ struct hmm_glocal_lmem : public lambda<system>
         {
             double *fi = &forwardMatrix[off(1)];
 
-            for (k = 0; k < 3*MAX_BAND_WIDTH2+6; ++k)
+            for (k = 0; k < LMEM_MAT_ROW_SIZE; ++k)
                 F[k] = fi[k];
         }
 
@@ -369,15 +370,12 @@ struct hmm_glocal_lmem : public lambda<system>
 
             sum = 0.0;
             //for (k = beg; k <= end; ++k)
-            for (int u = 3; u <= 3*MAX_BAND_WIDTH2+3; u += 3) // compile-time bounds
-            //for (int uu = 0; uu <= MAX_BAND_WIDTH2; ++uu) // compile-time bounds
+            for (int u = 3; u <= 3*MAX_BAND_WIDTH2; u += 3) // compile-time bounds
             {
                 // determine k from u:
                 x = i - bandWidth;
                 x = GUARD_BAND( x );
                 k = u/3 + x - 1;
-                //const int u = uu*3 + 3;
-                //k = uu + x;
 
 //                fprintf(stderr, "read %d: referenceBases[%d-1] = %c inputQualities[%d+%d-1] = %d qyi = %c -> e = %.4f\n",
 //                        read_index,
@@ -412,10 +410,7 @@ struct hmm_glocal_lmem : public lambda<system>
             // rescale
             scalingFactors[i] = sum;
 
-            const int _beg = set_u(bandWidth, i, beg);
-            const int _end = set_u(bandWidth, i, end) + 2;
-
-            for (k = _beg, sum = 1./sum; k <= _end; ++k)
+            for (k = ubeg, sum = 1./sum; k <= uend + 2; ++k)
                 fi[k] *= sum;
         }
 
@@ -455,7 +450,7 @@ struct hmm_glocal_lmem : public lambda<system>
         // initialize F to bi[l_query]
         {
             double *bi = &backwardMatrix[off(queryLen)];
-            for (k = 0; k < 3*MAX_BAND_WIDTH2+6; ++k) // compile-time bounds
+            for (k = 0; k < LMEM_MAT_ROW_SIZE; ++k) // compile-time bounds
                 F[k] = bi[k];
         }
 
@@ -485,15 +480,12 @@ struct hmm_glocal_lmem : public lambda<system>
             double prev = bi[set_u(bandWidth, i, end+1) + 2];
 
             //for (k = end; k >= beg; --k)
-            for (int u = 3; u <= 3*MAX_BAND_WIDTH2+3; u += 3) // compile-time bounds
-            //for (int uu = 0; uu <= MAX_BAND_WIDTH2; ++uu) // compile-time bounds
+            for (int u = 3; u <= 3*MAX_BAND_WIDTH2; u += 3) // compile-time bounds
             {
                 // determine k from u:
                 x = i - bandWidth;
                 x = GUARD_BAND( x );
                 k = u/3 + x - 1;
-                //const int u = uu*3 + 3;
-                //k = uu + x;
 
                 if (u >= ubeg && u <= uend)
                 {
@@ -512,11 +504,8 @@ struct hmm_glocal_lmem : public lambda<system>
             }
 
             // rescale
-            const int _beg = set_u(bandWidth, i, beg);
-            const int _end = set_u(bandWidth, i, end) + 2;
-
             y = 1.0 / scalingFactors[i];
-            for (k = _beg; k <= _end; ++k)
+            for (k = ubeg; k <= uend + 2; ++k)
                 bi[k] *= y;
         }
 
@@ -727,13 +716,13 @@ struct hmm_glocal : public lambda<system>
     // computes a matrix offset for forwardMatrix or backwardMatrix
     CUDA_HOST_DEVICE int off(int i, int j = 0)
     {
-        return i * (3 * MAX_BAND_WIDTH2 + 6) + j;
+        return i * LMEM_MAT_ROW_SIZE + j;
     }
 
     // computes the required HMM matrix size for the given read length
     CUDA_HOST_DEVICE static uint32 matrix_size(const uint32 read_len)
     {
-        return (read_len + 1) * (3 * MAX_BAND_WIDTH2 + 6);
+        return (read_len + 1) * LMEM_MAT_ROW_SIZE;
     }
 
     CUDA_HOST_DEVICE static double qual2prob(uint8 q)

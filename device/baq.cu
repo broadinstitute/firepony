@@ -56,6 +56,9 @@ namespace firepony {
 #define LMEM_MAX_READ_LEN 151
 #define LMEM_MAT_SIZE ((LMEM_MAX_READ_LEN + 1) * 3 * (2 * MAX_BAND_WIDTH + 1))
 
+#define GUARD_BAND(z) ((z) > 0 ? (z) : 0)
+//#define GUARD_BAND(z) (z)
+
 template <target_system system>
 struct compute_hmm_windows : public lambda<system>
 {
@@ -215,7 +218,7 @@ struct hmm_glocal_lmem : public lambda<system>
     CUDA_HOST_DEVICE int set_u(const int b, const int i, const int k)
     {
         int x = i - b;
-        x = x > 0 ? x : 0;
+        x = GUARD_BAND( x );
         return (k + 1 - x) * 3;
     }
 
@@ -290,14 +293,13 @@ struct hmm_glocal_lmem : public lambda<system>
         { // f[1]
             double *fi = &forwardMatrix[off(1)];
             double sum;
-            int beg = 1;
-            int end = referenceLength < bandWidth + 1? referenceLength : bandWidth + 1;
-            int _beg, _end;
+
+            const int beg = 1;
+            const int end = referenceLength < bandWidth + 1? referenceLength : bandWidth + 1;
 
             sum = 0.0;
             for (k = beg; k <= end; ++k)
             {
-                int u;
                 double e = calcEpsilon(referenceBases[k-1], queryBases[queryStart], inputQualities[queryStart]);
 //                fprintf(stderr, "read %d: referenceBases[%d-1] = %c inputQualities[%d] = %d queryBases[%d] = %c -> e = %.4f\n",
 //                        read_index,
@@ -308,7 +310,7 @@ struct hmm_glocal_lmem : public lambda<system>
 //                        queryStart,
 //                        from_nvbio::iupac16_to_char(queryBases[queryStart]), e);
 
-                u = set_u(bandWidth, 1, k);
+                const int u = set_u(bandWidth, 1, k);
 
                 fi[u+0] = e * bM;
                 fi[u+1] = EI * bI;
@@ -318,38 +320,65 @@ struct hmm_glocal_lmem : public lambda<system>
 
             // rescale
             scalingFactors[1] = sum;
-            _beg = set_u(bandWidth, 1, beg);
-            _end = set_u(bandWidth, 1, end);
-            _end += 2;
+            const int _beg = set_u(bandWidth, 1, beg);
+            const int _end = set_u(bandWidth, 1, end) + 2;
 
             for (int k = _beg; k <= _end; ++k)
                 fi[k] /= sum;
+        }
+
+        double F[3*MAX_BAND_WIDTH2+6];
+
+        // From now on, we mantain the one-to-one correspondence:
+        //   F[u] <-> fi[u]
+
+        // initialize F to f[1]
+        {
+            double *fi = &forwardMatrix[off(1)];
+
+            for (k = 0; k < 3*MAX_BAND_WIDTH2+6; ++k)
+                F[k] = fi[k];
         }
 
         // f[2..l_query]
         for (i = 2; i <= queryLen; ++i)
         {
             double *fi = &forwardMatrix[off(i)];
-            double *fi1 = &forwardMatrix[off(i-1)];
+            //double *fi1 = &forwardMatrix[off(i-1)];
             double sum;
 
             int beg = 1;
             int end = referenceLength;
-            int x, _beg, _end;
+            int x;
 
             char qyi = queryBases[queryStart+i-1];
 
             x = i - bandWidth;
-            beg = beg > x? beg : x; // band start
+            beg = beg > x ? beg : x; // band start
 
             x = i + bandWidth;
-            end = end < x? end : x; // band end
+            end = end < x ? end : x; // band end
+
+            // compute bounds on u
+            const int ubeg = set_u( bandWidth, i, beg );
+            const int uend = set_u( bandWidth, i, end );
+
+            double prev[2];
+            prev[0] = fi[set_u(bandWidth, i, beg-1) + 0];
+            prev[1] = fi[set_u(bandWidth, i, beg-1) + 2];
 
             sum = 0.0;
-            for (k = beg; k <= end; ++k)
+            //for (k = beg; k <= end; ++k)
+            for (int u = 3; u <= 3*MAX_BAND_WIDTH2+3; u += 3) // compile-time bounds
+            //for (int uu = 0; uu <= MAX_BAND_WIDTH2; ++uu) // compile-time bounds
             {
-                int u, v11, v01, v10;
-                double e = calcEpsilon(referenceBases[k-1], qyi, inputQualities[queryStart+i-1]);
+                // determine k from u:
+                x = i - bandWidth;
+                x = GUARD_BAND( x );
+                k = u/3 + x - 1;
+                //const int u = uu*3 + 3;
+                //k = uu + x;
+
 //                fprintf(stderr, "read %d: referenceBases[%d-1] = %c inputQualities[%d+%d-1] = %d qyi = %c -> e = %.4f\n",
 //                        read_index,
 //                        k,
@@ -359,27 +388,32 @@ struct hmm_glocal_lmem : public lambda<system>
 //                        inputQualities[queryStart+i-1],
 //                        from_nvbio::iupac16_to_char(qyi), e);
 
-                u = set_u(bandWidth, i, k);
-                v11 = set_u(bandWidth, i-1, k-1);
-                v10 = set_u(bandWidth, i-1, k);
-                v01 = set_u(bandWidth, i, k-1);
+                if (u >= ubeg && u <= uend)
+                {
+                    const double e = calcEpsilon(referenceBases[k-1], qyi, inputQualities[queryStart+i-1]);
 
-                fi[u+0] = e * (m[0] * fi1[v11+0] + m[3] * fi1[v11+1] + m[6] * fi1[v11+2]);
-                fi[u+1] = EI * (m[1] * fi1[v10+0] + m[4] * fi1[v10+1]);
-                fi[u+2] = m[2] * fi[v01+0] + m[8] * fi[v01+2];
+                    const int v11 = u;
+                    const int v10 = u + 3;
 
-                sum += fi[u] + fi[u+1] + fi[u+2];
+                    fi[u+0] = F[u+0] =  e * (m[0] * F[v11+0] + m[3] * F[v11+1] + m[6] * F[v11+2]);
+                    fi[u+1] = F[u+1] = EI * (m[1] * F[v10+0] + m[4] * F[v10+1]);
+                    fi[u+2] = F[u+2] = m[2] * prev[0] + m[8] * prev[1];
 
-    //            fprintf(stderr, "(%d,%d;%d): %.4f,%.4f,%.4f\n", i, k, u, fi[u], fi[u+1], fi[u+2]);
-    //            fprintf(stderr, " .. u = %d v11 = %d v01 = %d v10 = %d e = %f\n", u, v11, v01, v10, e);
+                    prev[0] = F[u+0];
+                    prev[1] = F[u+2];
+
+                    sum += F[u] + F[u+1] + F[u+2];
+
+      //            fprintf(stderr, "(%d,%d;%d): %.4f,%.4f,%.4f\n", i, k, u, fi[u], fi[u+1], fi[u+2]);
+      //            fprintf(stderr, " .. u = %d v11 = %d v01 = %d v10 = %d e = %f\n", u, v11, v01, v10, e);
+                }
             }
 
             // rescale
             scalingFactors[i] = sum;
 
-            _beg = set_u(bandWidth, i, beg);
-            _end = set_u(bandWidth, i, end);
-            _end += 2;
+            const int _beg = set_u(bandWidth, i, beg);
+            const int _end = set_u(bandWidth, i, end) + 2;
 
             for (k = _beg, sum = 1./sum; k <= _end; ++k)
                 fi[k] *= sum;
@@ -390,7 +424,7 @@ struct hmm_glocal_lmem : public lambda<system>
 
             for (k = 1; k <= referenceLength; ++k)
             {
-                int u = set_u(bandWidth, queryLen, k);
+                const int u = set_u(bandWidth, queryLen, k);
 
                 if (u < 3 || u >= bandWidth2*3+3)
                     continue;
@@ -405,7 +439,7 @@ struct hmm_glocal_lmem : public lambda<system>
         // b[l_query] (b[l_query+1][0]=1 and thus \tilde{b}[][]=1/s[l_query+1]; this is where s[l_query+1] comes from)
         for (k = 1; k <= referenceLength; ++k)
         {
-            int u = set_u(bandWidth, queryLen, k);
+            const int u = set_u(bandWidth, queryLen, k);
             double *bi = &backwardMatrix[off(queryLen)];
 
             if (u < 3 || u >= bandWidth2*3+3)
@@ -415,49 +449,71 @@ struct hmm_glocal_lmem : public lambda<system>
             bi[u+1] = sI / scalingFactors[queryLen] / scalingFactors[queryLen+1];
         }
 
+        // From now on, we mantain the one-to-one correspondence:
+        //   F[u] <-> bi[u]
+
+        // initialize F to bi[l_query]
+        {
+            double *bi = &backwardMatrix[off(queryLen)];
+            for (k = 0; k < 3*MAX_BAND_WIDTH2+6; ++k) // compile-time bounds
+                F[k] = bi[k];
+        }
+
         // b[l_query-1..1]
         for (i = queryLen - 1; i >= 1; --i)
         {
             int beg = 1;
             int end = referenceLength;
-            int x, _beg, _end;
+            int x;
 
             double *bi = &backwardMatrix[off(i)];
-            double *bi1 = &backwardMatrix[off(i+1)];
+            //double *bi1 = &backwardMatrix[off(i+1)];
             double y = (i > 1)? 1. : 0.;
 
             char qyi1 = queryBases[queryStart+i];
 
             x = i - bandWidth;
-            beg = beg > x? beg : x;
+            beg = beg > x ? beg : x;
 
             x = i + bandWidth;
-            end = end < x? end : x;
+            end = end < x ? end : x;
 
-            for (k = end; k >= beg; --k)
+            // compute bounds on u
+            const int ubeg = set_u( bandWidth, i, beg );
+            const int uend = set_u( bandWidth, i, end );
+
+            double prev = bi[set_u(bandWidth, i, end+1) + 2];
+
+            //for (k = end; k >= beg; --k)
+            for (int u = 3; u <= 3*MAX_BAND_WIDTH2+3; u += 3) // compile-time bounds
+            //for (int uu = 0; uu <= MAX_BAND_WIDTH2; ++uu) // compile-time bounds
             {
-                int u, v11, v01, v10;
+                // determine k from u:
+                x = i - bandWidth;
+                x = GUARD_BAND( x );
+                k = u/3 + x - 1;
+                //const int u = uu*3 + 3;
+                //k = uu + x;
 
-                u = set_u(bandWidth, i, k);
-                v11 = set_u(bandWidth, i+1, k+1);
-                v10 = set_u(bandWidth, i+1, k);
-                v01 = set_u(bandWidth, i, k+1);
+                if (u >= ubeg && u <= uend)
+                {
+                    const int v11 = u;
+                    const int v10 = u - 3;
 
-                /* const */ double e;
-                if (k >= referenceLength)
-                    e = 0;
-                else
-                    e = calcEpsilon(referenceBases[k], qyi1, inputQualities[queryStart+i]) * bi1[v11];
+                    const double e = k >= referenceLength ? 0.0 :
+                        calcEpsilon(referenceBases[k], qyi1, inputQualities[queryStart+i]) * F[v11];
 
-                bi[u+0] = e * m[0] + EI * m[1] * bi1[v10+1] + m[2] * bi[v01+2]; // bi1[v11] has been folded into e.
-                bi[u+1] = e * m[3] + EI * m[4] * bi1[v10+1];
-                bi[u+2] = (e * m[6] + m[8] * bi[v01+2]) * y;
+                    bi[u+0] = F[u+0] = e * m[0] + EI * m[1] * F[v10+1] + m[2] * prev; // bi1[v11] has been folded into e.
+                    bi[u+1] = F[u+1] = e * m[3] + EI * m[4] * F[v10+1];
+                    bi[u+2] = F[u+2] = (e * m[6] + m[8] * prev) * y;
+
+                    prev = F[u+2];
+                }
             }
 
             // rescale
-            _beg = set_u(bandWidth, i, beg);
-            _end = set_u(bandWidth, i, end);
-            _end += 2;
+            const int _beg = set_u(bandWidth, i, beg);
+            const int _end = set_u(bandWidth, i, end) + 2;
 
             y = 1.0 / scalingFactors[i];
             for (k = _beg; k <= _end; ++k)
@@ -472,8 +528,8 @@ struct hmm_glocal_lmem : public lambda<system>
             double sum = 0.0;
             for (k = end; k >= beg; --k)
             {
-                int u = set_u(bandWidth, 1, k);
-                double e = calcEpsilon(referenceBases[k-1], queryBases[queryStart], inputQualities[queryStart]);
+                const int u = set_u(bandWidth, 1, k);
+                const double e = calcEpsilon(referenceBases[k-1], queryBases[queryStart], inputQualities[queryStart]);
 
                 if (u < 3 || u >= bandWidth2*3+3)
                     continue;
@@ -499,10 +555,10 @@ struct hmm_glocal_lmem : public lambda<system>
             int x, max_k = -1;
 
             x = i - bandWidth;
-            beg = beg > x? beg : x;
+            beg = beg > x ? beg : x;
 
             x = i + bandWidth;
-            end = end < x? end : x;
+            end = end < x ? end : x;
 
             for (k = beg; k <= end; ++k)
             {

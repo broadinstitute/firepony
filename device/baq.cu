@@ -43,6 +43,7 @@ namespace firepony {
 #define EI 0.25
 
 #define MAX_BAND_WIDTH 7
+#define MAX_BAND_WIDTH2 (MAX_BAND_WIDTH * 2)
 #define MIN_BASE_QUAL 4
 
 // all bases with q < minBaseQual are up'd to this value
@@ -221,13 +222,13 @@ struct hmm_glocal_lmem : public lambda<system>
     // computes a matrix offset for forwardMatrix or backwardMatrix
     CUDA_HOST_DEVICE int off(int i, int j = 0)
     {
-        return i * 3 * (2 * MAX_BAND_WIDTH + 1) + j;
+        return i * (3 * MAX_BAND_WIDTH2 + 6) + j;
     }
 
     // computes the required HMM matrix size for the given read length
     CUDA_HOST_DEVICE static uint32 matrix_size(const uint32 read_len)
     {
-        return (read_len + 1) * 3 * (2 * MAX_BAND_WIDTH + 1);
+        return (read_len + 1) * (3 * MAX_BAND_WIDTH2 + 6);
     }
 
     CUDA_HOST_DEVICE static double qual2prob(uint8 q)
@@ -670,13 +671,13 @@ struct hmm_glocal : public lambda<system>
     // computes a matrix offset for forwardMatrix or backwardMatrix
     CUDA_HOST_DEVICE int off(int i, int j = 0)
     {
-        return i * 6 * (2 * MAX_BAND_WIDTH + 1) + j;
+        return i * (3 * MAX_BAND_WIDTH2 + 6) + j;
     }
 
     // computes the required HMM matrix size for the given read length
     CUDA_HOST_DEVICE static uint32 matrix_size(const uint32 read_len)
     {
-        return (read_len + 1) * 6 * (2 * MAX_BAND_WIDTH + 1);
+        return (read_len + 1) * (3 * MAX_BAND_WIDTH2 + 6);
     }
 
     CUDA_HOST_DEVICE static double qual2prob(uint8 q)

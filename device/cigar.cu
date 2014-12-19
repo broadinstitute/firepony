@@ -286,7 +286,7 @@ struct remove_soft_clips : public lambda<system>
 
         // iterate forward through the leading clip region
         while(cigar_index < idx.cigar_start + idx.cigar_len &&
-                read_offset < idx.read_len)
+              read_offset < idx.read_len)
         {
             const auto& op = batch.cigars[cigar_index];
 
@@ -306,10 +306,10 @@ struct remove_soft_clips : public lambda<system>
 
         // iterate backward through the trailing clip region
         cigar_index = idx.cigar_start + idx.cigar_len - 1;
-        read_offset = read_window_clipped.y;
+        read_offset = idx.read_len - 1;
 
         while(cigar_index >= idx.cigar_start &&
-                read_offset > read_window_clipped.x)
+              read_offset > read_window_clipped.x)
         {
             const auto& op = batch.cigars[cigar_index];
 
@@ -908,14 +908,14 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
     fprintf(stderr, "]\n");
 
     const uint32 ref_sequence_id = h_batch.chromosome[read_index];
-    const uint32 ref_sequence_base = context.reference.host.view.sequence_bp_start[ref_sequence_id];
+    const uint32 ref_sequence_base = context.reference.host.sequence_bp_start[ref_sequence_id];
     const uint32 ref_sequence_offset = ref_sequence_base + h_batch.alignment_start[read_index];
 
     fprintf(stderr, "    reference sequence data     = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
         const uint16 ref_bp = ctx.cigar_event_reference_coordinates[i];
-        fprintf(stderr, "  %c ", ref_bp == uint16(-1) ? '-' : from_nvbio::iupac16_to_char(context.reference.host.view.bases[ref_sequence_offset + ref_bp]));
+        fprintf(stderr, "  %c ", ref_bp == uint16(-1) ? '-' : from_nvbio::iupac16_to_char(context.reference.host.bases[ref_sequence_offset + ref_bp]));
     }
     fprintf(stderr, "]\n");
 

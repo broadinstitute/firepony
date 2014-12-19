@@ -24,9 +24,11 @@
 
 #include "types.h"
 #include "command_line.h"
-#include "gamgee_loader.h"
 #include "io_thread.h"
 #include "string_database.h"
+#include "loader/alignments.h"
+#include "loader/reference.h"
+#include "loader/variants.h"
 
 #include "device/pipeline.h"
 
@@ -117,34 +119,34 @@ static std::vector<firepony_pipeline *> enumerate_compute_devices(void)
     return ret;
 }
 
-static void print_statistics(const timer<host>& wall_clock, const pipeline_statistics& stats)
+static void print_statistics(const timer<host>& wall_clock, const pipeline_statistics& stats, int num_devices = 1)
 {
-    fprintf(stderr, "   blocked on io: %.4f (%.2f%%)\n", stats.io.elapsed_time, stats.io.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   read filtering: %.4f (%.2f%%)\n", stats.read_filter.elapsed_time, stats.read_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   cigar expansion: %.4f (%.2f%%)\n", stats.cigar_expansion.elapsed_time, stats.cigar_expansion.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   bp filtering: %.4f (%.2f%%)\n", stats.bp_filter.elapsed_time, stats.bp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   snp filtering: %.4f (%.2f%%)\n", stats.snp_filter.elapsed_time, stats.snp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   baq: %.4f (%.2f%%)\n", stats.baq.elapsed_time, stats.baq.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "     setup: %.4f (%.2f%%)\n", stats.baq_setup.elapsed_time, stats.baq_setup.elapsed_time / stats.baq.elapsed_time * 100.0);
-    fprintf(stderr, "     hmm: %.4f (%.2f%%)\n", stats.baq_hmm.elapsed_time, stats.baq_hmm.elapsed_time / stats.baq.elapsed_time * 100.0);
-    fprintf(stderr, "     post: %.4f (%.2f%%)\n", stats.baq_postprocess.elapsed_time, stats.baq_postprocess.elapsed_time / stats.baq.elapsed_time * 100.0);
-    fprintf(stderr, "   fractional error: %.4f (%.2f%%)\n", stats.fractional_error.elapsed_time, stats.fractional_error.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   covariates: %.4f (%.2f%%)\n", stats.covariates.elapsed_time, stats.covariates.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "     gather: %.4f (%.2f%%)\n", stats.covariates_gather.elapsed_time, stats.covariates_gather.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "     filter: %.4f (%.2f%%)\n", stats.covariates_filter.elapsed_time, stats.covariates_filter.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "     sort: %.4f (%.2f%%)\n", stats.covariates_sort.elapsed_time, stats.covariates_sort.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "     pack: %.4f (%.2f%%)\n", stats.covariates_pack.elapsed_time, stats.covariates_pack.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   post-processing: %.4f (%.2f%%)\n", stats.postprocessing.elapsed_time, stats.postprocessing.elapsed_time / wall_clock.elapsed_time() * 100.0);
-    fprintf(stderr, "   output: %.4f (%.2f%%)\n", stats.output.elapsed_time, stats.output.elapsed_time / wall_clock.elapsed_time() * 100.0);
+    fprintf(stderr, "   blocked on io: %.4f (%.2f%%)\n", stats.io.elapsed_time, stats.io.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   read filtering: %.4f (%.2f%%)\n", stats.read_filter.elapsed_time, stats.read_filter.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   cigar expansion: %.4f (%.2f%%)\n", stats.cigar_expansion.elapsed_time, stats.cigar_expansion.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   bp filtering: %.4f (%.2f%%)\n", stats.bp_filter.elapsed_time, stats.bp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   snp filtering: %.4f (%.2f%%)\n", stats.snp_filter.elapsed_time, stats.snp_filter.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   baq: %.4f (%.2f%%)\n", stats.baq.elapsed_time, stats.baq.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "     setup: %.4f (%.2f%%)\n", stats.baq_setup.elapsed_time, stats.baq_setup.elapsed_time / stats.baq.elapsed_time * 100.0 / num_devices);
+    fprintf(stderr, "     hmm: %.4f (%.2f%%)\n", stats.baq_hmm.elapsed_time, stats.baq_hmm.elapsed_time / stats.baq.elapsed_time * 100.0 / num_devices);
+    fprintf(stderr, "     post: %.4f (%.2f%%)\n", stats.baq_postprocess.elapsed_time, stats.baq_postprocess.elapsed_time / stats.baq.elapsed_time * 100.0 / num_devices);
+    fprintf(stderr, "   fractional error: %.4f (%.2f%%)\n", stats.fractional_error.elapsed_time, stats.fractional_error.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   covariates: %.4f (%.2f%%)\n", stats.covariates.elapsed_time, stats.covariates.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "     gather: %.4f (%.2f%%)\n", stats.covariates_gather.elapsed_time, stats.covariates_gather.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "     filter: %.4f (%.2f%%)\n", stats.covariates_filter.elapsed_time, stats.covariates_filter.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "     sort: %.4f (%.2f%%)\n", stats.covariates_sort.elapsed_time, stats.covariates_sort.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "     pack: %.4f (%.2f%%)\n", stats.covariates_pack.elapsed_time, stats.covariates_pack.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   post-processing: %.4f (%.2f%%)\n", stats.postprocessing.elapsed_time, stats.postprocessing.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
+    fprintf(stderr, "   output: %.4f (%.2f%%)\n", stats.output.elapsed_time, stats.output.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
     fprintf(stderr, "   batches: %lu (%.2f batches/sec)\n", stats.num_batches, stats.num_batches / wall_clock.elapsed_time());
-    fprintf(stderr, "   reads: %lu (%.2fM reads/sec)\n", stats.total_reads, stats.total_reads / 1000000.0 / wall_clock.elapsed_time());
+    fprintf(stderr, "   reads: %lu (%.2fK reads/sec)\n", stats.total_reads, stats.total_reads / 1000.0 / wall_clock.elapsed_time());
 }
 
 int main(int argc, char **argv)
 {
     std::vector<firepony_pipeline *> compute_devices;
 
-    sequence_data_host h_reference;
+    reference_file_handle *ref_h;
     variant_database_host h_dbsnp;
     bool ret;
 
@@ -177,26 +179,31 @@ int main(int argc, char **argv)
     }
     fprintf(stderr, "\n");
 
+    timer<host> data_io;
+    data_io.start();
+
     // load the reference genome
-    fprintf(stderr, "loading reference from %s...\n", command_line_options.reference);
-    ret = gamgee_load_sequences(&h_reference, command_line_options.reference,
-                                SequenceDataMask::BASES |
-                                SequenceDataMask::NAMES);
-    if (ret == false)
+    ref_h = reference_file_handle::open(command_line_options.reference, SequenceDataMask::BASES | SequenceDataMask::NAMES, compute_devices.size());
+
+    if (ref_h == nullptr)
     {
         fprintf(stderr, "failed to load reference %s\n", command_line_options.reference);
         exit(1);
     }
 
-    fprintf(stderr, "loading variant database %s...\n", command_line_options.snp_database);
-    ret = gamgee_load_vcf(&h_dbsnp, h_reference, command_line_options.snp_database,
-                          VariantDataMask::CHROMOSOME | VariantDataMask::ALIGNMENT);
+    fprintf(stderr, "loading variant database %s...", command_line_options.snp_database);
+    fflush(stderr);
+    ret = load_vcf(&h_dbsnp, ref_h, command_line_options.snp_database,
+                   VariantDataMask::CHROMOSOME | VariantDataMask::ALIGNMENT);
+    fprintf(stderr, "\n");
 
     if (ret == false)
     {
         fprintf(stderr, "failed to load variant database %s\n", command_line_options.snp_database);
         exit(1);
     }
+
+    data_io.stop();
 
     const uint32 data_mask = AlignmentDataMask::NAME |
                              AlignmentDataMask::CHROMOSOME |
@@ -211,7 +218,7 @@ int main(int argc, char **argv)
                              AlignmentDataMask::MAPQ |
                              AlignmentDataMask::READ_GROUP;
 
-    io_thread reader(command_line_options.input, data_mask, compute_devices.size());
+    io_thread reader(command_line_options.input, data_mask, compute_devices.size(), ref_h);
     reader.start();
 
     for(auto d : compute_devices)
@@ -219,7 +226,7 @@ int main(int argc, char **argv)
         d->setup(&reader,
                  &command_line_options,
                  &reader.file.header,
-                 &h_reference,
+                 &ref_h->sequence_data,
                  &h_dbsnp);
     }
 
@@ -274,12 +281,16 @@ int main(int argc, char **argv)
 
     fprintf(stderr, "\n");
 
-    fprintf(stderr, "wall clock time: %f\n", wall_clock.elapsed_time());
+    fprintf(stderr, "wall clock times:\n");
+    fprintf(stderr, " data I/O (reference + dbSNP): %f\n", data_io.elapsed_time());
+    fprintf(stderr, " compute: %f\n", wall_clock.elapsed_time());
+    fprintf(stderr, "\n");
 
     if (compute_devices.size() > 1)
         fprintf(stderr, "aggregate statistics:\n");
 
-    print_statistics(wall_clock, aggregate_stats);
+    print_statistics(wall_clock, aggregate_stats, compute_devices.size());
+
     if (compute_devices.size() > 1)
     {
         fprintf(stderr, "\n");

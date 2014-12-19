@@ -18,26 +18,8 @@
 
 #pragma once
 
-#include <sys/types.h>
-#include <vector>
-
-#include "device_types.h"
-
 namespace firepony {
 
-struct shared_memory_file
-{
-    int fd;
-    size_t size;
-    void *data;
-
-    shared_memory_file();
-    void unmap(void);
-
-    // open a shared memory segment and create a read-only mapping for it
-    static bool open(shared_memory_file *out, const char *fname);
-    // create a new shared memory segment of a given size with a read-write mapping
-    static bool create(shared_memory_file *out, const char *fname, size_t size);
-};
+bool load_vcf(variant_database_host *output, reference_file_handle *reference_handle, const char *filename, uint32 data_mask);
 
 } // namespace firepony

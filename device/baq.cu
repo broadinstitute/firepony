@@ -1266,7 +1266,7 @@ void do_hmm(iterator it1, iterator it2, hmm_glocal_lmem<system> hmm_context)
         // fast path: use local memory for the matrices
         const uint32 n = it2 - it1;
         const uint32 blockdim  = 128;
-        const uint32 minblocks = 5;
+        const uint32 minblocks = 3;
         const uint32 n_blocks  = (n + blockdim-1) / blockdim;
         do_hmm_kernel<blockdim,minblocks><<<n_blocks,blockdim>>>( it1, it2, hmm_context );
   }

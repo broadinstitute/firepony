@@ -115,7 +115,8 @@ struct hmm_glocal_lmem : public lambda<system>
     int referenceStart, referenceLength;
     int queryStart, queryEnd, queryLen;
 
-    double *scalingFactors;
+    double* scalingFactors;
+    //double scalingFactors[LMEM_MAX_READ_LEN];
 
     double sM, sI, bM, bI;
 
@@ -1198,6 +1199,38 @@ struct recode_baq_qualities : public lambda<system>
     }
 };
 
+template <uint32 BLOCKDIM, uint32 MINBLOCKS, target_system system, typename iterator>
+__global__
+void
+__launch_bounds__(BLOCKDIM,MINBLOCKS)
+do_hmm_kernel(iterator it1, iterator it2, hmm_glocal_lmem<system> hmm_context)
+{
+    const uint32 n = it2 - it1;
+    const uint32 thread_id = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (thread_id < n)
+        hmm_context( it1[thread_id] );
+}
+
+template <target_system system, typename iterator>
+void do_hmm(iterator it1, iterator it2, hmm_glocal_lmem<system> hmm_context)
+{
+  if (system == cuda)
+  {
+        // fast path: use local memory for the matrices
+        const uint32 n = it2 - it1;
+        const uint32 blockdim  = 128;
+        const uint32 minblocks = 5;
+        const uint32 n_blocks  = (n + blockdim-1) / blockdim;
+        do_hmm_kernel<blockdim,minblocks><<<n_blocks,blockdim>>>( it1, it2, hmm_context );
+  }
+  else
+  {
+        // fast path: use local memory for the matrices
+        parallel<system>::for_each( it1, it2, hmm_context );
+  }
+}
+
 template <target_system system>
 void baq_reads(firepony_context<system>& context, const alignment_batch<system>& batch)
 {
@@ -1313,7 +1346,7 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
     if (baq_use_lmem)
     {
         // fast path: use local memory for the matrices
-        parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
+	do_hmm<system>(  thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
                                                                       baq.matrix_index.begin(),
                                                                       baq.scaling_index.begin())),
                          thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),

@@ -42,9 +42,8 @@ namespace firepony {
 #define EM 0.33333333333
 #define EI 0.25
 
-#define MAX_BAND_WIDTH 7
-#define MAX_BAND_WIDTH2 (MAX_BAND_WIDTH * 2 + 1)
-#define MIN_BASE_QUAL 4
+#define MIN_BAND_WIDTH 7
+#define MIN_BAND_WIDTH2 (MIN_BAND_WIDTH * 2 + 1)
 
 // all bases with q < minBaseQual are up'd to this value
 #define MIN_BASE_QUAL 4
@@ -54,7 +53,7 @@ namespace firepony {
 
 // maximum read size for the lmem kernel
 #define LMEM_MAX_READ_LEN 151
-#define LMEM_MAT_ROW_SIZE (3 * MAX_BAND_WIDTH2 + 6)
+#define LMEM_MAT_ROW_SIZE (3 * MIN_BAND_WIDTH2 + 6)
 #define LMEM_MAT_SIZE ((LMEM_MAX_READ_LEN + 1) * LMEM_MAT_ROW_SIZE)
 
 //#define GUARD_BAND(z) ((z) > 0 ? (z) : 0)
@@ -83,7 +82,7 @@ struct compute_hmm_windows : public lambda<system>
         const uint32 first_insertion_offset = read_window_no_insertions.x - read_window.x;
         const uint32 last_insertion_offset = read_window_no_insertions.y - read_window.y;
 
-        const int offset = MAX_BAND_WIDTH / 2;
+        const int offset = MIN_BAND_WIDTH / 2;
         uint32 readStart = reference_window.x + seq_to_alignment_offset; // always clipped
 
         // reference window for HMM
@@ -164,13 +163,13 @@ struct hmm_glocal_lmem : public lambda<system>
         else
             bandWidth = queryLen;
 
-        if (MAX_BAND_WIDTH < abs(referenceLength - queryLen))
+        if (MIN_BAND_WIDTH < abs(referenceLength - queryLen))
         {
             bandWidth = abs(referenceLength - queryLen) + 3;
         }
 
-        if (bandWidth > MAX_BAND_WIDTH)
-            bandWidth = MAX_BAND_WIDTH;
+        if (bandWidth > MIN_BAND_WIDTH)
+            bandWidth = MIN_BAND_WIDTH;
 
         if (bandWidth < abs(referenceLength - queryLen))
         {
@@ -284,7 +283,7 @@ struct hmm_glocal_lmem : public lambda<system>
 //        fprintf(stderr, "read %d: _iqual = { % 3d % 3d % 3d % 3d % 3d ... % 3d % 3d % 3d % 3d % 3d }\n", read_index,
 //                inputQualities[0], inputQualities[1], inputQualities[2], inputQualities[3], inputQualities[4],
 //                inputQualities[queryLen - 5], inputQualities[queryLen - 4], inputQualities[queryLen - 3], inputQualities[queryLen - 2], inputQualities[queryLen - 1]);
-//        fprintf(stderr, "read %d: c->bw = %d, bw = %d, l_ref = %d, l_query = %d\n", read_index, MAX_BAND_WIDTH, bandWidth, referenceLength, queryLen);
+//        fprintf(stderr, "read %d: c->bw = %d, bw = %d, l_ref = %d, l_query = %d\n", read_index, MIN_BAND_WIDTH, bandWidth, referenceLength, queryLen);
 
         /*** forward ***/
         // f[0]
@@ -613,13 +612,13 @@ struct hmm_glocal : public lambda<system>
         else
             bandWidth = queryLen;
 
-        if (MAX_BAND_WIDTH < abs(referenceLength - queryLen))
+        if (MIN_BAND_WIDTH < abs(referenceLength - queryLen))
         {
             bandWidth = abs(referenceLength - queryLen) + 3;
         }
 
-        if (bandWidth > MAX_BAND_WIDTH)
-            bandWidth = MAX_BAND_WIDTH;
+        if (bandWidth > MIN_BAND_WIDTH)
+            bandWidth = MIN_BAND_WIDTH;
 
         if (bandWidth < abs(referenceLength - queryLen))
         {
@@ -727,7 +726,7 @@ struct hmm_glocal : public lambda<system>
 //        fprintf(stderr, "read %d: _iqual = { % 3d % 3d % 3d % 3d % 3d ... % 3d % 3d % 3d % 3d % 3d }\n", read_index,
 //                inputQualities[0], inputQualities[1], inputQualities[2], inputQualities[3], inputQualities[4],
 //                inputQualities[queryLen - 5], inputQualities[queryLen - 4], inputQualities[queryLen - 3], inputQualities[queryLen - 2], inputQualities[queryLen - 1]);
-//        fprintf(stderr, "read %d: c->bw = %d, bw = %d, l_ref = %d, l_query = %d\n", read_index, MAX_BAND_WIDTH, bandWidth, referenceLength, queryLen);
+//        fprintf(stderr, "read %d: c->bw = %d, bw = %d, l_ref = %d, l_query = %d\n", read_index, MIN_BAND_WIDTH, bandWidth, referenceLength, queryLen);
 
         /*** forward ***/
         // f[0]
@@ -1115,7 +1114,7 @@ struct cap_baq_qualities : public lambda<system>
         const uint32 seq_to_alignment_offset = batch.alignment_start[read_index];
         const uint32 first_insertion_offset = read_window_no_insertions.x - read_window.x;
 
-        const int offset = MAX_BAND_WIDTH / 2;
+        const int offset = MIN_BAND_WIDTH / 2;
 
         const uint32 readStart = reference_window.x + seq_to_alignment_offset;
         const uint32 start = max(readStart - offset - first_insertion_offset, 0u);

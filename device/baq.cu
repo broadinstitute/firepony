@@ -75,7 +75,7 @@ struct compute_hmm_windows : public lambda<system>
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        uint2&   out_reference_window = ctx.baq.reference_windows[read_index];
+        uint2   hmm_reference_window;
 
         // grab reference sequence window in the genome
         const uint32 ref_ID = batch.chromosome[read_index];
@@ -100,14 +100,44 @@ struct compute_hmm_windows : public lambda<system>
 
         if (stop > ref_length)
         {
-            out_reference_window = make_uint2(uint32(-1), uint32(-1));
+            hmm_reference_window = make_uint2(uint32(-1), uint32(-1));
             return;
         }
 
         start += ref_base;
         stop += ref_base;
 
-        out_reference_window = make_uint2(start, stop);
+        hmm_reference_window = make_uint2(start, stop);
+        ctx.baq.reference_windows[read_index] = hmm_reference_window;
+
+        // compute the band width
+        int referenceLength;
+        int queryLen;
+
+        referenceLength = hmm_reference_window.y - hmm_reference_window.x + 1;
+        queryLen = read_window.y - read_window.x + 1;
+
+        uint16 bandWidth;
+
+        if (referenceLength > queryLen)
+            bandWidth = referenceLength;
+        else
+            bandWidth = queryLen;
+
+        if (MIN_BAND_WIDTH < abs(referenceLength - queryLen))
+        {
+            bandWidth = abs(referenceLength - queryLen) + 3;
+        }
+
+        if (bandWidth > MIN_BAND_WIDTH)
+            bandWidth = MIN_BAND_WIDTH;
+
+        if (bandWidth < abs(referenceLength - queryLen))
+        {
+            bandWidth = abs(referenceLength - queryLen);
+        }
+
+        ctx.baq.bandwidth[read_index] = bandWidth;
     }
 };
 
@@ -166,25 +196,7 @@ struct hmm_glocal_lmem : public lambda<system>
         queryEnd = read_window.y;
         queryLen = read_window.y - read_window.x + 1;
 
-        // compute band width
-        if (referenceLength > queryLen)
-            bandWidth = referenceLength;
-        else
-            bandWidth = queryLen;
-
-        if (MIN_BAND_WIDTH < abs(referenceLength - queryLen))
-        {
-            bandWidth = abs(referenceLength - queryLen) + 3;
-        }
-
-        if (bandWidth > MIN_BAND_WIDTH)
-            bandWidth = MIN_BAND_WIDTH;
-
-        if (bandWidth < abs(referenceLength - queryLen))
-        {
-            bandWidth = abs(referenceLength - queryLen);
-        }
-
+        bandWidth = ctx.baq.bandwidth[read_index];
         bandWidth2 = bandWidth * 2 + 1;
 
         // initialize transition probabilities
@@ -615,25 +627,7 @@ struct hmm_glocal : public lambda<system>
         queryEnd = read_window.y;
         queryLen = read_window.y - read_window.x + 1;
 
-        // compute band width
-        if (referenceLength > queryLen)
-            bandWidth = referenceLength;
-        else
-            bandWidth = queryLen;
-
-        if (MIN_BAND_WIDTH < abs(referenceLength - queryLen))
-        {
-            bandWidth = abs(referenceLength - queryLen) + 3;
-        }
-
-        if (bandWidth > MIN_BAND_WIDTH)
-            bandWidth = MIN_BAND_WIDTH;
-
-        if (bandWidth < abs(referenceLength - queryLen))
-        {
-            bandWidth = abs(referenceLength - queryLen);
-        }
-
+        bandWidth = ctx.baq.bandwidth[read_index];
         bandWidth2 = bandWidth * 2 + 1;
 
         // initialize transition probabilities
@@ -682,13 +676,14 @@ struct hmm_glocal : public lambda<system>
     // computes a matrix offset for forwardMatrix or backwardMatrix
     CUDA_HOST_DEVICE int off(int i, int j = 0)
     {
-        return i * LMEM_MAT_ROW_SIZE + j;
+        return i * (bandWidth2 * 3 + 6) + j;
     }
 
     // computes the required HMM matrix size for the given read length
-    CUDA_HOST_DEVICE static uint32 matrix_size(const uint32 read_len)
+    CUDA_HOST_DEVICE static uint32 matrix_size(const uint32 read_len, const int bandWidth)
     {
-        return (read_len + 1) * LMEM_MAT_ROW_SIZE;
+        const int bandWidth2 = bandWidth * 2 + 1;
+        return (read_len + 1) * (bandWidth2 * 3 + 6);
     }
 
     CUDA_HOST_DEVICE static double qual2prob(uint8 q)
@@ -1009,7 +1004,7 @@ struct compute_hmm_matrix_size : public thrust::unary_function<uint32, uint32>, 
     CUDA_HOST_DEVICE uint32 operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
-        return hmm_glocal<system>::matrix_size(idx.read_len);
+        return hmm_glocal<system>::matrix_size(idx.read_len, ctx.baq.bandwidth[read_index]);
     }
 };
 
@@ -1219,8 +1214,14 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
     vector<system, uint32>& baq_state = context.temp_u32_2;
 
     // check if we can use the lmem kernel
+#if 0
+    // note: the lmem path is effectively broken due to the varying band width
     const bool baq_use_lmem = (batch.host->max_read_size <= LMEM_MAX_READ_LEN);
     static bool baq_lmem_warning_printed = false;
+#else
+    constexpr bool baq_use_lmem = false;
+    static bool baq_lmem_warning_printed = true;
+#endif
 
     if (!baq_use_lmem && !baq_lmem_warning_printed)
     {
@@ -1244,6 +1245,15 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
                                            context.temp_storage);
 
     active_baq_read_list.resize(num_active);
+
+    baq.reference_windows.resize(batch.device.num_reads);
+    baq.bandwidth.resize(batch.device.num_reads);
+
+    // compute the alignment frames
+    // note: this is used both for real BAQ and flat BAQ, so we use the full active read list
+    parallel<system>::for_each(context.active_read_list.begin(),
+                               context.active_read_list.end(),
+                               compute_hmm_windows<system>(context, batch.device));
 
     if (!baq_use_lmem)
     {
@@ -1296,19 +1306,12 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
 //    fprintf(stderr, "]\n");
 //    fflush(stdout);
 
-    baq.reference_windows.resize(batch.device.num_reads);
 
     baq_state.resize(batch.device.qualities.size());
     baq.qualities.resize(batch.device.qualities.size());
 
     thrust::fill(baq_state.begin(), baq_state.end(), uint32(-1));
     thrust::fill(baq.qualities.begin(), baq.qualities.end(), uint8(-1));
-
-    // compute the alignment frames
-    // note: this is used both for real BAQ and flat BAQ, so we use the full active read list
-    parallel<system>::for_each(context.active_read_list.begin(),
-                     context.active_read_list.end(),
-                     compute_hmm_windows<system>(context, batch.device));
 
     // initialize matrices and scaling factors
     if (!baq_use_lmem)

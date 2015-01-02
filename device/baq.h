@@ -39,6 +39,8 @@ struct baq_context
 {
     // reference windows for HMM
     d_vector_u32_2<system> reference_windows;
+    // band widths
+    d_vector_u16<system> bandwidth;
 
     // BAQ'ed qualities for each read, same size as each read
     d_vector_u8<system> qualities;
@@ -58,6 +60,7 @@ struct baq_context
     struct view
     {
         typename d_vector_u32_2<system>::view reference_windows;
+        typename d_vector_u16<system>::view bandwidth;
         typename d_vector_u8<system>::view qualities;
         typename d_vector<system, double>::view forward;
         typename d_vector<system, double>::view backward;
@@ -70,6 +73,7 @@ struct baq_context
     {
         view v = {
                 reference_windows,
+                bandwidth,
                 qualities,
                 forward,
                 backward,

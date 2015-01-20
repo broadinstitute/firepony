@@ -181,7 +181,13 @@ struct remove_adapters : public lambda<system>
         }
     }
 
-    CUDA_HOST_DEVICE int getReadCoordinateForReferenceCoordinate(const uint32 read_index, uint32 ref_coord)
+    enum AdaptorTail
+    {
+        left,
+        right,
+    };
+
+    CUDA_HOST_DEVICE int getReadCoordinateForReferenceCoordinate(const uint32 read_index, uint32 ref_coord, AdaptorTail tail)
     {
         const CRQ_index idx = batch.crq_index(read_index);
 
@@ -197,21 +203,35 @@ struct remove_adapters : public lambda<system>
                 if (read_coord == uint16(-1))
                 {
                     // if there is no read coordinate, we must be in a deletion
-                    // this can (in theory) only happen for the right tail
-                    // move forward until we find a valid clipping point
-                    while(ev < cigar_stop)
+                    // move forward/backward (depending on which tail we're locating) until we find a valid clipping point
+
+                    if (tail == AdaptorTail::right)
                     {
-                        read_coord = ctx.cigar.cigar_event_read_coordinates[ev];
+                        while(ev < cigar_stop)
+                        {
+                            read_coord = ctx.cigar.cigar_event_read_coordinates[ev];
 
-                        if (read_coord != uint16(-1))
-                            break;
+                            if (read_coord != uint16(-1))
+                                break;
 
-                        ev++;
+                            ev++;
+                        }
+                    } else {
+                        while (ev > cigar_start)
+                        {
+                            read_coord = ctx.cigar.cigar_event_read_coordinates[ev];
+
+                            if (read_coord != uint16(-1))
+                                break;
+
+                            ev--;
+                        }
                     }
 
                     // if we get here, then we failed to find a clipping coordinate
                     // this should not happen unless the read is malformed
-                    if (ev == cigar_stop)
+                    if (tail == AdaptorTail::right && ev == cigar_stop ||
+                        tail == AdaptorTail::left && ev == cigar_start)
                         return -1;
                 }
 
@@ -230,9 +250,9 @@ struct remove_adapters : public lambda<system>
         if (refStart < 0)
         {
             start = 0;
-            stop = getReadCoordinateForReferenceCoordinate(read_index, uint32(refStop));
+            stop = getReadCoordinateForReferenceCoordinate(read_index, uint32(refStop), AdaptorTail::left);
         } else {
-            start = getReadCoordinateForReferenceCoordinate(read_index, uint32(refStart));
+            start = getReadCoordinateForReferenceCoordinate(read_index, uint32(refStart), AdaptorTail::right);
             stop = ctx.cigar.read_window_clipped[read_index].y - ctx.cigar.read_window_clipped[read_index].x - 1;
         }
 

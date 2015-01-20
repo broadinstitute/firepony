@@ -275,6 +275,11 @@ public:
             {
                 const uint16 ref_coord = ctx.cigar.cigar_event_reference_coordinates[ev];
 
+                if (ref_coord == uint16(-1))
+                {
+                    continue;
+                }
+
                 if (int(ref_coord) <= feature_end)
                 {
                     if (ctx.cigar.cigar_event_read_coordinates[ev] != uint16(-1))

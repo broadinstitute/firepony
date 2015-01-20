@@ -43,12 +43,15 @@ void covariate_table<system, covariate_value>::sort(vector<system, covariate_key
                                                     vector<system, uint8>& temp_storage,
                                                     uint32 num_key_bits)
 {
-    parallel<system>::sort_by_key(this->keys,
-                                  this->values,
-                                  temp_keys,
-                                  temp_values,
-                                  temp_storage,
-                                  num_key_bits);
+    if (this->keys.size())
+    {
+        parallel<system>::sort_by_key(this->keys,
+                                      this->values,
+                                      temp_keys,
+                                      temp_values,
+                                      temp_storage,
+                                      num_key_bits);
+    }
 }
 
 METHOD_INSTANTIATE(covariate_observation_table, sort);

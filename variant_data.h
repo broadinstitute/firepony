@@ -81,6 +81,10 @@ struct variant_database_storage
     vector<system, uint32> alternate_sequence_start;
     vector<system, uint32> alternate_sequence_len;
 
+    // contains a prefix scan of the end points using max as the operator
+    // each element encodes the maximum end point of any feature to the left of it
+    vector<system, uint32> max_end_point_left;
+
     CUDA_HOST variant_database_storage()
         : num_variants(0)
     { }
@@ -106,6 +110,8 @@ struct variant_database_storage
         typename packed_vector<system, 4>::const_view alternate_sequence;
         typename vector<system, uint32>::const_view alternate_sequence_start;
         typename vector<system, uint32>::const_view alternate_sequence_len;
+
+        typename vector<system, uint32>::const_view max_end_point_left;
     };
 
     CUDA_HOST operator const_view() const
@@ -128,6 +134,8 @@ struct variant_database_storage
                 alternate_sequence,
                 alternate_sequence_start,
                 alternate_sequence_len,
+
+                max_end_point_left,
         };
 
         return v;

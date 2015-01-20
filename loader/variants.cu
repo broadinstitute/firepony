@@ -180,6 +180,13 @@ bool load_vcf(variant_database_host *output, reference_file_handle *reference_ha
         }
     }
 
+    if (data_mask & VariantDataMask::ALIGNMENT)
+    {
+        // generate the search index
+        h.max_end_point_left.resize(h.feature_stop.size());
+        thrust::inclusive_scan(h.feature_stop.begin(), h.feature_stop.end(), h.max_end_point_left.begin(), thrust::maximum<uint32>());
+    }
+
     return true;
 }
 

@@ -69,4 +69,34 @@ inline CUDA_HOST_DEVICE Iterator lower_bound(const Value         x,
     return begin;
 }
 
+/// find the upper bound in a sequence
+///
+/// \param x        element to find
+/// \param begin    sequence start iterator
+/// \param n        sequence size
+template <typename Iterator, typename Value>
+inline CUDA_HOST_DEVICE Iterator upper_bound(const Value         x,
+                                             Iterator            begin,
+                                             const size_t        n)
+{
+    size_t count = n;
+
+    while (count > 0)
+    {
+        const size_t step = count / 2;
+
+        Iterator it = begin + step;
+
+        if (!(x < *it))
+        {
+            begin = ++it;
+            count -= step + 1;
+        }
+        else
+            count = step;
+    }
+
+    return begin;
+}
+
 } // namespace firepony

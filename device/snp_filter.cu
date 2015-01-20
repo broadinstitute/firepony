@@ -179,79 +179,25 @@ struct compute_vcf_ranges : public lambda<system>
         const uint2 alignment_window = make_uint2(ref_sequence_offset + uint32(reference_window_clipped.x),
                                                   ref_sequence_offset + uint32(reference_window_clipped.y));
 
-        // do a binary search along the start and stop arrays to find first overlap
-        const uint32 vcf_start_idx = lower_bound(alignment_window.x,
-                                                 db.feature_start.begin(),
-                                                 db.feature_start.size()) - db.feature_start.begin();
-
-        auto permuted_stop_iter = thrust::make_permutation_iterator(db.feature_stop.begin(), ctx.snp_filter.feature_stop_sort_order.begin());
-        auto stop_iter = lower_bound(alignment_window.x,
-                                     permuted_stop_iter,
-                                     db.feature_stop.size());
-
-        const uint32 vcf_stop_idx = &(*stop_iter) - db.feature_stop.begin();
-
-        // compute the initial vcf range
         uint2 vcf_range;
 
-        vcf_range.x = min(vcf_start_idx, vcf_stop_idx);
-        vcf_range.y = vcf_range.x;
+        // do a binary search along the max end point array to find the first overlap
+        vcf_range.x = lower_bound(alignment_window.x,
+                                  db.max_end_point_left.begin(),
+                                  db.max_end_point_left.size()) - db.max_end_point_left.begin();
 
-        // do a linear search to find the end of the VCF range
-        // (there are generally very few VCF entries for an average read length --- and often none --- so this is expected to be faster than a binary search)
-        while(vcf_range.y < db.feature_start.size() - 1 && db.feature_start[vcf_range.y + 1] <= alignment_window.y)
+        // now search along the min end point array to find the last overlap
+        vcf_range.y = upper_bound(alignment_window.y,
+                                  db.feature_start.begin(),
+                                  db.feature_start.size()) - db.feature_start.begin();
+
+        if (vcf_range.y <= vcf_range.x)
         {
-            vcf_range.y++;
+            // mark range as inactive
+            vcf_range = make_uint2(uint32(-1), uint32(-1));
         }
 
-        while(vcf_range.y < db.feature_stop.size() - 1 && permuted_stop_iter[vcf_range.y + 1] <= alignment_window.y)
-        {
-            vcf_range.y++;
-        }
-
-        // figure out the (reference) interval that our set of features covers
-        const uint32 feature_start = db.feature_start[vcf_range.x];
-        const uint32 feature_end = db.feature_stop[vcf_range.y];
-
-        // figure out which "side" of the read alignment window (in reference coordinates) these features lie on
-        enum {
-            left,
-            inside,
-            right
-        } loc_start, loc_end;
-
-        if (feature_start < alignment_window.x)
-        {
-            loc_start = left;
-        } else if (feature_start >= alignment_window.x &&
-                   feature_start <= alignment_window.y)
-        {
-            loc_start = inside;
-        } else {
-            loc_start = right;
-        }
-
-        if (feature_end < alignment_window.x)
-        {
-            loc_end = left;
-        } else if (feature_end >= alignment_window.x &&
-                   feature_end <= alignment_window.y)
-        {
-            loc_end = inside;
-        } else {
-            loc_end = right;
-        }
-
-        // check for overlap
-        if (loc_start == loc_end && loc_start != inside)
-        {
-            // both start and end are on the same side and they're not inside, we don't overlap the read
-            // emit an empty vcf range
-            ctx.snp_filter.active_vcf_ranges[read_index] = make_uint2(uint32(-1), uint32(-1));
-        } else {
-            // start and end are on different sides (or are both inside the read), emit a valid vcf range
-            ctx.snp_filter.active_vcf_ranges[read_index] = vcf_range;
-        }
+        ctx.snp_filter.active_vcf_ranges[read_index] = vcf_range;
     }
 };
 
@@ -364,27 +310,6 @@ template <target_system system>
 void filter_known_snps(firepony_context<system>& context, const alignment_batch<system>& batch)
 {
     auto& snp = context.snp_filter;
-    auto& snp_db = context.variant_db.device;
-
-    if (snp.feature_stop_sort_order.size() != snp_db.feature_stop.size())
-    {
-        vector<system, uint32> temp_keys, temp_values;
-        vector<system, uint32> input_keys;
-
-        // generate sort order for feature_stop
-        snp.feature_stop_sort_order.resize(snp_db.feature_stop.size());
-        thrust::sequence(snp.feature_stop_sort_order.begin(),
-                         snp.feature_stop_sort_order.end());
-
-        input_keys = snp_db.feature_stop;
-
-        // sort indices by ascending value of feature_stop
-        parallel<system>::sort_by_key(input_keys,
-                                      snp.feature_stop_sort_order,
-                                      temp_keys,
-                                      temp_values,
-                                      context.temp_storage);
-    }
 
     // compute the VCF ranges for each read
     snp.active_vcf_ranges.resize(batch.device.num_reads);

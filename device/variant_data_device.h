@@ -64,12 +64,15 @@ struct variant_database_device : public variant_database_storage<system>
         {
             this->feature_start = host.feature_start;
             this->feature_stop = host.feature_stop;
+            this->max_end_point_left = host.max_end_point_left;
 
             TRACK_VECTOR_SIZE(feature_start);
             TRACK_VECTOR_SIZE(feature_stop);
+            TRACK_VECTOR_SIZE(max_end_point_left);
         } else {
             this->feature_start.clear();
             this->feature_stop.clear();
+            this->max_end_point_left.clear();
         }
 
         if (this->data_mask & VariantDataMask::QUAL)

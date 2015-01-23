@@ -372,8 +372,8 @@ struct compute_no_insertions_window : public lambda<system>
         const auto& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
         auto read_window_clipped_no_insertions = ctx.cigar.read_window_clipped_no_insertions[read_index];
 
-        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
-        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
+        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start] + read_window_clipped.x;
+        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len] - read_window_clipped.y;
 
         read_window_clipped_no_insertions = read_window_clipped;
 

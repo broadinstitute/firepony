@@ -28,6 +28,7 @@
 #include "device_types.h"
 #include "firepony_context.h"
 #include "snp_filter.h"
+#include "cigar.h"
 
 #include "primitives/algorithms.h"
 #include "primitives/cuda.h"
@@ -246,50 +247,107 @@ public:
             const int feature_start = db.feature_start[feature] - ref_sequence_offset;
             const int feature_end = db.feature_stop[feature] - ref_sequence_offset;
 
-            // convert start and end to read coordinates
-            uint32 read_start = 0xffffffff, read_end = 0xffffffff;
+            // locate a starting point for matching the feature along the read: search for the first read bp with a known reference coordinate inside our feature
             uint32 ev;
+            uint16 ref_coord = uint16(-1);
 
             for(ev = cigar_start; ev < cigar_end; ev++)
             {
-                const uint16 ref_coord = ctx.cigar.cigar_event_reference_coordinates[ev];
+                ref_coord = ctx.cigar.cigar_event_reference_coordinates[ev];
 
-                if (ref_coord != uint16(-1) && int(ref_coord) >= feature_start)
+                if (ref_coord != uint16(-1) && ref_coord >= feature_start)
                 {
-                    // if the feature starts inside a deletion, move ev backward until we find a read base
-                    // (note that we preserve ev since the next loop relies on it being accurate --- moving ev back could land us in an insertion!)
-                    uint32 ev_read = ev;
-                    while(ev_read >= cigar_start && ctx.cigar.cigar_event_read_coordinates[ev_read] == uint16(-1))
-                    {
-                        ev_read--;
-                    }
-
-                    read_start = ctx.cigar.cigar_event_read_coordinates[ev_read];
-                    read_end = read_start;
-
                     break;
                 }
             }
 
-            for( ; ev < cigar_end; ev++)
+            if (ev == cigar_end)
             {
-                const uint16 ref_coord = ctx.cigar.cigar_event_reference_coordinates[ev];
+                // no match found
+                continue;
+            }
 
-                if (ref_coord == uint16(-1))
+            // the rest of this function is best left alone
+
+            // how many base pairs exist in the feature to the left of our starting point?
+            int feature_bp_left = ref_coord - feature_start;
+            uint32 ev_feature_start = ev;
+
+            if (feature_bp_left > 0)
+            {
+                // we skipped some base pairs in the feature, which means there is an indel region to the left
+                // move backwards in the indel region to compensate
+                while(feature_bp_left && ev_feature_start > cigar_start)
                 {
-                    continue;
+                    auto event = ctx.cigar.cigar_events[ev_feature_start];
+
+                    if (event == cigar_event::S)
+                    {
+                        // we've reached the left clip region, stop
+                        break;
+                    }
+
+                    // (mis)matches and deletions consume base pairs from the feature
+                    // (note: matches should *never* show up here, since our starting point is essentially the first match/mismatch point along the read)
+                    if (event == cigar_event::M || event == cigar_event::D)
+                    {
+                        feature_bp_left--;
+                    }
+
+                    ev_feature_start--;
                 }
 
-                if (int(ref_coord) <= feature_end)
+                // if the matching event has no read coordinate, move forward again until we find the first read coordinate inside the feature range
+                while (ev_feature_start < cigar_end && ctx.cigar.cigar_event_read_coordinates[ev_feature_start] == uint16(-1))
                 {
-                    if (ctx.cigar.cigar_event_read_coordinates[ev] != uint16(-1))
-                    {
-                        read_end = ctx.cigar.cigar_event_read_coordinates[ev];
-                    }
-                } else {
-                    break;
+                    ev_feature_start++;
+                }
+            } else {
+                // if we didn't move backwards at all AND we're in a deletion, move backwards
+                while (ev_feature_start > cigar_start && ctx.cigar.cigar_events[ev_feature_start] == cigar_event::D)
+                {
+                    ev_feature_start--;
                 }
             }
+
+            // how many base pairs exist in the feature to the right of the starting point?
+            int feature_bp_right = feature_end - ref_coord;
+
+            // now walk forward from our starting point until we have enough base pairs to cover the feature
+            while(feature_bp_right > 0 && ev < cigar_end - 1)
+            {
+                auto event = ctx.cigar.cigar_events[ev];
+
+                if (event == cigar_event::S)
+                {
+                    // we've reached the right clip region, stop
+                    break;
+                }
+
+                // matches and deletions consume base pairs from the feature
+                if (event == cigar_event::M || event == cigar_event::D)
+                {
+                    feature_bp_right--;
+                }
+
+                ev++;
+            }
+
+            // if there's no read coordinate for the matching event, move backward again until we find the last read coordinate inside the feature range
+            while(ev > cigar_start && ctx.cigar.cigar_event_read_coordinates[ev] == uint16(-1))
+            {
+                ev--;
+            }
+
+            // we adjusted both start and end points of the feature in event coordinates
+            // if they crossed over, the feature didn't match any base pairs in the read
+            if (ev < ev_feature_start)
+            {
+                continue;
+            }
+
+            uint32 read_start = ctx.cigar.cigar_event_read_coordinates[ev_feature_start];
+            uint32 read_end   = ctx.cigar.cigar_event_read_coordinates[ev];
 
             if ((read_start < read_window_clipped.x && read_end < read_window_clipped.x) ||
                 (read_start > read_window_clipped.y && read_end > read_window_clipped.y))

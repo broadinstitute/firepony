@@ -303,10 +303,13 @@ public:
                     ev_feature_start++;
                 }
             } else {
-                // if we didn't move backwards at all AND we're in a deletion, move backwards
-                while (ev_feature_start > cigar_start && ctx.cigar.cigar_events[ev_feature_start] == cigar_event::D)
+                // if we didn't move backwards at all and we're in a deletion, then move backwards if the (reference) starting point for the feature is inside our clipping window
+                if (ctx.cigar.cigar_event_reference_coordinates[ev_feature_start] <= read_window_clipped.y)
                 {
-                    ev_feature_start--;
+                    while (ev_feature_start > cigar_start && ctx.cigar.cigar_events[ev_feature_start] == cigar_event::D)
+                    {
+                        ev_feature_start--;
+                    }
                 }
             }
 

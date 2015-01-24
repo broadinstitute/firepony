@@ -80,7 +80,7 @@ void build_read_group_table(firepony_context<system>& context)
     auto& temp_storage = context.temp_storage;
 
     cv.read_group.sort(temp_keys, temp_values, temp_storage, covariate_packer_quality_score<system>::chain::bits_used);
-    cv.read_group.pack(temp_keys, temp_values);
+    cv.read_group.pack(temp_keys, temp_values, temp_storage);
 
     // finally compute the empirical quality for this table
     compute_empirical_quality(context, cv.read_group, false);

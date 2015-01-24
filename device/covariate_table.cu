@@ -86,22 +86,13 @@ struct covariate_value_sum<covariate_empirical_value>
 
 template <target_system system, typename covariate_value>
 void covariate_table<system, covariate_value>::pack(vector<system, covariate_key>& temp_keys,
-                                                    vector<system, covariate_value>& temp_values)
+                                                    vector<system, covariate_value>& temp_values,
+                                                    vector<system,uint8>& temp_storage)
 {
     temp_keys.resize(this->size());
     temp_values.resize(this->size());
 
-    thrust::pair<typename d_vector<system, covariate_key>::iterator,
-                 typename d_vector<system, covariate_value>::iterator> out;
-    out = thrust::reduce_by_key(this->keys.begin(),
-                                this->keys.end(),
-                                this->values.begin(),
-                                temp_keys.begin(),
-                                temp_values.begin(),
-                                thrust::equal_to<covariate_key>(),
-                                covariate_value_sum<covariate_value>());
-
-    uint32 new_size = out.first - temp_keys.begin();
+    uint32 new_size = parallel<system>::reduce_by_key(keys, values, temp_keys, temp_values, temp_storage, covariate_value_sum<covariate_value>());
 
     this->keys = temp_keys;
     this->values = temp_values;

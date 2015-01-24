@@ -199,7 +199,7 @@ static void build_covariates_table(covariate_observation_table<system>& table, f
         covariates_sort.stop();
 
         covariates_pack.start();
-        table.pack(temp_keys, temp_values);
+        table.pack(temp_keys, temp_values, context.temp_storage);
         covariates_pack.stop();
     }
 
@@ -275,13 +275,13 @@ template <target_system system> void postprocess_covariates(firepony_context<sys
     vector<system, covariate_key> temp_keys;
 
     cv.quality.sort(temp_keys, temp_values, context.temp_storage, covariate_packer_quality_score<system>::chain::bits_used);
-    cv.quality.pack(temp_keys, temp_values);
+    cv.quality.pack(temp_keys, temp_values, context.temp_storage);
 
     cv.cycle.sort(temp_keys, temp_values, context.temp_storage, covariate_packer_cycle_illumina<system>::chain::bits_used);
-    cv.cycle.pack(temp_keys, temp_values);
+    cv.cycle.pack(temp_keys, temp_values, context.temp_storage);
 
     cv.context.sort(temp_keys, temp_values, context.temp_storage, covariate_packer_context<system>::chain::bits_used);
-    cv.context.pack(temp_keys, temp_values);
+    cv.context.pack(temp_keys, temp_values, context.temp_storage);
 }
 INSTANTIATE(postprocess_covariates);
 

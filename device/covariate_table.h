@@ -112,7 +112,8 @@ struct covariate_table
               uint32 num_key_bits);
 
     void pack(vector<system, covariate_key>& temp_keys,
-              vector<system, covariate_value>& temp_values);
+              vector<system, covariate_value>& temp_values,
+              vector<system, uint8>& temp_storage);
 
     struct view
     {

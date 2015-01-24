@@ -314,8 +314,11 @@ public:
             int feature_bp_right = feature_end - ref_coord;
 
             // now walk forward from our starting point until we have enough base pairs to cover the feature
+            // (note that we pre-increment here; this is because the starting point has already been consumed)
             while(feature_bp_right > 0 && ev < cigar_end - 1)
             {
+                ev++;
+
                 auto event = ctx.cigar.cigar_events[ev];
 
                 if (event == cigar_event::S)
@@ -329,8 +332,6 @@ public:
                 {
                     feature_bp_right--;
                 }
-
-                ev++;
             }
 
             // if there's no read coordinate for the matching event, move backward again until we find the last read coordinate inside the feature range

@@ -276,17 +276,80 @@ struct remove_adapters : public lambda<system>
         read_window_clipped.y = min<uint16>(read_window_clipped.y, adapter.x - 1);
     }
 
-    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
+    // this is essentially a copy of the compute_reference_window functor, except it uses the current read window (with indels)
+    // we need to compute this early for adapter clipping, but the results will be out of date as soon as we're finished
+    CUDA_HOST_DEVICE ushort2 get_current_reference_window(const uint32 read_index)
     {
         const auto& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
+        ushort2 reference_window_clipped;
+
+        auto idx = batch.crq_index(read_index);
+        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
+        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
+
+        // do a linear search for the read offset
+        // (this could be smarter, but it doesn't seem to matter)
+        for(uint32 i = cigar_start; i < cigar_end; i++)
+        {
+            if (ctx.cigar.cigar_event_read_coordinates[i] == read_window_clipped.x)
+            {
+                while(ctx.cigar.cigar_event_reference_coordinates[i] == uint16(-1) &&
+                        i < cigar_end)
+                {
+                    i++;
+                }
+
+                if (i == cigar_end)
+                {
+                    // should never happen
+                    reference_window_clipped = make_ushort2(uint16(-1), uint16(-1));
+                    return reference_window_clipped;
+                }
+
+                reference_window_clipped.x = ctx.cigar.cigar_event_reference_coordinates[i];
+                break;
+            }
+        }
+
+        for(uint32 i = cigar_end - 1; i >= cigar_start; i--)
+        {
+            if (ctx.cigar.cigar_event_read_coordinates[i] == read_window_clipped.y)
+            {
+                while(ctx.cigar.cigar_event_reference_coordinates[i] == uint16(-1) &&
+                        i > cigar_start)
+                {
+                    i--;
+                }
+
+                if (i == cigar_start)
+                {
+                    // should never happen
+                    reference_window_clipped = make_ushort2(uint16(-1), uint16(-1));
+                    return reference_window_clipped;
+                }
+
+                reference_window_clipped.y = ctx.cigar.cigar_event_reference_coordinates[i];
+                break;
+            }
+        }
+
+        return reference_window_clipped;
+    }
+
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
+    {
         uint32 adaptorBoundary = getAdaptorBoundary(read_index);
 
         if (adaptorBoundary == CANNOT_COMPUTE_ADAPTOR_BOUNDARY)
             return;
 
-        // xxxnsubtil: i think this might be wrong, doesn't account for indels (do we need to?)
-        if (adaptorBoundary < batch.alignment_start[read_index] + read_window_clipped.x || adaptorBoundary > batch.alignment_start[read_index] + read_window_clipped.y)
+        const auto reference_window = get_current_reference_window(read_index);
+
+        if (adaptorBoundary < batch.alignment_start[read_index] + reference_window.x ||
+            adaptorBoundary > batch.alignment_start[read_index] + reference_window.y)
+        {
             return;
+        }
 
         if (batch.flags[read_index] & AlignmentFlags::REVERSE)
         {

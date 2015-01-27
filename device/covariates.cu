@@ -98,33 +98,32 @@ struct covariate_gatherer : public lambda<system>
     }
 };
 
-// functor used for filtering out invalid keys in a table
+// functor that determines if a key is valid
+// note: operator() returns a uint32 to allow for composition of this functor with reduction operators
 template <target_system system, typename covariate_packer>
-struct flag_valid_keys : public lambda<system>
+struct is_key_valid : public thrust::unary_function<covariate_key, uint32>
 {
-    LAMBDA_INHERIT_MEMBERS;
-
-    typename d_vector_u8<system>::view flags;
-
-    flag_valid_keys(typename firepony_context<system>::view ctx,
-                    const typename alignment_batch_device<system>::const_view batch,
-                    typename d_vector_u8<system>::view flags)
-        : lambda<system>(ctx, batch), flags(flags)
-    { }
-
-    CUDA_HOST_DEVICE void operator() (const uint32 key_index)
+    CUDA_HOST_DEVICE uint32 operator() (const covariate_key key)
     {
         constexpr bool sparse = covariate_packer::chain::is_sparse(covariate_packer::TargetCovariate);
-
-        const covariate_key& key = ctx.covariates.scratch_table_space.keys[key_index];
 
         if (key == covariate_key(-1) ||
             (sparse && covariate_packer::decode(key, covariate_packer::TargetCovariate) == covariate_packer::chain::invalid_key(covariate_packer::TargetCovariate)))
         {
-            flags[key_index] = 0;
+            return 0;
         } else {
-            flags[key_index] = 1;
+            return 1;
         }
+    }
+};
+
+template <target_system system, typename covariate_packer, typename Tuple>
+struct is_key_value_pair_valid : public thrust::unary_function<Tuple, bool>
+{
+    CUDA_HOST_DEVICE uint32 operator() (const Tuple& T)
+    {
+        covariate_key key = thrust::get<0>(T);
+        return is_key_valid<system, covariate_packer>()(key) ? true : false;
     }
 };
 
@@ -135,8 +134,6 @@ static void build_covariates_table(covariate_observation_table<system>& table, f
     auto& cv = context.covariates;
     auto& scratch_table = cv.scratch_table_space;
 
-    auto& flags = context.temp_u8;
-
     firepony::vector<system, covariate_observation_value> temp_values;
     firepony::vector<system, covariate_key> temp_keys;
 
@@ -146,7 +143,6 @@ static void build_covariates_table(covariate_observation_table<system>& table, f
 
     // set up a scratch table space with enough room for 3 keys per cigar event
     scratch_table.resize(context.cigar.cigar_events.size() * 3);
-    flags.resize(context.cigar.cigar_events.size() * 3);
 
     // mark all keys as invalid
     thrust::fill(scratch_table.keys.begin(),
@@ -162,13 +158,11 @@ static void build_covariates_table(covariate_observation_table<system>& table, f
 
     covariates_filter.start();
 
-    // flag valid keys
-    parallel<system>::for_each(thrust::make_counting_iterator(0u),
-                               thrust::make_counting_iterator(0u) + cv.scratch_table_space.keys.size(),
-                               flag_valid_keys<system, covariate_packer>(context, batch.device, flags));
-
     // count valid keys
-    uint32 valid_keys = thrust::reduce(flags.begin(), flags.end(), uint32(0));
+    uint32 valid_keys = parallel<system>::sum(thrust::make_transform_iterator(scratch_table.keys.begin(),
+                                                                              is_key_valid<system, covariate_packer>()),
+                                              scratch_table.keys.size(),
+                                              context.temp_storage);
 
     if (valid_keys)
     {
@@ -176,17 +170,15 @@ static void build_covariates_table(covariate_observation_table<system>& table, f
         size_t off = table.size();
         table.resize(table.size() + valid_keys);
 
-        parallel<system>::copy_flagged(scratch_table.keys.begin(),
-                                       flags.size(),
-                                       table.keys.begin() + off,
-                                       flags.begin(),
-                                       context.temp_storage);
-
-        parallel<system>::copy_flagged(scratch_table.values.begin(),
-                                       flags.size(),
-                                       table.values.begin() + off,
-                                       flags.begin(),
-                                       context.temp_storage);
+        parallel<system>::copy_if(thrust::make_zip_iterator(thrust::make_tuple(scratch_table.keys.begin(),
+                                                                               scratch_table.values.begin())),
+                                  scratch_table.keys.size(),
+                                  thrust::make_zip_iterator(thrust::make_tuple(table.keys.begin() + off,
+                                                                               table.values.begin() + off)),
+                                  is_key_value_pair_valid<system,
+                                                          covariate_packer,
+                                                          thrust::tuple<const covariate_key&, const typename covariate_observation_table<system>::value_type&> >(),
+                                  context.temp_storage);
     }
 
     covariates_filter.stop();

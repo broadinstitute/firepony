@@ -229,6 +229,7 @@ public:
 
         const CRQ_index& idx = batch.crq_index(read_index);
         const ushort2& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
+        const ushort2& reference_window_clipped = ctx.cigar.reference_window_clipped[read_index];
 
         // figure out the genome alignment window for this read
         const uint32 ref_sequence_id = batch.chromosome[read_index];
@@ -304,7 +305,7 @@ public:
                 }
             } else {
                 // if we didn't move backwards at all and we're in a deletion, then move backwards if the (reference) starting point for the feature is inside our clipping window
-                if (ctx.cigar.cigar_event_reference_coordinates[ev_feature_start] <= read_window_clipped.y)
+                if (ctx.cigar.cigar_event_reference_coordinates[ev_feature_start] <= reference_window_clipped.y)
                 {
                     while (ev_feature_start > cigar_start && ctx.cigar.cigar_events[ev_feature_start] == cigar_event::D)
                     {

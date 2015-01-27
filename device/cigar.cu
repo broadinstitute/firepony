@@ -148,8 +148,9 @@ struct remove_adapters : public lambda<system>
             // only reads when both reads are mapped can be trimmed
             return false;
 
-        if ((flags & AlignmentFlags::REVERSE) ==
-            (flags & AlignmentFlags::MATE_REVERSE))
+        const bool rev = flags & AlignmentFlags::REVERSE;
+        const bool mate_rev = flags & AlignmentFlags::MATE_REVERSE;
+        if (rev == mate_rev)
             // sanity check to ensure that read1 and read2 aren't on the same strand
             return false;
 

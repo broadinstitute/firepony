@@ -218,21 +218,20 @@ struct remove_adapters : public lambda<system>
                             ev++;
                         }
                     } else {
-                        while (ev > cigar_start)
+                        while (ev >= cigar_start && ev > 0)
                         {
+                            ev--;
+
                             read_coord = ctx.cigar.cigar_event_read_coordinates[ev];
 
                             if (read_coord != uint16(-1))
                                 break;
-
-                            ev--;
                         }
                     }
 
                     // if we get here, then we failed to find a clipping coordinate
                     // this should not happen unless the read is malformed
-                    if (tail == AdaptorTail::right && ev == cigar_stop ||
-                        tail == AdaptorTail::left && ev == cigar_start)
+                    if (read_coord == uint16(-1))
                         return -1;
                 }
 

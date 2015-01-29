@@ -187,6 +187,13 @@ struct compute_vcf_ranges : public lambda<system>
                                   db.max_end_point_left.begin(),
                                   db.max_end_point_left.size()) - db.max_end_point_left.begin();
 
+        if (vcf_range.x >= db.feature_start.size())
+        {
+            // overlap not found, mark as inactive
+            ctx.snp_filter.active_vcf_ranges[read_index] = make_uint2(uint32(-1), uint32(-1));
+            return;
+        }
+
         // now search along the min end point array to find the last overlap
         vcf_range.y = upper_bound(alignment_window.y,
                                   db.feature_start.begin(),
@@ -194,8 +201,15 @@ struct compute_vcf_ranges : public lambda<system>
 
         if (vcf_range.y <= vcf_range.x)
         {
-            // mark range as inactive
-            vcf_range = make_uint2(uint32(-1), uint32(-1));
+            // overlap not found, mark range as inactive
+            ctx.snp_filter.active_vcf_ranges[read_index] = make_uint2(uint32(-1), uint32(-1));
+            return;
+        }
+
+        if (vcf_range.y >= db.feature_start.size())
+        {
+            // end point not found, clip to the end of the database
+            vcf_range.y = db.feature_start.size() - 1;
         }
 
         ctx.snp_filter.active_vcf_ranges[read_index] = vcf_range;

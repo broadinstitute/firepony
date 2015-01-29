@@ -115,6 +115,9 @@ void firepony_process_batch(firepony_context<system>& context, const alignment_b
 
     if (context.options.debug)
     {
+        // GPU debugging output always goes to stdout; flush here to ensure it gets printed in the right place
+        fflush(stdout);
+
         for(uint32 read_id = 0; read_id < context.active_read_list.size(); read_id++)
         {
             const uint32 read_index = context.active_read_list[read_id];

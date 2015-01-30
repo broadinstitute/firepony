@@ -58,7 +58,6 @@ struct fractional_error_context
 };
 
 template <target_system system> void build_fractional_error_arrays(firepony_context<system>& context, const alignment_batch<system>& batch);
-template <target_system system> void debug_fractional_error_arrays(firepony_context<system>& context, const alignment_batch<system>& batch, int read_index);
 
 } // namespace firepony
 

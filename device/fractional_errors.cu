@@ -126,53 +126,16 @@ void build_fractional_error_arrays(firepony_context<system>& context, const alig
     thrust::fill(frac.deletion_errors.begin(), frac.deletion_errors.end(), 0.0);
 
     parallel<system>::for_each(context.active_read_list.begin(),
-                     context.active_read_list.end(),
-                     compute_fractional_errors<system>(context, batch.device, context.cigar.is_snp, frac.snp_errors));
+                               context.active_read_list.end(),
+                               compute_fractional_errors<system>(context, batch.device, context.cigar.is_snp, frac.snp_errors));
     parallel<system>::for_each(context.active_read_list.begin(),
-                     context.active_read_list.end(),
-                     compute_fractional_errors<system>(context, batch.device, context.cigar.is_insertion, frac.insertion_errors));
+                               context.active_read_list.end(),
+                               compute_fractional_errors<system>(context, batch.device, context.cigar.is_insertion, frac.insertion_errors));
     parallel<system>::for_each(context.active_read_list.begin(),
-                     context.active_read_list.end(),
-                     compute_fractional_errors<system>(context, batch.device, context.cigar.is_deletion, frac.deletion_errors));
+                               context.active_read_list.end(),
+                               compute_fractional_errors<system>(context, batch.device, context.cigar.is_deletion, frac.deletion_errors));
 }
 INSTANTIATE(build_fractional_error_arrays);
-
-template <target_system system>
-void debug_fractional_error_arrays(firepony_context<system>& context, const alignment_batch<system>& batch, int read_index)
-{
-    const alignment_batch_host& h_batch = *batch.host;
-
-    fprintf(stderr, "  fractional error arrays:\n");
-
-    const CRQ_index idx = h_batch.crq_index(read_index);
-
-    fprintf(stderr, "    snp                        = [ ");
-    for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
-    {
-        double err = context.fractional_error.snp_errors[i];
-        fprintf(stderr, " %.1f", err);
-    }
-    fprintf(stderr, " ]\n");
-
-    fprintf(stderr, "    ins                        = [ ");
-    for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
-    {
-        double err = context.fractional_error.insertion_errors[i];
-        fprintf(stderr, " %.1f", err);
-    }
-    fprintf(stderr, " ]\n");
-
-    fprintf(stderr, "    del                        = [ ");
-    for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
-    {
-        double err = context.fractional_error.deletion_errors[i];
-        fprintf(stderr, " %.1f", err);
-    }
-    fprintf(stderr, " ]\n");
-
-    fprintf(stderr, "\n");
-}
-INSTANTIATE(debug_fractional_error_arrays);
 
 } // namespace firepony
 

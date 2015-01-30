@@ -224,7 +224,6 @@ void debug_read(firepony_context<system>& context, const alignment_batch<system>
 
     debug_cigar(context, batch, read_index);
     debug_baq(context, batch, read_index);
-    debug_fractional_error_arrays(context, batch, read_index);
 
     const uint2 alignment_window = context.alignment_windows[read_index];
     fprintf(stderr, "  sequence name [%s]\n  sequence base [%lu]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",

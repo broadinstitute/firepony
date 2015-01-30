@@ -144,6 +144,35 @@ void firepony_process_batch(firepony_context<system>& context, const alignment_b
 INSTANTIATE(firepony_process_batch);
 
 template <target_system system>
+static void output_header(firepony_context<system>& context)
+{
+    // note: we only output 4 tables, as opposed to GATK's 5
+    // this is because the quality quantization map doesn't seem to matter, so we omit that
+    printf("%s", "#:GATKReport.v1.1:4\n");
+    printf("%s", "#:GATKTable:2:17:%s:%s:;\n");
+    printf("%s", "#:GATKTable:Arguments:Recalibration argument collection values used in this run\n");
+    printf("%s", "Argument                    Value\n");
+    printf("%s", "binary_tag_name             null\n");
+    printf("%s", "covariate                   ReadGroupCovariate,QualityScoreCovariate,ContextCovariate,CycleCovariate\n");
+    printf("%s", "default_platform            null\n");
+    printf("%s", "deletions_default_quality   45\n");
+    printf("%s", "force_platform              null\n");
+    printf("%s", "indels_context_size         3\n");
+    printf("%s", "insertions_default_quality  45\n");
+    printf("%s", "low_quality_tail            2\n");
+    printf("%s", "maximum_cycle_value         500\n");
+    printf("%s", "mismatches_context_size     2\n");
+    printf("%s", "mismatches_default_quality  -1\n");
+    printf("%s", "no_standard_covs            false\n");
+    printf("%s", "quantizing_levels           16\n");
+    printf("%s", "recalibration_report        null\n");
+    printf("%s", "run_without_dbsnp           false\n");
+    printf("%s", "solid_nocall_strategy       THROW_EXCEPTION\n");
+    printf("%s", "solid_recal_mode            SET_Q_ZERO\n");
+    printf("\n");
+}
+
+template <target_system system>
 void firepony_postprocess(firepony_context<system>& context)
 {
     timer<system> postprocessing;
@@ -156,6 +185,7 @@ void firepony_postprocess(firepony_context<system>& context)
     postprocessing.stop();
 
     output.start();
+    output_header(context);
     output_read_group_table(context);
     output_covariates(context);
     output.stop();

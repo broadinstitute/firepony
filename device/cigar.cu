@@ -628,7 +628,8 @@ struct compute_error_vectors : public lambda<system>
         const uint32 align_offset = batch.alignment_start[read_index];
         const uint32 reference_alignment_start = seq_base + align_offset;
 
-        const auto& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
+        const auto read_window_clipped = ctx.cigar.read_window_clipped[read_index];
+        const auto reference_window_clipped = ctx.cigar.reference_window_clipped[read_index];
 
         uint16 current_bp_idx = 0;
         uint16 num_errors = 0;
@@ -671,45 +672,48 @@ struct compute_error_vectors : public lambda<system>
                 // mark the read bp where an insertion begins
                 current_bp_idx = ctx.cigar.cigar_event_read_coordinates[cigar_start];
 
-                if (!negative_strand)
-                {
-                    int off = current_bp_idx - 1;
-                    if (off >= 0)
-                    {
-                        ctx.cigar.is_insertion[idx.read_start + off] = 1;
-                    }
-                } else {
-                    int off = current_bp_idx + batch.cigars[event].len - 1;
-                    if (off >= 0)
-                    {
-                        ctx.cigar.is_insertion[idx.read_start + off] = 1;
-                    }
-                }
-
-                // if we are inside the clipped read window, count this error
-                // xxxnsubtil: unclear what happens if only part of the insertion is inside the clipped read window --- can this happen?
                 if (current_bp_idx >= read_window_clipped.x && current_bp_idx <= read_window_clipped.y)
+                {
+                    int off;
+
+                    if (!negative_strand)
+                    {
+                        off = current_bp_idx - 1;
+                    } else {
+                        off = current_bp_idx + batch.cigars[event].len;
+                    }
+
+                    if (off >= 0 && off <= read_window_clipped.y)
+                    {
+                        ctx.cigar.is_insertion[idx.read_start + off] = 1;
+                    }
+
                     num_errors++;
+                }
 
                 break;
 
             case cigar_event::D:
                 // note: deletions do not exist in the read, so current_bp_idx is not updated here
-                // mark the read bp where a deletion begins
-                if (!negative_strand)
-                {
-                    ctx.cigar.is_deletion[idx.read_start + current_bp_idx] = 1;
-                } else {
-                    uint16 off = current_bp_idx + 1;
-                    if (off < idx.read_len)
-                    {
-                        ctx.cigar.is_deletion[idx.read_start + off] = 1;
-                    }
-                }
+                // also, because of this, we need to test against reference coordinates instead
+                uint16 current_ref_idx = ctx.cigar.cigar_event_reference_coordinates[cigar_start];
 
-                // if we are inside the clipped read window, count this error
-                if (current_bp_idx >= read_window_clipped.x && current_bp_idx <= read_window_clipped.y)
+                if (current_ref_idx >= reference_window_clipped.x && current_ref_idx <= reference_window_clipped.y)
+                {
+                    // mark the read bp where a deletion begins
+                    if (!negative_strand)
+                    {
+                        ctx.cigar.is_deletion[idx.read_start + current_bp_idx] = 1;
+                    } else {
+                        uint16 off = current_bp_idx + 1;
+                        if (off < idx.read_len)
+                        {
+                            ctx.cigar.is_deletion[idx.read_start + off] = 1;
+                        }
+                    }
+
                     num_errors++;
+                }
 
                 break;
             }
@@ -889,7 +893,7 @@ void expand_cigars(firepony_context<system>& context, const alignment_batch<syst
                                context.active_read_list.end(),
                                compute_reference_window<system>(context, batch.device));
 
-    // compute the error bit vectors        -- XXXNSUBTIL ACCESS VIOLATION HERE
+    // compute the error bit vectors
     // this also counts the number of errors in each read
     parallel<system>::for_each(context.active_read_list.begin(),
                                context.active_read_list.end(),

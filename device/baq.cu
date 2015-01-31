@@ -89,7 +89,7 @@ struct compute_hmm_windows : public lambda<system>
         const ushort2& reference_window = ctx.cigar.reference_window_clipped[read_index];
 
         const uint32 first_insertion_offset = read_window_no_insertions.x - read_window.x;
-        const uint32 last_insertion_offset = read_window_no_insertions.y - read_window.y;
+        const uint32 last_insertion_offset = read_window.y - read_window_no_insertions.y;
 
         const int offset = MIN_BAND_WIDTH / 2;
         uint32 readStart = reference_window.x + seq_to_alignment_offset; // always clipped

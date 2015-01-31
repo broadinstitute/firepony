@@ -65,7 +65,7 @@ struct covariate_packer_quality_score
         covariate_empirical_table<host> table;
         table.copyfrom(d_table);
 
-        printf("#:GATKTable:6:138:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n");
+        printf("#:GATKTable:6:%lu:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n", table.size());
         printf("#:GATKTable:RecalTable1:\n");
         printf("ReadGroup\tQualityScore\tEventType\tEmpiricalQuality\tObservations\tErrors\n");
         for(uint32 i = 0; i < table.size(); i++)

@@ -95,7 +95,7 @@ void output_read_group_table(firepony_context<system>& context)
     covariate_empirical_table<host> table;
     table.copyfrom(context.covariates.read_group);
 
-    printf("#:GATKTable:6:3:%%s:%%s:%%.4f:%%.4f:%%d:%%.2f:;\n");
+    printf("#:GATKTable:6:%lu:%%s:%%s:%%.4f:%%.4f:%%d:%%.2f:;\n", table.size());
     printf("#:GATKTable:RecalTable0:\n");
     printf("ReadGroup\tEventType\tEmpiricalQuality\tEstimatedQReported\tObservations\tErrors\n");
 

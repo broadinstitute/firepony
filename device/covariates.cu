@@ -282,7 +282,7 @@ void output_covariates(firepony_context<system>& context)
 {
     covariate_packer_quality_score<system>::dump_table(context, context.covariates.empirical_quality);
 
-    printf("#:GATKTable:8:2386:%%s:%%s:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n");
+    printf("#:GATKTable:8:%lu:%%s:%%s:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n", context.covariates.context.size() + context.covariates.cycle.size());
     printf("#:GATKTable:RecalTable2:\n");
     printf("ReadGroup\tQualityScore\tCovariateValue\tCovariateName\tEventType\tEmpiricalQuality\tObservations\tErrors\n");
     covariate_packer_context<system>::dump_table(context, context.covariates.empirical_context);

@@ -148,7 +148,7 @@ static CUDA_HOST_DEVICE double bayesianEstimateOfEmpiricalQuality(const uint32 n
     return Qemp;
 }
 
-CUDA_HOST_DEVICE double calcEmpiricalQuality(const covariate_empirical_value& val, bool need_rounding)
+static CUDA_HOST_DEVICE double calcEmpiricalQuality(const covariate_empirical_value& val, bool need_rounding)
 {
     // smoothing is one error and one non-error observation
     const uint32 mismatches = uint32(val.mismatches + 0.5) + SMOOTHING_CONSTANT;

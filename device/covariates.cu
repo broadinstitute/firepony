@@ -285,32 +285,39 @@ void output_covariates(firepony_context<system>& context)
     printf("#:GATKTable:8:2386:%%s:%%s:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n");
     printf("#:GATKTable:RecalTable2:\n");
     printf("ReadGroup\tQualityScore\tCovariateValue\tCovariateName\tEventType\tEmpiricalQuality\tObservations\tErrors\n");
-    covariate_packer_context<system>::dump_table(context, context.covariates.context);
-    covariate_packer_cycle_illumina<system>::dump_table(context, context.covariates.cycle);
+    covariate_packer_context<system>::dump_table(context, context.covariates.empirical_context);
+    covariate_packer_cycle_illumina<system>::dump_table(context, context.covariates.empirical_cycle);
     printf("\n");
 }
 INSTANTIATE(output_covariates);
 
-template <target_system system>
-void build_empirical_quality_score_table(firepony_context<system>& context)
+template <target_system system, typename covariate_packer>
+static void build_empirical_table(firepony_context<system>& context, covariate_empirical_table<system>& out, covariate_observation_table<system>& in)
 {
-    auto& cv = context.covariates;
-    auto& table = cv.empirical_quality;
-
-    if (cv.quality.size() == 0)
+    if (in.size() == 0)
     {
         // if we didn't gather any entries in the table, there's nothing to do
         return;
     }
 
-    // convert the quality table into the read group table
-    covariate_observation_to_empirical_table(context, cv.quality, table);
+    // convert the observation keys to empirical value keys
+    covariate_observation_to_empirical_table(context, in, out);
     // compute the expected error for each entry
-    compute_expected_error<system, covariate_packer_quality_score<system> >(context, table);
+    compute_expected_error<system, covariate_packer>(context, out);
     // finally compute the empirical quality for this table
-    compute_empirical_quality(context, table, true);
+    compute_empirical_quality(context, out, true);
 }
-INSTANTIATE(build_empirical_quality_score_table);
+
+template <target_system system>
+void compute_empirical_quality_scores(firepony_context<system>& context)
+{
+    auto& cv = context.covariates;
+
+    build_empirical_table<system, covariate_packer_quality_score<system> >(context, cv.empirical_quality, cv.quality);
+    build_empirical_table<system, covariate_packer_cycle_illumina<system> >(context, cv.empirical_cycle, cv.cycle);
+    build_empirical_table<system, covariate_packer_context<system> >(context, cv.empirical_context, cv.context);
+}
+INSTANTIATE(compute_empirical_quality_scores);
 
 } // namespace firepony
 

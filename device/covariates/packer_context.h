@@ -78,9 +78,9 @@ struct covariate_packer_context
         return chain::decode(key, id);
     }
 
-    static void dump_table(firepony_context<system>& context, covariate_observation_table<system>& d_table)
+    static void dump_table(firepony_context<system>& context, covariate_empirical_table<system>& d_table)
     {
-        covariate_observation_table<host> table;
+        covariate_empirical_table<host> table;
         table.copyfrom(d_table);
 
         for(uint32 i = 0; i < table.size(); i++)
@@ -113,7 +113,7 @@ struct covariate_packer_context
                     sequence,
                     "Context",
                     cigar_event::ascii(decode(table.keys[i], EventTracker)),
-                    round_n(double(decode(table.keys[i], QualityScore)), 4),
+                    table.values[i].empirical_quality,
                     table.values[i].observations,
                     round_n(table.values[i].mismatches, 2));
         }

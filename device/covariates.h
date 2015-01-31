@@ -45,6 +45,9 @@ struct covariates_context
     covariate_observation_table<system> context;
 
     covariate_empirical_table<system> empirical_quality;
+    covariate_empirical_table<system> empirical_cycle;
+    covariate_empirical_table<system> empirical_context;
+
     covariate_empirical_table<system> read_group;
 
     struct view
@@ -73,7 +76,7 @@ struct covariates_context
 template <target_system system> void gather_covariates(firepony_context<system>& context, const alignment_batch<system>& batch);
 template <target_system system> void postprocess_covariates(firepony_context<system>& context);
 template <target_system system> void output_covariates(firepony_context<system>& context);
-template <target_system system> void build_empirical_quality_score_table(firepony_context<system>& context);
+template <target_system system> void compute_empirical_quality_scores(firepony_context<system>& context);
 
 } // namespace firepony
 

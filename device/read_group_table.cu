@@ -95,7 +95,14 @@ void output_read_group_table(firepony_context<system>& context)
     covariate_empirical_table<host> table;
     table.copyfrom(context.covariates.read_group);
 
-    printf("#:GATKTable:6:%lu:%%s:%%s:%%.4f:%%.4f:%%d:%%.2f:;\n", table.size());
+    const char *fmt_string_header =
+#if DISABLE_OUTPUT_ROUNDING
+            "#:GATKTable:6:%lu:%%s:%%s:%%.64f:%%.64f:%%d:%%.64f:;\n";
+#else
+            "#:GATKTable:6:%lu:%%s:%%s:%%.4f:%%.4f:%%d:%%.2f:;\n";
+#endif
+
+    printf(fmt_string_header, table.size());
     printf("#:GATKTable:RecalTable0:\n");
     printf("ReadGroup\tEventType\tEmpiricalQuality\tEstimatedQReported\tObservations\tErrors\n");
 
@@ -107,13 +114,19 @@ void output_read_group_table(firepony_context<system>& context)
         covariate_empirical_value val = table.values[i];
 
         // ReadGroup, EventType, EmpiricalQuality, EstimatedQReported, Observations, Errors
-        printf("%s\t%c\t\t%.4f\t\t\t%.4f\t\t\t%d\t\t%.2f\n",
-                rg_name.c_str(),
-                cigar_event::ascii(packer::decode(table.keys[i], packer::EventTracker)),
-                round_n(val.empirical_quality, 4),
-                round_n(val.estimated_quality, 4),
-                val.observations,
-                round_n(val.mismatches, 2));
+        const char *fmt_string =
+#if DISABLE_OUTPUT_ROUNDING
+                "%s\t%c\t\t%.64f\t\t\t%.64f\t\t\t%d\t\t%.64f\n";
+#else
+                "%s\t%c\t\t%.64f\t\t\t%.4f\t\t\t%d\t\t%.2f\n";
+#endif
+        printf(fmt_string,
+               rg_name.c_str(),
+               cigar_event::ascii(packer::decode(table.keys[i], packer::EventTracker)),
+               round_n(val.empirical_quality, 4),
+               round_n(val.estimated_quality, 4),
+               val.observations,
+               round_n(val.mismatches, 2));
     }
 
     printf("\n");

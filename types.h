@@ -27,6 +27,8 @@
 
 #pragma once
 
+#define DISABLE_OUTPUT_ROUNDING 0
+
 // help the eclipse error parser deal with CUDA keywords
 #ifdef __CDT_PARSER__
 #define __global__

@@ -65,7 +65,14 @@ struct covariate_packer_quality_score
         covariate_empirical_table<host> table;
         table.copyfrom(d_table);
 
-        printf("#:GATKTable:6:%lu:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n", table.size());
+        const char *fmt_string_header =
+#if DISABLE_OUTPUT_ROUNDING
+               "#:GATKTable:6:%lu:%%s:%%s:%%s:%%.64f:%%d:%%.64f:;\n";
+#else
+               "#:GATKTable:6:%lu:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n";
+#endif
+        printf(fmt_string_header, table.size());
+
         printf("#:GATKTable:RecalTable1:\n");
         printf("ReadGroup\tQualityScore\tEventType\tEmpiricalQuality\tObservations\tErrors\n");
         for(uint32 i = 0; i < table.size(); i++)
@@ -77,13 +84,20 @@ struct covariate_packer_quality_score
             uint32 rg_id = decode(table.keys[i], ReadGroup);
             const std::string& rg_name = context.bam_header.host.read_groups_db.lookup(rg_id);
 
-            printf("%s\t%d\t\t%c\t\t%.4f\t\t\t%d\t\t%.2f\n",
-                    rg_name.c_str(),
-                    decode(table.keys[i], QualityScore),
-                    cigar_event::ascii(decode(table.keys[i], EventTracker)),
-                    table.values[i].empirical_quality,
-                    table.values[i].observations,
-                    round_n(table.values[i].mismatches, 2));
+            const char *fmt_string =
+#if DISABLE_OUTPUT_ROUNDING
+                   "%s\t%d\t\t%c\t\t%.64f\t\t\t%d\t\t%.64f\n";
+#else
+                   "%s\t%d\t\t%c\t\t%.4f\t\t\t%d\t\t%.2f\n";
+#endif
+
+            printf(fmt_string,
+                   rg_name.c_str(),
+                   decode(table.keys[i], QualityScore),
+                   cigar_event::ascii(decode(table.keys[i], EventTracker)),
+                   table.values[i].empirical_quality,
+                   table.values[i].observations,
+                   round_n(table.values[i].mismatches, 2));
         }
         printf("\n");
     }

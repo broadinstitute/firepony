@@ -107,15 +107,22 @@ struct covariate_packer_context
             sequence[size] = 0;
 
             // ReadGroup, QualityScore, CovariateValue, CovariateName, EventType, EmpiricalQuality, Observations, Errors
-            printf("%s\t%d\t\t%s\t\t%s\t\t%c\t\t%.4f\t\t%d\t\t%.2f\n",
-                    rg_name.c_str(),
-                    decode(table.keys[i], QualityScore),
-                    sequence,
-                    "Context",
-                    cigar_event::ascii(decode(table.keys[i], EventTracker)),
-                    table.values[i].empirical_quality,
-                    table.values[i].observations,
-                    round_n(table.values[i].mismatches, 2));
+            const char *fmt_string =
+#if DISABLE_OUTPUT_ROUNDING
+                   "%s\t%d\t\t%s\t\t%s\t\t%c\t\t%.64f\t\t%d\t\t%.64f\n";
+#else
+                   "%s\t%d\t\t%s\t\t%s\t\t%c\t\t%.4f\t\t%d\t\t%.2f\n";
+#endif
+
+            printf(fmt_string,
+                   rg_name.c_str(),
+                   decode(table.keys[i], QualityScore),
+                   sequence,
+                   "Context",
+                   cigar_event::ascii(decode(table.keys[i], EventTracker)),
+                   table.values[i].empirical_quality,
+                   table.values[i].observations,
+                   round_n(table.values[i].mismatches, 2));
         }
     }
 };

@@ -646,8 +646,8 @@ struct hmm_glocal : public lambda<system>
         m[2*3+1] = 0.0;
         m[2*3+2] = GAP_EXTENSION_PROBABILITY;
 
-//        fprintf(stderr, "referenceStart = %u\n", referenceStart);
-//        fprintf(stderr, "queryStart = %u queryLen = %u\n", queryStart, queryLen);
+//        printf("referenceStart = %u\n", referenceStart);
+//        printf("queryStart = %u queryLen = %u\n", queryStart, queryLen);
 
         queryBases = batch.reads + idx.read_start + queryStart;
         referenceBases = ctx.reference.bases + referenceStart;
@@ -712,25 +712,25 @@ struct hmm_glocal : public lambda<system>
         setup(hmm_index);
 
 //        const uint32 read_index    = thrust::get<0>(hmm_index);
-//        fprintf(stderr, "read %d: hmm_glocal(l_ref=%d qstart=%d, l_query=%d)\n", read_index, referenceLength, queryStart, queryLen);
-//        fprintf(stderr, "read %d: ref = { ", read_index);
+//        printf("read %d: hmm_glocal(l_ref=%d qstart=%d, l_query=%d)\n", read_index, referenceLength, queryStart, queryLen);
+//        printf("read %d: ref = { ", read_index);
 //        for(int c = 0; c < referenceLength; c++)
 //        {
-//            fprintf(stderr, "%c ", from_nvbio::iupac16_to_char(referenceBases[c]));
+//            printf("%c ", from_nvbio::iupac16_to_char(referenceBases[c]));
 //        }
-//        fprintf(stderr, "\n");
+//        printf("\n");
 //
-//        fprintf(stderr, "read %d: que = { ", read_index);
+//        printf("read %d: que = { ", read_index);
 //        for(int c = 0; c < queryLen; c++)
 //        {
-//            fprintf(stderr, "%c ", from_nvbio::iupac16_to_char(queryBases[c]));
+//            printf("%c ", from_nvbio::iupac16_to_char(queryBases[c]));
 //        }
-//        fprintf(stderr, "\n");
-
-//        fprintf(stderr, "read %d: _iqual = { % 3d % 3d % 3d % 3d % 3d ... % 3d % 3d % 3d % 3d % 3d }\n", read_index,
+//        printf("\n");
+//
+//        printf("read %d: _iqual = { % 3d % 3d % 3d % 3d % 3d ... % 3d % 3d % 3d % 3d % 3d }\n", read_index,
 //                inputQualities[0], inputQualities[1], inputQualities[2], inputQualities[3], inputQualities[4],
 //                inputQualities[queryLen - 5], inputQualities[queryLen - 4], inputQualities[queryLen - 3], inputQualities[queryLen - 2], inputQualities[queryLen - 1]);
-//        fprintf(stderr, "read %d: c->bw = %d, bw = %d, l_ref = %d, l_query = %d\n", read_index, MIN_BAND_WIDTH, bandWidth, referenceLength, queryLen);
+//        printf("read %d: c->bw = %d, bw = %d, l_ref = %d, l_query = %d\n", read_index, MIN_BAND_WIDTH, bandWidth, referenceLength, queryLen);
 
         /*** forward ***/
         // f[0]
@@ -748,14 +748,14 @@ struct hmm_glocal : public lambda<system>
             {
                 int u;
                 double e = calcEpsilon(referenceBases[k-1], queryBases[queryStart], inputQualities[queryStart]);
-//                fprintf(stderr, "read %d: referenceBases[%d-1] = %c inputQualities[%d] = %d queryBases[%d] = %c -> e = %.4f\n",
-//                        read_index,
-//                        k,
-//                        from_nvbio::iupac16_to_char(referenceBases[k-1]),
-//                        queryStart,
-//                        inputQualities[queryStart],
-//                        queryStart,
-//                        from_nvbio::iupac16_to_char(queryBases[queryStart]), e);
+//                printf("referenceBases[%d-1] = %c inputQualities[%d] = %d queryBases[%d] = %c -> e = %.4f\n",
+////                       read_index,
+//                       k,
+//                       from_nvbio::iupac16_to_char(referenceBases[k-1]),
+//                       queryStart,
+//                       inputQualities[queryStart],
+//                       queryStart,
+//                       from_nvbio::iupac16_to_char(queryBases[queryStart]), e);
 
                 u = set_u(bandWidth, 1, k);
 
@@ -799,14 +799,14 @@ struct hmm_glocal : public lambda<system>
             {
                 int u, v11, v01, v10;
                 double e = calcEpsilon(referenceBases[k-1], qyi, inputQualities[queryStart+i-1]);
-//                fprintf(stderr, "read %d: referenceBases[%d-1] = %c inputQualities[%d+%d-1] = %d qyi = %c -> e = %.4f\n",
-//                        read_index,
-//                        k,
-//                        from_nvbio::iupac16_to_char(referenceBases[k-1]),
-//                        queryStart,
-//                        i,
-//                        inputQualities[queryStart+i-1],
-//                        from_nvbio::iupac16_to_char(qyi), e);
+//                printf("read %d: referenceBases[%d-1] = %c inputQualities[%d+%d-1] = %d qyi = %c -> e = %.4f\n",
+//                       read_index,
+//                       k,
+//                       from_nvbio::iupac16_to_char(referenceBases[k-1]),
+//                       queryStart,
+//                       i,
+//                       inputQualities[queryStart+i-1],
+//                       from_nvbio::iupac16_to_char(qyi), e);
 
                 u = set_u(bandWidth, i, k);
                 v11 = set_u(bandWidth, i-1, k-1);
@@ -819,8 +819,8 @@ struct hmm_glocal : public lambda<system>
 
                 sum += fi[u] + fi[u+1] + fi[u+2];
 
-    //            fprintf(stderr, "(%d,%d;%d): %.4f,%.4f,%.4f\n", i, k, u, fi[u], fi[u+1], fi[u+2]);
-    //            fprintf(stderr, " .. u = %d v11 = %d v01 = %d v10 = %d e = %f\n", u, v11, v01, v10, e);
+//                printf("(%d,%d;%d): %.32f,%.32f,%.32f\n", i, k, u, fi[u], fi[u+1], fi[u+2]);
+//                printf(" .. u = %d v11 = %d v01 = %d v10 = %d e = %f\n", u, v11, v01, v10, e);
             }
 
             // rescale
@@ -986,10 +986,10 @@ struct hmm_glocal : public lambda<system>
                 k = (int)(double(-4.343) * log(double(1.0) - double(max)) + double(.499)); // = 10*log10(1-max)
                 outputQualities[queryStart+i-1] = (char)(k > 100? 99 : (k < MIN_BASE_QUAL ? MIN_BASE_QUAL : k));
 
-//                fprintf(stderr, "read %d: outputQualities[%d]: max = %.16f k = %d -> %d\n", read_index, queryStart+i-1, max, k, outputQualities[queryStart+i-1]);
+//                printf("outputQualities[%d]: max = %.16f k = %d -> %d\n", queryStart+i-1, max, k, outputQualities[queryStart+i-1]);
             }
 
-    //        fprintf(stderr, "(%.4f,%.4f) (%d,%d,%d,%.4f)\n", pb, sum, (i-1), (max_k>>2), (max_k&3), max);
+//            printf("(%.4f,%.4f) (%d,%d,%d,%.4f)\n", pb, sum, (i-1), (max_k>>2), (max_k&3), max);
         }
     }
 };

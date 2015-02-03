@@ -1135,7 +1135,7 @@ struct cap_baq_qualities : public lambda<system>
         for(i = 0; i < cigar_end - cigar_start; i++)
         {
             const uint16 read_bp_idx = ctx.cigar.cigar_event_read_coordinates[cigar_start + i];
-            if (read_bp_idx >= read_window.x)
+            if (read_bp_idx != uint16(-1) && read_bp_idx >= read_window.x)
                 break;
         }
 

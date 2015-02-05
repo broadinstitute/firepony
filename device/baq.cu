@@ -60,6 +60,10 @@ namespace firepony {
 #define GAP_OPEN_PROBABILITY (pow(10.0, (-40.0)/10.))
 #define GAP_EXTENSION_PROBABILITY 0.1
 
+// note: the lmem path is effectively broken due to the varying band width
+#define ENABLE_LMEM_PATH 0
+
+#if ENABLE_LMEM_PATH
 // maximum read size for the lmem kernel
 #define LMEM_MAX_READ_LEN 151
 #define LMEM_MAT_ROW_SIZE (3 * MIN_BAND_WIDTH2 + 6)
@@ -67,6 +71,7 @@ namespace firepony {
 
 //#define GUARD_BAND(z) ((z) > 0 ? (z) : 0)
 #define GUARD_BAND(z) (z)
+#endif
 
 template <target_system system>
 struct compute_hmm_windows : public lambda<system>
@@ -141,6 +146,7 @@ struct compute_hmm_windows : public lambda<system>
     }
 };
 
+#if ENABLE_LMEM_PATH
 // runs the entire BAQ algorithm in a single kernel, storing forward and backward matrices in local memory
 template <target_system system>
 struct hmm_glocal_lmem : public lambda<system>
@@ -567,6 +573,7 @@ struct hmm_glocal_lmem : public lambda<system>
         }
     }
 };
+#endif
 
 template <target_system system>
 struct hmm_glocal : public lambda<system>
@@ -1214,20 +1221,16 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
     vector<system, uint32>& baq_state = context.temp_u32_2;
 
     // check if we can use the lmem kernel
-#if 0
-    // note: the lmem path is effectively broken due to the varying band width
+#if ENABLE_LMEM_PATH
     const bool baq_use_lmem = (batch.host->max_read_size <= LMEM_MAX_READ_LEN);
     static bool baq_lmem_warning_printed = false;
-#else
-    constexpr bool baq_use_lmem = false;
-    static bool baq_lmem_warning_printed = true;
-#endif
 
     if (!baq_use_lmem && !baq_lmem_warning_printed)
     {
         fprintf(stderr, "WARNING: read size exceeds LMEM_MAX_READ_LEN, using fallback path for BAQ\n");
         baq_lmem_warning_printed = true;
     }
+#endif
 
     timer<system> baq_setup, baq_hmm, baq_postprocess;
 
@@ -1255,7 +1258,9 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
                                context.active_read_list.end(),
                                compute_hmm_windows<system>(context, batch.device));
 
+#if ENABLE_LMEM_PATH
     if (!baq_use_lmem)
+#endif
     {
         // compute the index and size of the HMM matrices
         baq.matrix_index.resize(num_active + 1);
@@ -1314,7 +1319,9 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
     thrust::fill(baq.qualities.begin(), baq.qualities.end(), uint8(-1));
 
     // initialize matrices and scaling factors
+#if ENABLE_LMEM_PATH
     if (!baq_use_lmem)
+#endif
     {
         thrust::fill_n(baq.forward.begin(), baq.forward.size(), 0.0);
         thrust::fill_n(baq.backward.begin(), baq.backward.size(), 0.0);
@@ -1326,17 +1333,10 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
 
     baq_hmm.start();
 
-    if (baq_use_lmem)
+#if ENABLE_LMEM_PATH
+    if (!baq_use_lmem)
+#endif
     {
-        // fast path: use local memory for the matrices
-        parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
-                                                                      baq.matrix_index.begin(),
-                                                                      baq.scaling_index.begin())),
-                         thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
-                                                                      baq.matrix_index.end(),
-                                                                      baq.scaling_index.end())),
-                         hmm_glocal_lmem<system>(context, batch.device, baq_state));
-    } else {
         // slow path: store the matrices in global memory
         parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
                                                                       baq.matrix_index.begin(),
@@ -1346,6 +1346,18 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
                                                                       baq.scaling_index.end())),
                          hmm_glocal<system>(context, batch.device, baq_state));
     }
+#if ENABLE_LMEM_PATH
+    else {
+        // fast path: use local memory for the matrices
+        parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
+                                                                      baq.matrix_index.begin(),
+                                                                      baq.scaling_index.begin())),
+                         thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
+                                                                      baq.matrix_index.end(),
+                                                                      baq.scaling_index.end())),
+                         hmm_glocal_lmem<system>(context, batch.device, baq_state));
+    }
+#endif
 
     baq_hmm.stop();
 
@@ -1353,17 +1365,17 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
 
     // for any reads that we did *not* compute a BAQ, mark the base pairs as having no BAQ uncertainty
     parallel<system>::for_each(context.active_read_list.begin(),
-                     context.active_read_list.end(),
-                     read_flat_baq<system>(context, batch.device));
+                               context.active_read_list.end(),
+                               read_flat_baq<system>(context, batch.device));
 
     // transform quality scores
     parallel<system>::for_each(active_baq_read_list.begin(),
-                     active_baq_read_list.end(),
-                     cap_baq_qualities<system>(context, batch.device, baq_state));
+                               active_baq_read_list.end(),
+                               cap_baq_qualities<system>(context, batch.device, baq_state));
 
     parallel<system>::for_each(active_baq_read_list.begin(),
-                     active_baq_read_list.end(),
-                     recode_baq_qualities<system>(context, batch.device));
+                               active_baq_read_list.end(),
+                               recode_baq_qualities<system>(context, batch.device));
 
     baq_postprocess.stop();
 

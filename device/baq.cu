@@ -80,66 +80,48 @@ struct compute_hmm_windows : public lambda<system>
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        uint2   hmm_reference_window;
+        uint2 hmm_reference_window;
 
-        // grab reference sequence window in the genome
+        const ushort2& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
+        const ushort2& read_window_clipped_no_insertions = ctx.cigar.read_window_clipped_no_insertions[read_index];
+        const ushort2& reference_window_clipped = ctx.cigar.reference_window_clipped[read_index];
+
+        constexpr int offset = MIN_BAND_WIDTH / 2;
+
+        // compute the reference window in local read coordinates
+        hmm_reference_window.x = reference_window_clipped.x - (read_window_clipped_no_insertions.x - read_window_clipped.x) - offset;
+        hmm_reference_window.y = reference_window_clipped.y + (read_window_clipped.y - read_window_clipped_no_insertions.y) + offset;
+
+        // transform to genome coordinates
         const uint32 ref_ID = batch.chromosome[read_index];
         const uint32 ref_base = ctx.reference.sequence_bp_start[ref_ID];
-        const uint32 ref_length = ctx.reference.sequence_bp_len[ref_ID];
 
-        const uint32 seq_to_alignment_offset = batch.alignment_start[read_index];
+        hmm_reference_window.x += ref_base + batch.alignment_start[read_index];
+        hmm_reference_window.y += ref_base + batch.alignment_start[read_index];
 
-        const ushort2& read_window = ctx.cigar.read_window_clipped[read_index];
-        const ushort2& read_window_no_insertions = ctx.cigar.read_window_clipped_no_insertions[read_index];
-        const ushort2& reference_window = ctx.cigar.reference_window_clipped[read_index];
-
-        const uint32 first_insertion_offset = read_window_no_insertions.x - read_window.x;
-        const uint32 last_insertion_offset = read_window.y - read_window_no_insertions.y;
-
-        const int offset = MIN_BAND_WIDTH / 2;
-        uint32 readStart = reference_window.x + seq_to_alignment_offset; // always clipped
-
-        // reference window for HMM
-        uint32 start = max(readStart - offset - first_insertion_offset, 0u);
-        uint32 stop = reference_window.y + seq_to_alignment_offset + offset + last_insertion_offset;
-
-        if (stop > ref_length)
-        {
-            hmm_reference_window = make_uint2(uint32(-1), uint32(-1));
-            return;
-        }
-
-        start += ref_base;
-        stop += ref_base;
-
-        hmm_reference_window = make_uint2(start, stop);
+        // write out the result
         ctx.baq.reference_windows[read_index] = hmm_reference_window;
 
         // compute the band width
-        int referenceLength;
+        int referenceLen;
         int queryLen;
 
-        referenceLength = hmm_reference_window.y - hmm_reference_window.x + 1;
-        queryLen = read_window.y - read_window.x + 1;
+        referenceLen = hmm_reference_window.y - hmm_reference_window.x + 1;
+        queryLen = read_window_clipped.y - read_window_clipped.x + 1;
 
-        uint16 bandWidth;
+        uint16 bandWidth = max(referenceLen, queryLen);
 
-        if (referenceLength > queryLen)
-            bandWidth = referenceLength;
-        else
-            bandWidth = queryLen;
-
-        if (MIN_BAND_WIDTH < abs(referenceLength - queryLen))
+        if (MIN_BAND_WIDTH < abs(referenceLen - queryLen))
         {
-            bandWidth = abs(referenceLength - queryLen) + 3;
+            bandWidth = abs(referenceLen - queryLen) + 3;
         }
 
         if (bandWidth > MIN_BAND_WIDTH)
             bandWidth = MIN_BAND_WIDTH;
 
-        if (bandWidth < abs(referenceLength - queryLen))
+        if (bandWidth < abs(referenceLen - queryLen))
         {
-            bandWidth = abs(referenceLength - queryLen);
+            bandWidth = abs(referenceLen - queryLen);
         }
 
         ctx.baq.bandwidth[read_index] = bandWidth;
@@ -625,14 +607,14 @@ struct hmm_glocal : public lambda<system>
 
         // get the windows for the current read
         const uint2& reference_window = ctx.baq.reference_windows[read_index];
-        const ushort2& read_window = ctx.cigar.read_window_clipped[read_index];
+        const ushort2& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
 
         referenceStart = reference_window.x;
         referenceLength = reference_window.y - reference_window.x + 1;
 
-        queryStart = read_window.x;
-        queryEnd = read_window.y;
-        queryLen = read_window.y - read_window.x + 1;
+        queryStart = read_window_clipped.x;
+        queryEnd = read_window_clipped.y;
+        queryLen = queryEnd - queryStart + 1;
 
         bandWidth = ctx.baq.bandwidth[read_index];
         bandWidth2 = bandWidth * 2 + 1;
@@ -1073,6 +1055,8 @@ struct read_flat_baq : public lambda<system>
 template <target_system system>
 struct cap_baq_qualities : public lambda<system>
 {
+    LAMBDA_INHERIT;
+
     typename vector<system, uint32>::view baq_state;
 
     cap_baq_qualities(typename firepony_context<system>::view ctx,
@@ -1107,42 +1091,35 @@ struct cap_baq_qualities : public lambda<system>
         return b;
     }
 
-    // xxxnsubtil: this could use some cleanup
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        auto& ctx = this->ctx;
-        auto& batch = this->batch;
-
         const CRQ_index idx = batch.crq_index(read_index);
 
         const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
         const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
 
-        const ushort2& read_window = ctx.cigar.read_window_clipped[read_index];
-        const ushort2& read_window_no_insertions = ctx.cigar.read_window_clipped_no_insertions[read_index];
-        const ushort2& reference_window = ctx.cigar.reference_window_clipped[read_index];
+        auto hmm_reference_window = ctx.baq.reference_windows[read_index];
+        const auto read_window_clipped = ctx.cigar.read_window_clipped[read_index];
 
-        const uint32 seq_to_alignment_offset = batch.alignment_start[read_index];
-        const uint32 first_insertion_offset = read_window_no_insertions.x - read_window.x;
+        // transform the hmm reference window back to read local coordinates
+        const uint32 ref_ID = batch.chromosome[read_index];
+        const uint32 ref_base = ctx.reference.sequence_bp_start[ref_ID];
 
-        const int offset = MIN_BAND_WIDTH / 2;
-
-        const uint32 readStart = reference_window.x + seq_to_alignment_offset;
-        const uint32 start = max(readStart - offset - first_insertion_offset, 0u);
-
-        const int refOffset = (int)(start - readStart);
+        hmm_reference_window.x -= ref_base + batch.alignment_start[read_index];
+        hmm_reference_window.y -= ref_base + batch.alignment_start[read_index];
 
         uint32 readI = 0;
         uint32 refI = 0;
         uint32 current_op_offset = 0;
         uint32 numD = 0;
+        const uint32 refOffset = hmm_reference_window.x;
 
         // scan for the start of the baq region
         uint32 i;
         for(i = 0; i < cigar_end - cigar_start; i++)
         {
             const uint16 read_bp_idx = ctx.cigar.cigar_event_read_coordinates[cigar_start + i];
-            if (read_bp_idx != uint16(-1) && read_bp_idx >= read_window.x)
+            if (read_bp_idx != uint16(-1) && read_bp_idx >= read_window_clipped.x)
                 break;
         }
 

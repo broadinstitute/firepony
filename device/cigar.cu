@@ -433,39 +433,56 @@ struct compute_no_insertions_window : public lambda<system>
     {
         const CRQ_index idx = batch.crq_index(read_index);
         const auto& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
-        auto read_window_clipped_no_insertions = ctx.cigar.read_window_clipped_no_insertions[read_index];
+        auto& read_window_clipped_no_insertions = ctx.cigar.read_window_clipped_no_insertions[read_index];
 
-        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start] + read_window_clipped.x;
-        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len] - read_window_clipped.y;
+        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
+        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
 
-        read_window_clipped_no_insertions = read_window_clipped;
+        uint32 ev;
 
         // iterate forward at the start
-        uint32 ev = cigar_start;
-        uint32 read_offset = read_window_clipped.x;
-
-        while(ev < cigar_start + read_window_clipped.y &&
-              read_offset < read_window_clipped.y &&
-              ctx.cigar.cigar_events[ev] == cigar_event::I)
+        ev = cigar_start;
+        while(ev < cigar_end)
         {
-            read_window_clipped_no_insertions.x++;
-            read_offset++;
-            ev++;
+            const uint16 read_offset = ctx.cigar.cigar_event_read_coordinates[ev];
+            // skip bases without a read offset and bases behind the current clipping window
+            if (read_offset == uint16(-1) || read_offset < read_window_clipped.x)
+            {
+                ev++;
+                continue;
+            }
+
+            if (ctx.cigar.cigar_events[ev] == cigar_event::I)
+            {
+                ev++;
+                continue;
+            }
+
+            read_window_clipped_no_insertions.x = read_offset;
+            break;
         }
 
+        // iterate backwards from the end
         ev = cigar_end - 1;
-        read_offset = read_window_clipped.y;
-
-        while(ev > cigar_start + read_window_clipped_no_insertions.x &&
-                read_offset > read_window_clipped_no_insertions.x &&
-                ctx.cigar.cigar_events[ev] == cigar_event::I)
+        while(ev >= cigar_start && ev < cigar_end)
         {
-            read_window_clipped_no_insertions.y--;
-            read_offset--;
-            ev--;
-        }
+            const uint16 read_offset = ctx.cigar.cigar_event_read_coordinates[ev];
+            // skip bases without a read offset and bases beyond the current clipping window
+            if (read_offset == uint16(-1) || read_offset > read_window_clipped.y)
+            {
+                ev--;
+                continue;
+            }
 
-        ctx.cigar.read_window_clipped_no_insertions[read_index] = read_window_clipped_no_insertions;
+            if (ctx.cigar.cigar_events[ev] == cigar_event::I)
+            {
+                ev--;
+                continue;
+            }
+
+            read_window_clipped_no_insertions.y = read_offset;
+            break;
+        }
     }
 };
 

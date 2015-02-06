@@ -1091,41 +1091,22 @@ struct cap_baq_qualities : public lambda<system>
         return b;
     }
 
-    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
+    template <bool update_qualities>
+    CUDA_HOST_DEVICE bool cap_baq (const uint32 read_index,
+                                   const CRQ_index idx,
+                                   const uint32 cigar_start,
+                                   const uint32 cigar_end,
+                                   const uint32 baq_start,
+                                   const ushort2 read_window_clipped,
+                                   const uint2 hmm_reference_window)
     {
-        const CRQ_index idx = batch.crq_index(read_index);
-
-        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
-        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
-
-        auto hmm_reference_window = ctx.baq.reference_windows[read_index];
-        const auto read_window_clipped = ctx.cigar.read_window_clipped[read_index];
-
-        // transform the hmm reference window back to read local coordinates
-        const uint32 ref_ID = batch.chromosome[read_index];
-        const uint32 ref_base = ctx.reference.sequence_bp_start[ref_ID];
-
-        hmm_reference_window.x -= ref_base + batch.alignment_start[read_index];
-        hmm_reference_window.y -= ref_base + batch.alignment_start[read_index];
-
         uint32 readI = 0;
         uint32 refI = 0;
         uint32 current_op_offset = 0;
         uint32 numD = 0;
         const uint32 refOffset = hmm_reference_window.x;
 
-        // scan for the start of the baq region
-        uint32 i;
-        for(i = 0; i < cigar_end - cigar_start; i++)
-        {
-            const uint16 read_bp_idx = ctx.cigar.cigar_event_read_coordinates[cigar_start + i];
-            if (read_bp_idx != uint16(-1) && read_bp_idx >= read_window_clipped.x)
-                break;
-        }
-
-        const uint32 baq_start = i;
-
-        for(; i < cigar_end - cigar_start; i++)
+        for(uint32 i = baq_start; i < cigar_end - cigar_start; i++)
         {
             const uint16 read_bp_idx = ctx.cigar.cigar_event_read_coordinates[cigar_start + i];
             const uint32 qual_idx = idx.qual_start + read_bp_idx;
@@ -1138,7 +1119,11 @@ struct cap_baq_qualities : public lambda<system>
                 break;
 
             case cigar_event::I:
-                ctx.baq.qualities[qual_idx] = batch.qualities[qual_idx];
+                if (update_qualities)
+                {
+                    ctx.baq.qualities[qual_idx] = batch.qualities[qual_idx];
+                }
+
                 readI++;
                 current_op_offset = 0;
                 break;
@@ -1150,17 +1135,92 @@ struct cap_baq_qualities : public lambda<system>
                 break;
 
             case cigar_event::M:
-                const uint32 expectedPos = refI - refOffset + (i - numD - baq_start - readI);
-                ctx.baq.qualities[qual_idx] = capBaseByBAQ(batch.qualities[idx.qual_start + read_bp_idx],
-                                                           ctx.baq.qualities[idx.qual_start + read_bp_idx],
-                                                           baq_state[idx.qual_start + read_bp_idx],
-                                                           expectedPos);
+                if (update_qualities)
+                {
+                    const uint32 expectedPos = refI - refOffset + (i - numD - baq_start - readI);
+                    ctx.baq.qualities[qual_idx] = capBaseByBAQ(batch.qualities[idx.qual_start + read_bp_idx],
+                                                               ctx.baq.qualities[idx.qual_start + read_bp_idx],
+                                                               baq_state[idx.qual_start + read_bp_idx],
+                                                               expectedPos);
+                }
+
                 readI++;
                 refI++;
                 current_op_offset++;
 
                 break;
             }
+        }
+
+        if (!update_qualities)
+        {
+            const uint32 read_len = read_window_clipped.y - read_window_clipped.x + 1;
+            if (readI != read_len)
+            {
+                // odd cigar string, do not update
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    CUDA_HOST_DEVICE void operator() (const uint32 read_index)
+    {
+        const CRQ_index idx = batch.crq_index(read_index);
+
+        const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
+        const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
+
+        const auto read_window_clipped = ctx.cigar.read_window_clipped[read_index];
+
+        // scan for the start of the baq region
+        uint32 baq_start = 0;
+        for(uint32 i = 0; i < cigar_end - cigar_start; i++)
+        {
+            const uint16 read_bp_idx = ctx.cigar.cigar_event_read_coordinates[cigar_start + i];
+            if (read_bp_idx != uint16(-1) && read_bp_idx >= read_window_clipped.x)
+            {
+                baq_start = i;
+                break;
+            }
+        }
+
+        // compute the transformed HMM reference window
+        auto hmm_reference_window = ctx.baq.reference_windows[read_index];
+
+        // transform the hmm reference window back to read local coordinates
+        const uint32 ref_ID = batch.chromosome[read_index];
+        const uint32 ref_base = ctx.reference.sequence_bp_start[ref_ID];
+
+        hmm_reference_window.x -= ref_base + batch.alignment_start[read_index];
+        hmm_reference_window.y -= ref_base + batch.alignment_start[read_index];
+
+        // check if we need to update the BAQ qualities...
+        const bool need_update = cap_baq<false>(read_index,
+                                                idx,
+                                                cigar_start,
+                                                cigar_end,
+                                                baq_start,
+                                                read_window_clipped,
+                                                hmm_reference_window);
+
+        if (need_update)
+        {
+            // ... and update them
+            cap_baq<true>(read_index,
+                          idx,
+                          cigar_start,
+                          cigar_end,
+                          baq_start,
+                          read_window_clipped,
+                          hmm_reference_window);
+        } else {
+            // ... or overwrite BAQ with the original qualities instead
+            const uint32 base_off = idx.qual_start + read_window_clipped.x;
+            const uint32 len = read_window_clipped.y - read_window_clipped.x + 1;
+
+            memcpy(&ctx.baq.qualities[base_off], &batch.qualities[base_off], len);
         }
     }
 };

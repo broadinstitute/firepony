@@ -1028,35 +1028,53 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
     fprintf(stderr, "\n");
 
     fprintf(stderr, "    fractional snp error        = [ ");
-    for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
+    for(uint32 i = cigar_start; i < cigar_end; i++)
     {
-        double err = context.fractional_error.snp_errors[i];
-        if (err == 0.0)
-            fprintf(stderr, "  . ");
-        else
-            fprintf(stderr, " %.1f", err);
+        uint16 bp_offset = ctx.cigar_event_read_coordinates[i];
+        if (bp_offset == uint16(-1))
+        {
+            fprintf(stderr, "  - ");
+        } else {
+            double err = context.fractional_error.snp_errors[idx.qual_start + bp_offset];
+            if (err == 0.0)
+                fprintf(stderr, "  . ");
+            else
+                fprintf(stderr, " %.1f", err);
+        }
     }
     fprintf(stderr, "]\n");
 
     fprintf(stderr, "           ... ins error        = [ ");
-    for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
+    for(uint32 i = cigar_start; i < cigar_end; i++)
     {
-        double err = context.fractional_error.insertion_errors[i];
-        if (err == 0.0)
-            fprintf(stderr, "  . ");
-        else
-            fprintf(stderr, " %.1f", err);
+        uint16 bp_offset = ctx.cigar_event_read_coordinates[i];
+        if (bp_offset == uint16(-1))
+        {
+            fprintf(stderr, "  - ");
+        } else {
+            double err = context.fractional_error.insertion_errors[idx.qual_start + bp_offset];
+            if (err == 0.0)
+                fprintf(stderr, "  . ");
+            else
+                fprintf(stderr, " %.1f", err);
+        }
     }
     fprintf(stderr, "]\n");
 
     fprintf(stderr, "           ... del error        = [ ");
-    for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
+    for(uint32 i = cigar_start; i < cigar_end; i++)
     {
-        double err = context.fractional_error.deletion_errors[i];
-        if (err == 0.0)
-            fprintf(stderr, "  . ");
-        else
-            fprintf(stderr, " %.1f", err);
+        uint16 bp_offset = ctx.cigar_event_read_coordinates[i];
+        if (bp_offset == uint16(-1))
+        {
+            fprintf(stderr, "  - ");
+        } else {
+            double err = context.fractional_error.deletion_errors[idx.qual_start + bp_offset];
+            if (err == 0.0)
+                fprintf(stderr, "  . ");
+            else
+                fprintf(stderr, " %.1f", err);
+        }
     }
     fprintf(stderr, "]\n");
 

@@ -37,42 +37,43 @@ namespace firepony {
 template <target_system system>
 struct baq_context
 {
-    // reference windows for HMM
-    d_vector_u32_2<system> reference_windows;
+    // reference windows for HMM relative to the base alignment position
+    // note: these are signed and the first coordinate is expected to be negative
+    vector<system, short2> hmm_reference_windows;
     // band widths
-    d_vector_u16<system> bandwidth;
+    vector<system, uint16> bandwidth;
 
     // BAQ'ed qualities for each read, same size as each read
-    d_vector_u8<system> qualities;
+    vector<system, uint8> qualities;
 
     // forward and backward HMM matrices
     // each read requires read_len * 6 * (bandWidth + 1)
-    d_vector<system, double> forward;
-    d_vector<system, double> backward;
+    vector<system, double> forward;
+    vector<system, double> backward;
     // index vector for forward/backward matrices
-    d_vector<system, uint32> matrix_index;
+    vector<system, uint32> matrix_index;
 
     // scaling factors
-    d_vector<system, double> scaling;
+    vector<system, double> scaling;
     // index vector for scaling factors
-    d_vector<system, uint32> scaling_index;
+    vector<system, uint32> scaling_index;
 
     struct view
     {
-        typename d_vector_u32_2<system>::view reference_windows;
-        typename d_vector_u16<system>::view bandwidth;
-        typename d_vector_u8<system>::view qualities;
-        typename d_vector<system, double>::view forward;
-        typename d_vector<system, double>::view backward;
-        typename d_vector<system, uint32>::view matrix_index;
-        typename d_vector<system, double>::view scaling;
-        typename d_vector<system, uint32>::view scaling_index;
+        typename vector<system, short2>::view hmm_reference_windows;
+        typename vector<system, uint16>::view bandwidth;
+        typename vector<system, uint8>::view qualities;
+        typename vector<system, double>::view forward;
+        typename vector<system, double>::view backward;
+        typename vector<system, uint32>::view matrix_index;
+        typename vector<system, double>::view scaling;
+        typename vector<system, uint32>::view scaling_index;
     };
 
     operator view()
     {
         view v = {
-                reference_windows,
+                hmm_reference_windows,
                 bandwidth,
                 qualities,
                 forward,

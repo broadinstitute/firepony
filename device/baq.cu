@@ -80,7 +80,7 @@ struct compute_hmm_windows : public lambda<system>
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        uint2 hmm_reference_window;
+        short2 hmm_reference_window;
 
         const ushort2& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
         const ushort2& read_window_clipped_no_insertions = ctx.cigar.read_window_clipped_no_insertions[read_index];
@@ -92,15 +92,8 @@ struct compute_hmm_windows : public lambda<system>
         hmm_reference_window.x = reference_window_clipped.x - (read_window_clipped_no_insertions.x - read_window_clipped.x) - offset;
         hmm_reference_window.y = reference_window_clipped.y + (read_window_clipped.y - read_window_clipped_no_insertions.y) + offset;
 
-        // transform to genome coordinates
-        const uint32 ref_ID = batch.chromosome[read_index];
-        const uint32 ref_base = ctx.reference.sequence_bp_start[ref_ID];
-
-        hmm_reference_window.x += ref_base + batch.alignment_start[read_index];
-        hmm_reference_window.y += ref_base + batch.alignment_start[read_index];
-
         // write out the result
-        ctx.baq.reference_windows[read_index] = hmm_reference_window;
+        ctx.baq.hmm_reference_windows[read_index] = hmm_reference_window;
 
         // compute the band width
         int referenceLen;
@@ -606,11 +599,11 @@ struct hmm_glocal : public lambda<system>
         scalingFactors = &ctx.baq.scaling[scaling_index];
 
         // get the windows for the current read
-        const uint2& reference_window = ctx.baq.reference_windows[read_index];
+        const auto& hmm_reference_window = ctx.baq.hmm_reference_windows[read_index];
         const ushort2& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
 
-        referenceStart = reference_window.x;
-        referenceLength = reference_window.y - reference_window.x + 1;
+        referenceStart = hmm_reference_window.x;
+        referenceLength = hmm_reference_window.y - hmm_reference_window.x + 1;
 
         queryStart = read_window_clipped.x;
         queryEnd = read_window_clipped.y;
@@ -638,8 +631,13 @@ struct hmm_glocal : public lambda<system>
 //        printf("referenceStart = %u\n", referenceStart);
 //        printf("queryStart = %u queryLen = %u\n", queryStart, queryLen);
 
+        // compute the offset from our local coordinate system to global genome coordinates
+        const uint32 ref_ID = batch.chromosome[read_index];
+        const uint32 ref_base = ctx.reference.sequence_bp_start[ref_ID];
+        const uint32 genome_offset = ref_base + batch.alignment_start[read_index];
+
         queryBases = batch.reads + idx.read_start + queryStart;
-        referenceBases = ctx.reference.bases + referenceStart;
+        referenceBases = ctx.reference.bases + genome_offset + hmm_reference_window.x;
         inputQualities = &batch.qualities[idx.qual_start] + queryStart;
 
         if (ctx.baq.qualities.size() > 0)
@@ -1081,7 +1079,7 @@ struct cap_baq_qualities : public lambda<system>
         bool isIndel = stateIsIndel(state);
         uint32 pos = stateAlignedPosition(state);
 
-        if (isIndel || pos != expectedPos) // we are an indel or we don't algin to our best current position
+        if (isIndel || pos != expectedPos) // we are an indel or we don't align to our best current position
         {
             b = MIN_BASE_QUAL; // just take b = minBaseQuality
         } else {
@@ -1098,13 +1096,14 @@ struct cap_baq_qualities : public lambda<system>
                                    const uint32 cigar_end,
                                    const uint32 baq_start,
                                    const ushort2 read_window_clipped,
-                                   const uint2 hmm_reference_window)
+                                   const ushort2 reference_window_clipped,
+                                   const short2 hmm_reference_window)
     {
         uint32 readI = 0;
         uint32 refI = 0;
-        uint32 current_op_offset = 0;
         uint32 numD = 0;
-        const uint32 refOffset = hmm_reference_window.x;
+        const int16 refOffset = hmm_reference_window.x - reference_window_clipped.x;
+
 
         for(uint32 i = baq_start; i < cigar_end - cigar_start; i++)
         {
@@ -1115,7 +1114,6 @@ struct cap_baq_qualities : public lambda<system>
             {
             case cigar_event::S:
                 refI++;
-                current_op_offset = 0;
                 break;
 
             case cigar_event::I:
@@ -1125,13 +1123,11 @@ struct cap_baq_qualities : public lambda<system>
                 }
 
                 readI++;
-                current_op_offset = 0;
                 break;
 
             case cigar_event::D:
                 refI++;
                 numD++;
-                current_op_offset = 0;
                 break;
 
             case cigar_event::M:
@@ -1146,7 +1142,6 @@ struct cap_baq_qualities : public lambda<system>
 
                 readI++;
                 refI++;
-                current_op_offset++;
 
                 break;
             }
@@ -1173,6 +1168,8 @@ struct cap_baq_qualities : public lambda<system>
         const uint32 cigar_end = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
 
         const auto read_window_clipped = ctx.cigar.read_window_clipped[read_index];
+        const auto reference_window_clipped = ctx.cigar.reference_window_clipped[read_index];
+        const auto hmm_reference_window = ctx.baq.hmm_reference_windows[read_index];
 
         // scan for the start of the baq region
         uint32 baq_start = 0;
@@ -1186,16 +1183,6 @@ struct cap_baq_qualities : public lambda<system>
             }
         }
 
-        // compute the transformed HMM reference window
-        auto hmm_reference_window = ctx.baq.reference_windows[read_index];
-
-        // transform the hmm reference window back to read local coordinates
-        const uint32 ref_ID = batch.chromosome[read_index];
-        const uint32 ref_base = ctx.reference.sequence_bp_start[ref_ID];
-
-        hmm_reference_window.x -= ref_base + batch.alignment_start[read_index];
-        hmm_reference_window.y -= ref_base + batch.alignment_start[read_index];
-
         // check if we need to update the BAQ qualities...
         const bool need_update = cap_baq<false>(read_index,
                                                 idx,
@@ -1203,6 +1190,7 @@ struct cap_baq_qualities : public lambda<system>
                                                 cigar_end,
                                                 baq_start,
                                                 read_window_clipped,
+                                                reference_window_clipped,
                                                 hmm_reference_window);
 
         if (need_update)
@@ -1214,6 +1202,7 @@ struct cap_baq_qualities : public lambda<system>
                           cigar_end,
                           baq_start,
                           read_window_clipped,
+                          reference_window_clipped,
                           hmm_reference_window);
         } else {
             // ... or overwrite BAQ with the original qualities instead
@@ -1286,7 +1275,7 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
 
     active_baq_read_list.resize(num_active);
 
-    baq.reference_windows.resize(batch.device.num_reads);
+    baq.hmm_reference_windows.resize(batch.device.num_reads);
     baq.bandwidth.resize(batch.device.num_reads);
 
     // compute the alignment frames
@@ -1435,14 +1424,10 @@ void debug_baq(firepony_context<system>& context, const alignment_batch<system>&
     const CRQ_index idx = h_batch.crq_index(read_index);
 
     ushort2 read_window = context.cigar.read_window_clipped[read_index];
-    uint2 reference_window = context.baq.reference_windows[read_index];
+    short2 reference_window = context.baq.hmm_reference_windows[read_index];
 
     fprintf(stderr, "    read window                 = [ %u %u ]\n", read_window.x, read_window.y);
-    fprintf(stderr, "    absolute reference window   = [ %u %u ]\n", reference_window.x, reference_window.y);
-    //fprintf(stderr, "    sequence base: %u\n", genome.sequence_offsets[batch.alignment_sequence_IDs[read_index]]);
-    fprintf(stderr, "    relative reference window   = [ %lu %lu ]\n",
-            reference_window.x - context.reference.host.sequence_bp_start[h_batch.chromosome[read_index]],
-            reference_window.y - context.reference.host.sequence_bp_start[h_batch.chromosome[read_index]]);
+    fprintf(stderr, "    relative reference window   = [ %d %d ]\n", reference_window.x, reference_window.y);
 
     fprintf(stderr, "    BAQ quals                   = [ ");
     for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)

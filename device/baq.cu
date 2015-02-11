@@ -80,18 +80,32 @@ struct compute_hmm_windows : public lambda<system>
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        short2 hmm_reference_window;
+        const CRQ_index idx = batch.crq_index(read_index);
 
         const ushort2& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
+        const ushort2& read_window_clipped_no_insertions = ctx.cigar.read_window_clipped_no_insertions[read_index];
         const ushort2& reference_window_clipped = ctx.cigar.reference_window_clipped[read_index];
 
         // note: the band width for any given read is not necessarily constant, but GATK always uses the min band width when computing the reference offset
         // this looks a lot like a bug in GATK, but we replicate the same behavior here
         constexpr int offset = MIN_BAND_WIDTH / 2;
 
+        // xxxnsubtil: this is a hack --- GATK hard clips adapters and soft clipping regions, meaning that any clipped reads can *never* have leading/trail insertions
+        // (the cigar operators are replaced with H, and lead/trail insertion detection tests for I at the very beginning/end of the read)
+        // this effectively means that the no-insertions read window is not usable in this case
+
+        // figure out if we applied clipping on either end of the read
+        const bool left_clip = (read_window_clipped.x != 0);
+        const bool right_clip = (read_window_clipped.y != idx.read_len);
+
+        // compute the left and right insertion offsets
+        const short left_insertion = (left_clip ? 0 : read_window_clipped_no_insertions.x - read_window_clipped.x);
+        const short right_insertion = (right_clip ? 0 : read_window_clipped.y - read_window_clipped_no_insertions.y);
+
         // compute the reference window in local read coordinates
-        hmm_reference_window.x = reference_window_clipped.x - offset;
-        hmm_reference_window.y = reference_window_clipped.y + offset;
+        short2 hmm_reference_window;
+        hmm_reference_window.x = reference_window_clipped.x - left_insertion - offset;
+        hmm_reference_window.y = reference_window_clipped.y + right_insertion + offset;
 
         // write out the result
         ctx.baq.hmm_reference_windows[read_index] = hmm_reference_window;

@@ -83,14 +83,15 @@ struct compute_hmm_windows : public lambda<system>
         short2 hmm_reference_window;
 
         const ushort2& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
-        const ushort2& read_window_clipped_no_insertions = ctx.cigar.read_window_clipped_no_insertions[read_index];
         const ushort2& reference_window_clipped = ctx.cigar.reference_window_clipped[read_index];
 
+        // note: the band width for any given read is not necessarily constant, but GATK always uses the min band width when computing the reference offset
+        // this looks a lot like a bug in GATK, but we replicate the same behavior here
         constexpr int offset = MIN_BAND_WIDTH / 2;
 
         // compute the reference window in local read coordinates
-        hmm_reference_window.x = reference_window_clipped.x - (read_window_clipped_no_insertions.x - read_window_clipped.x) - offset;
-        hmm_reference_window.y = reference_window_clipped.y + (read_window_clipped.y - read_window_clipped_no_insertions.y) + offset;
+        hmm_reference_window.x = reference_window_clipped.x - offset;
+        hmm_reference_window.y = reference_window_clipped.y + offset;
 
         // write out the result
         ctx.baq.hmm_reference_windows[read_index] = hmm_reference_window;

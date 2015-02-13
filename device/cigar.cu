@@ -92,24 +92,6 @@ struct cigar_op_expand : public lambda<system>
     }
 };
 
-// compact the cigar events from temporary storage into a 2-bit packed vector
-template <target_system system>
-struct cigar_op_compact : public lambda<system>
-{
-    LAMBDA_INHERIT;
-
-    CUDA_HOST_DEVICE void operator() (const uint32 word_index)
-    {
-        auto& events = ctx.cigar.cigar_events;
-        const uint8 *input = &ctx.temp_storage[word_index * d_packed_vector_2b<system>::SYMBOLS_PER_WORD];
-
-        for(uint32 i = 0; i < d_packed_vector_2b<system>::SYMBOLS_PER_WORD; i++)
-        {
-            events[word_index * d_packed_vector_2b<system>::SYMBOLS_PER_WORD + i] = input[i];
-        }
-    }
-};
-
 // initialize read windows
 // note: this does not initialize the reference window, as it needs to be computed once all clipping has been done
 template <target_system system>

@@ -208,6 +208,7 @@ void debug_read(firepony_context<system>& context, const alignment_batch<system>
     fprintf(stderr, "== read %lu\n", context.stats.total_reads + read_id);
 
     fprintf(stderr, "name = [%s]\n", h_batch.name[read_index].c_str());
+    fprintf(stderr, "flags = %d\n", h_batch.flags[read_index]);
 
     fprintf(stderr, "  offset list = [ ");
     for(uint32 i = idx.read_start; i < idx.read_start + idx.read_len; i++)

@@ -614,7 +614,22 @@ struct cigar_coordinates_expand : public lambda<system>
 template <target_system system>
 struct compute_error_vectors : public lambda<system>
 {
-    LAMBDA_INHERIT;
+    LAMBDA_INHERIT_MEMBERS;
+
+    typename vector<system, uint8>::view snp_vector;
+    typename vector<system, uint8>::view ins_vector;
+    typename vector<system, uint8>::view del_vector;
+
+    compute_error_vectors(typename firepony_context<system>::view ctx,
+                          const typename alignment_batch_device<system>::const_view batch,
+                          typename vector<system, uint8>::view snp_vector,
+                          typename vector<system, uint8>::view ins_vector,
+                          typename vector<system, uint8>::view del_vector)
+        : lambda<system>(ctx, batch),
+          snp_vector(snp_vector),
+          ins_vector(ins_vector),
+          del_vector(del_vector)
+    { }
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
@@ -657,7 +672,7 @@ struct compute_error_vectors : public lambda<system>
 
                     if (reference_bp != read_bp)
                     {
-                        ctx.cigar.is_snp[idx.read_start + current_bp_idx] = 1;
+                        snp_vector[idx.read_start + current_bp_idx] = 1;
 
                         // if we are inside the clipped read window, count this error
                         if (current_bp_idx >= read_window_clipped.x && current_bp_idx <= read_window_clipped.y)
@@ -684,7 +699,7 @@ struct compute_error_vectors : public lambda<system>
 
                     if (off >= 0 && off <= read_window_clipped.y)
                     {
-                        ctx.cigar.is_insertion[idx.read_start + off] = 1;
+                        ins_vector[idx.read_start + off] = 1;
                     }
 
                     num_errors++;
@@ -702,12 +717,12 @@ struct compute_error_vectors : public lambda<system>
                     // mark the read bp where a deletion begins
                     if (!negative_strand)
                     {
-                        ctx.cigar.is_deletion[idx.read_start + current_bp_idx] = 1;
+                        del_vector[idx.read_start + current_bp_idx] = 1;
                     } else {
                         uint16 off = current_bp_idx + 1;
                         if (off < idx.read_len)
                         {
-                            ctx.cigar.is_deletion[idx.read_start + off] = 1;
+                            del_vector[idx.read_start + off] = 1;
                         }
                     }
 
@@ -837,10 +852,7 @@ void expand_cigars(firepony_context<system>& context, const alignment_batch<syst
     ctx.is_deletion.resize(batch.device.reads.size());
     ctx.num_errors.resize(batch.device.num_reads);
 
-    // the following require zero initialization
-    thrust::fill(ctx.is_snp.m_storage.begin(), ctx.is_snp.m_storage.end(), 0);
-    thrust::fill(ctx.is_insertion.m_storage.begin(), ctx.is_insertion.m_storage.end(), 0);
-    thrust::fill(ctx.is_deletion.m_storage.begin(), ctx.is_deletion.m_storage.end(), 0);
+    // initialize num_errors to zero
     thrust::fill(ctx.num_errors.begin(), ctx.num_errors.end(), 0);
 
     // cigar_events_read_index is initialized to -1; this means that all reads are considered inactive
@@ -849,16 +861,16 @@ void expand_cigars(firepony_context<system>& context, const alignment_batch<syst
 
     // expand the cigar ops into temp storage (xxxnsubtil: same as above, active read list is ignored)
     parallel<system>::for_each(thrust::make_counting_iterator(0),
-                     thrust::make_counting_iterator(0) + batch.device.cigars.size(),
-                     cigar_op_expand<system>(context, batch.device));
+                               thrust::make_counting_iterator(0) + batch.device.cigars.size(),
+                               cigar_op_expand<system>(context, batch.device));
 
     // pack the cigar into a 2-bit vector
     pack_to_2bit(ctx.cigar_events, context.temp_storage);
 
 #ifdef CUDA_DEBUG
     parallel<system>::for_each(firepony_context.active_read_list.begin(),
-                     firepony_context.active_read_list.end(),
-                     sanity_check_cigar_events<system>(firepony_context, batch.device));
+                               firepony_context.active_read_list.end(),
+                               sanity_check_cigar_events<system>(firepony_context, batch.device));
 #endif
 
     // now expand the coordinates per read
@@ -894,9 +906,33 @@ void expand_cigars(firepony_context<system>& context, const alignment_batch<syst
 
     // compute the error bit vectors
     // this also counts the number of errors in each read
+    // note: we compute the error bit vectors into uint8 then pack these into 1-bit-per-bp vectors
+    // this is to avoid RMW hazards across threads, as the number of symbols per word won't match that of the read vectors themselves
+    vector<system, uint8>& snp_error = context.temp_storage;
+    vector<system, uint8>& ins_error = context.temp_u8;
+    vector<system, uint8> del_error;
+
+    // set up the temp storage for packing into 1bit
+    size_t len = batch.device.reads.size();
+    pack_prepare_storage_1bit(snp_error, len);
+    pack_prepare_storage_1bit(ins_error, len);
+    pack_prepare_storage_1bit(del_error, len);
+
+    // initialize temp storage to zero
+    thrust::fill(snp_error.begin(), snp_error.end(), 0);
+    thrust::fill(ins_error.begin(), ins_error.end(), 0);
+    thrust::fill(del_error.begin(), del_error.end(), 0);
+
+    // compute the error bit vectors into temp storage
     parallel<system>::for_each(context.active_read_list.begin(),
                                context.active_read_list.end(),
-                               compute_error_vectors<system>(context, batch.device));
+                               compute_error_vectors<system>(context, batch.device,
+                                                             snp_error, ins_error, del_error));
+
+    // now pack the temp storage into the 1-bit vectors
+    pack_to_1bit(context.cigar.is_snp, snp_error);
+    pack_to_1bit(context.cigar.is_insertion, ins_error);
+    pack_to_1bit(context.cigar.is_deletion, del_error);
 }
 INSTANTIATE(expand_cigars);
 

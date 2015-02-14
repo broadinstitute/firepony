@@ -44,7 +44,7 @@ class Error (ErrorBase):
     def __str__(self):
         s = StringIO()
 
-        print >> s, "%s: error = %f%% (row %d col %d left=%f right=%f abs delta=%f)" % (
+        print >> s, "%s: error = %.8f%% (row %d col %d left=%.8f right=%.8f abs delta=%.8f)" % (
             err.table_name,
             err.relative_delta,
             err.table_row,
@@ -68,30 +68,27 @@ class Error (ErrorBase):
 
     # logic to decide whether a given error can be waived
     def can_waive(self):
-        if self.delta == 0.0:
+        if self.relative_delta < 0.001:
             return True
 
-        if self.relative_delta >= 0.5:
-            if self.table_A.column_names[self.table_col] == "EmpiricalQuality":
-                # empirical quality is a discretized value, which amplifies small errors in values around the .5 threshold
-                # waive off-by-one errors in empirical quality
-                if math.fabs(math.fabs(self.val_B) - math.fabs(self.val_A)) > 1.0:
-                    error_index = self.table_A.column_names.index("Error")
-                    error_A = self.data_A[error_index]
-                    error_B = self.data_B[error_index]
+        # the following is useful when tracking down errors in order to ignore off-by-one deltas in discretized values
 
-                    frac_A = math.fabs(math.modf(error_A)[0])
-                    frac_B = math.fabs(math.modf(error_B)[0])
-
-                    dist_A = 0.5 - frac_A
-                    dist_B = 0.5 - frac_B
-
-                    if (dist_A < 0.0 and dist_B >= 0.0) or (dist_A >= 0.0 and dist_B < 0.0):
-                        if math.fabs(dist_A) < 0.01 and math.fabs(dist_B) < 0.01:
-                            return True
-        else:
-            # less than 0.5% is waivable
-            return True
+        # if self.table_A.column_names[self.table_col] == "EmpiricalQuality":
+        #     # empirical quality is a discretized value, which amplifies small errors in values around the .5 threshold
+        #     # waive off-by-one errors in empirical quality if the errors are both within 0.01 of the .5 threshold
+        #     if math.fabs(math.fabs(self.val_B) - math.fabs(self.val_A)) == 1.0:
+        #         error_index = self.table_A.column_names.index("Errors")
+        #         error_A = self.data_A[error_index]
+        #         error_B = self.data_B[error_index]
+        #
+        #         frac_A = math.fabs(math.modf(error_A)[0])
+        #         frac_B = math.fabs(math.modf(error_B)[0])
+        #
+        #         dist_A = math.fabs(0.5 - frac_A)
+        #         dist_B = math.fabs(0.5 - frac_B)
+        #
+        #         if dist_A <= 0.05 and dist_B <= 0.05:
+        #             return True
 
         # everything else is a real error
         return False
@@ -155,8 +152,6 @@ for table_A in report_A.tables:
             compare_indices.append(i)
 
     # now diff the list based on the indices
-    max_error = Error(delta=0.0)
-
     for i in xrange(table_A.num_rows):
         # compare everything that should match exactly
         for j in compare_indices:
@@ -168,11 +163,9 @@ for table_A in report_A.tables:
         for j in measure_indices:
             err = Error.diff(table_A, table_B, i, j)
 
-            if err.delta > 0.0:
-                if not err.can_waive():
-                    #print "*** ERROR"
-                    print err
-                    exit_code = 2
+            if not err.can_waive():
+                print err
+                exit_code = 2
 
 if exit_code == 0:
     print "no errors"

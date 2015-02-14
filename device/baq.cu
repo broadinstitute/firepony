@@ -96,7 +96,7 @@ struct compute_hmm_windows : public lambda<system>
 
         // figure out if we applied clipping on either end of the read
         const bool left_clip = (read_window_clipped.x != 0);
-        const bool right_clip = (read_window_clipped.y != idx.read_len);
+        const bool right_clip = (read_window_clipped.y != idx.read_len - 1);
 
         // compute the left and right insertion offsets
         const short left_insertion = (left_clip ? 0 : read_window_clipped_no_insertions.x - read_window_clipped.x);

@@ -220,14 +220,15 @@ bool reference_file_handle::make_sequence_available(const std::string& sequence_
     } else {
         if (sequence_data.sequence_names.lookup(sequence_name) == uint32(-1))
         {
-
+            // search for the sequence name in our index
             auto it = reference_index.find(string_database::hash(sequence_name));
             if (it == reference_index.end())
             {
-                fprintf(stderr, "ERROR: sequence %s not found in reference index\n", sequence_name.c_str());
+                // sequence not found in index, can't load
                 return false;
             }
 
+            // found it, grab the offset
             size_t offset = it->second;
 
             // we must seek backwards to the beginning of the header

@@ -146,12 +146,14 @@ bool alignment_file::next_batch(alignment_batch_host *batch, uint32 data_mask, r
         if (data_mask & AlignmentDataMask::CHROMOSOME)
         {
             std::string sequence_name = get_sequence_name(record.chromosome());
-            if (reference->make_sequence_available(sequence_name) == false)
-            {
-                fprintf(stderr, "ERROR: could not load reference sequence %s\n", sequence_name.c_str());
-            }
+            const bool seq_valid = reference->make_sequence_available(sequence_name);
 
-            batch->chromosome.push_back(reference->sequence_data.sequence_names.lookup(sequence_name));
+            if (seq_valid)
+            {
+                batch->chromosome.push_back(reference->sequence_data.sequence_names.lookup(sequence_name));
+            } else {
+                batch->chromosome.push_back(uint32(-1));
+            }
         }
 
         if (data_mask & AlignmentDataMask::ALIGNMENT_START)
@@ -167,12 +169,14 @@ bool alignment_file::next_batch(alignment_batch_host *batch, uint32 data_mask, r
         if (data_mask & AlignmentDataMask::MATE_CHROMOSOME)
         {
             std::string sequence_name = get_sequence_name(record.mate_chromosome());
-            if (reference->make_sequence_available(sequence_name) == false)
-            {
-                fprintf(stderr, "ERROR: could not load reference sequence %s\n", sequence_name.c_str());
-            }
+            const bool seq_valid = reference->make_sequence_available(sequence_name);
 
-            batch->mate_chromosome.push_back(reference->sequence_data.sequence_names.lookup(sequence_name));
+            if (seq_valid)
+            {
+                batch->mate_chromosome.push_back(reference->sequence_data.sequence_names.lookup(sequence_name));
+            } else {
+                batch->mate_chromosome.push_back(uint32(-1));
+            }
         }
 
         if (data_mask & AlignmentDataMask::MATE_ALIGNMENT_START)
@@ -281,6 +285,13 @@ bool alignment_file::next_batch(alignment_batch_host *batch, uint32 data_mask, r
 
 const char *alignment_file::get_sequence_name(uint32 id)
 {
+    if (id >= gamgee_header.n_sequences())
+    {
+        // if the reference sequence is not noted in the file, return a special token
+        // this will cause an invalid reference sequence ID to be inserted in the data stream
+        return "<firepony-invalid-reference-sequence>";
+    }
+
     return gamgee_header.sequence_name(id).c_str();
 }
 

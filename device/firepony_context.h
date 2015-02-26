@@ -31,7 +31,7 @@
 #include "../runtime_options.h"
 
 #include "alignment_data_device.h"
-#include "sequence_data_device.h"
+#include "../sequence_database.h"
 #include "variant_data_device.h"
 #include "snp_filter.h"
 #include "covariates.h"
@@ -124,30 +124,28 @@ struct firepony_context
 #if 0
     const variant_database<system>& variant_db;
 #endif
-    const sequence_data<system>& reference;
+    const sequence_database<system>& reference_db;
 
     // sorted list of active reads
-    d_vector_u32<system> active_read_list;
-    // alignment windows for each read in reference coordinates
-    d_vector_u32_2<system> alignment_windows;
-    // alignment windows for each read in local sequence coordinates
-    d_vector_u16_2<system> sequence_alignment_windows;
+    vector<system, uint32> active_read_list;
+    // alignment windows for each read in chromosome coordinates
+    vector<system, uint2> alignment_windows;
 
     // list of active BP locations
     d_vector_active_location_list<system> active_location_list;
     // list of read offsets in the reference for each BP (relative to the alignment start position)
-    d_vector_u16<system> read_offset_list;
+    vector<system, uint16> read_offset_list;
 
     // temporary storage for CUB calls
-    d_vector_u8<system> temp_storage;
+    vector<system, uint8> temp_storage;
 
     // and more temporary storage
-    d_vector_u32<system> temp_u32;
-    d_vector_u32<system> temp_u32_2;
-    d_vector_u32<system> temp_u32_3;
-    d_vector_u32<system> temp_u32_4;
-    d_vector_f32<system> temp_f32;
-    d_vector_u8<system>  temp_u8;
+    vector<system, uint32> temp_u32;
+    vector<system, uint32> temp_u32_2;
+    vector<system, uint32> temp_u32_3;
+    vector<system, uint32> temp_u32_4;
+    vector<system, float> temp_f32;
+    vector<system, uint8>  temp_u8;
 
     // various pipeline states go here
 #if 0
@@ -164,12 +162,12 @@ struct firepony_context
     firepony_context(const int compute_device,
                      const runtime_options& options,
                      const alignment_header<system>& bam_header,
-                     const sequence_data<system>& reference
+                     const sequence_database<system>& reference_db
                      /* const variant_database<system>& variant_db */ )
         : compute_device(compute_device),
           options(options),
           bam_header(bam_header),
-          reference(reference)
+          reference_db(reference_db)
 //          variant_db(variant_db)
     { }
 
@@ -179,18 +177,17 @@ struct firepony_context
 #if 0
         typename variant_database_device<system>::const_view    variant_db;
 #endif
-        typename sequence_data_device<system>::const_view       reference;
-        typename d_vector_u32<system>::view                       active_read_list;
-        typename d_vector_u32_2<system>::view                     alignment_windows;
-        typename d_vector_u16_2<system>::view                     sequence_alignment_windows;
+        typename sequence_database_device<system>::const_view   reference_db;
+        typename vector<system, uint32>::view                   active_read_list;
+        typename vector<system, uint2>::view                    alignment_windows;
         typename d_vector_active_location_list<system>::view      active_location_list;
-        typename d_vector_u16<system>::view                       read_offset_list;
-        typename d_vector_u8<system>::view                        temp_storage;
-        typename d_vector_u32<system>::view                       temp_u32;
-        typename d_vector_u32<system>::view                       temp_u32_2;
-        typename d_vector_u32<system>::view                       temp_u32_3;
-        typename d_vector_u32<system>::view                       temp_u32_4;
-        typename d_vector_u8<system>::view                        temp_u8;
+        typename vector<system, uint16>::view                   read_offset_list;
+        typename vector<system, uint8>::view                    temp_storage;
+        typename vector<system, uint32>::view                   temp_u32;
+        typename vector<system, uint32>::view                   temp_u32_2;
+        typename vector<system, uint32>::view                   temp_u32_3;
+        typename vector<system, uint32>::view                   temp_u32_4;
+        typename vector<system, uint8>::view                    temp_u8;
 #if 0
         typename snp_filter_context<system>::view               snp_filter;
 #endif
@@ -207,10 +204,9 @@ struct firepony_context
 #if 0
             variant_db.device,
 #endif
-            reference.device,
+            reference_db.device,
             active_read_list,
             alignment_windows,
-            sequence_alignment_windows,
             active_location_list,
             read_offset_list,
             temp_storage,

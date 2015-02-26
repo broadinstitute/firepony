@@ -34,7 +34,7 @@
 #include <fstream>
 #include <algorithm>
 
-#include "../sequence_data.h"
+#include "../sequence_database.h"
 #include "../string_database.h"
 
 #include "reference.h"
@@ -55,60 +55,31 @@ struct iupac16 : public thrust::unary_function<char, uint8>
     }
 };
 
-static bool load_record(sequence_data_host *output, const gamgee::Fastq& record, uint32 data_mask)
+static void load_record(sequence_database_host *output, const gamgee::Fastq& record)
 {
-    auto& h = *output;
-    h.data_mask = data_mask;
+    sequence_storage<host> *h;
 
-    h.num_sequences++;
+    uint32 seq_id = output->sequence_names.insert(record.name());
+    h = output->new_entry(seq_id);
 
-    if (data_mask & SequenceDataMask::BASES)
-    {
-        std::string sequence = record.sequence();
+    std::string sequence = record.sequence();
 
-        const size_t seq_start = h.bases.size();
-        const size_t seq_len = sequence.size();
-
-        h.sequence_bp_start.push_back(seq_start);
-        h.sequence_bp_len.push_back(seq_len);
-
-        h.bases.resize(seq_start + seq_len);
-
-        assign(sequence.size(),
-               thrust::make_transform_iterator(sequence.begin(), iupac16()),
-               h.bases.stream_at_index(seq_start));
-    }
-
-    if (data_mask & SequenceDataMask::QUALITIES)
-    {
-        assert(!"unimplemented");
-        return false;
-    }
-
-    if (data_mask & SequenceDataMask::NAMES)
-    {
-        uint32 seq_id = output->sequence_names.insert(record.name());
-        h.sequence_id.push_back(seq_id);
-    }
-
-    h.generation++;
-    return true;
+    h->bases.resize(sequence.size());
+    assign(sequence.size(),
+           thrust::make_transform_iterator(sequence.begin(), iupac16()),
+           h->bases.stream_at_index(0));
 }
 
 // loader for sequence data
-static bool load_reference(sequence_data_host *output, const char *filename, uint32 data_mask)
+static void load_reference(sequence_database_host *output, const char *filename)
 {
     for (gamgee::Fastq& record : gamgee::FastqReader(std::string(filename)))
     {
-        bool ret = load_record(output, record, data_mask);
-        if (ret == false)
-            return false;
-    }
-
-    return true;
+        load_record(output, record);
+   }
 }
 
-static bool load_one_sequence(sequence_data_host *output, const std::string filename, size_t file_offset, uint32 data_mask)
+static void load_one_sequence(sequence_database_host *output, const std::string filename, size_t file_offset)
 {
     // note: we can't reuse the existing ifstream as gamgee for some reason wants to take ownership of the pointer and destroy it
     std::ifstream *file_stream = new std::ifstream();
@@ -118,11 +89,11 @@ static bool load_one_sequence(sequence_data_host *output, const std::string file
     gamgee::FastqReader reader(file_stream);
     gamgee::Fastq record = *(reader.begin());
 
-    return load_record(output, record, data_mask);
+    load_record(output, record);
 }
 
-reference_file_handle::reference_file_handle(const std::string filename, uint32 data_mask, uint32 consumers)
-  : filename(filename), data_mask(data_mask), consumers(consumers)
+reference_file_handle::reference_file_handle(const std::string filename, uint32 consumers)
+  : filename(filename), consumers(consumers)
 {
     sequence_mutexes.resize(consumers);
 }
@@ -176,15 +147,15 @@ bool reference_file_handle::load_index()
     return true;
 }
 
-reference_file_handle *reference_file_handle::open(const std::string filename, uint32 data_mask, uint32 consumers)
+reference_file_handle *reference_file_handle::open(const std::string filename, uint32 consumers)
 {
-    reference_file_handle *handle = new reference_file_handle(filename, data_mask, consumers);
+    reference_file_handle *handle = new reference_file_handle(filename, consumers);
 
     if (!handle->load_index())
     {
         // no index present, load entire reference
         fprintf(stderr, "WARNING: index not available for reference file %s, loading entire reference\n", filename.c_str());
-        load_reference(&handle->sequence_data, filename.c_str(), data_mask);
+        load_reference(&handle->sequence_data, filename.c_str());
     } else {
         fprintf(stderr, "loaded index for %s\n", filename.c_str());
 
@@ -218,42 +189,43 @@ bool reference_file_handle::make_sequence_available(const std::string& sequence_
     {
         return (sequence_data.sequence_names.lookup(sequence_name) != uint32(-1));
     } else {
-        if (sequence_data.sequence_names.lookup(sequence_name) == uint32(-1))
+        if (sequence_data.sequence_names.lookup(sequence_name) != uint32(-1))
         {
-            // search for the sequence name in our index
-            auto it = reference_index.find(string_database::hash(sequence_name));
-            if (it == reference_index.end())
-            {
-                // sequence not found in index, can't load
-                return false;
-            }
-
-            // found it, grab the offset
-            size_t offset = it->second;
-
-            // we must seek backwards to the beginning of the header
-            // (faidx points at the beginning of the sequence data, but gamgee needs to parse the header)
-            char c;
-            do {
-                file_handle.seekg(offset);
-                file_handle >> c;
-                file_handle.seekg(offset);
-
-                if (c != '>')
-                    offset--;
-            } while(c != '>');
-
-            producer_lock();
-            bool ret = load_one_sequence(&sequence_data, filename, offset, data_mask);
-            producer_unlock();
-
-            fprintf(stderr, "+");
-            fflush(stderr);
-
-            return ret;
-        } else {
+            // sequence already loaded
             return true;
         }
+
+        // search for the sequence name in our index
+        auto it = reference_index.find(string_database::hash(sequence_name));
+        if (it == reference_index.end())
+        {
+            // sequence not found in index, can't load
+            return false;
+        }
+
+        // found it, grab the offset
+        size_t offset = it->second;
+
+        // we must seek backwards to the beginning of the header
+        // (faidx points at the beginning of the sequence data, but gamgee needs to parse the header)
+        char c;
+        do {
+            file_handle.seekg(offset);
+            file_handle >> c;
+            file_handle.seekg(offset);
+
+            if (c != '>')
+                offset--;
+        } while(c != '>');
+
+        producer_lock();
+        load_one_sequence(&sequence_data, filename, offset);
+        producer_unlock();
+
+        fprintf(stderr, "+");
+        fflush(stderr);
+
+        return true;
     }
 }
 

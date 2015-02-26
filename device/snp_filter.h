@@ -29,7 +29,7 @@
 
 #include "../types.h"
 #include "alignment_data_device.h"
-#include "sequence_data_device.h"
+#include "../sequence_database.h"
 #include "variant_data_device.h"
 #include "util.h"
 

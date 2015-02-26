@@ -37,7 +37,7 @@
 
 #include "device_types.h"
 #include "alignment_data_device.h"
-#include "sequence_data_device.h"
+#include "../sequence_database.h"
 #include "firepony_context.h"
 
 #include "primitives/util.h"
@@ -646,13 +646,14 @@ struct hmm_glocal : public lambda<system>
 //        printf("referenceStart = %u\n", referenceStart);
 //        printf("queryStart = %u queryLen = %u\n", queryStart, queryLen);
 
-        // compute the offset from our local coordinate system to global genome coordinates
-        const uint32 ref_ID = batch.chromosome[read_index];
-        const uint32 ref_base = ctx.reference.sequence_bp_start[ref_ID];
-        const uint32 genome_offset = ref_base + batch.alignment_start[read_index];
-
         queryBases = batch.reads + idx.read_start + queryStart;
-        referenceBases = ctx.reference.bases + genome_offset + hmm_reference_window.x;
+
+        // xxxnsubtil: hmm_reference_window.x is expected to be negative for most cases
+        // reads aligning to the start of a chromosome will yield undefined results here
+        // it's unclear to me how GATK handles this case
+        referenceBases = ctx.reference_db.get_sequence_data({batch.chromosome[read_index],
+                                                             batch.alignment_start[read_index] + hmm_reference_window.x});
+
         inputQualities = &batch.qualities[idx.qual_start] + queryStart;
 
         if (ctx.baq.qualities.size() > 0)

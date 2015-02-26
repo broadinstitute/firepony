@@ -122,7 +122,6 @@ struct compute_alignment_window : public lambda<system>
         const CRQ_index idx = batch.crq_index(read_index);
         const uint16 *offset_list = &ctx.read_offset_list[idx.read_start];
         uint2& output = ctx.alignment_windows[read_index];
-        ushort2& output_sequence = ctx.sequence_alignment_windows[read_index];
 
         // scan the offset list looking for the largest offset
         int c;
@@ -138,11 +137,8 @@ struct compute_alignment_window : public lambda<system>
             output = make_uint2(uint32(-1), uint32(-1));
         } else {
             // transform the start position
-            output.x = ctx.reference.sequence_bp_start[batch.chromosome[read_index]] + batch.alignment_start[read_index];
+            output.x = batch.alignment_start[read_index];
             output.y = output.x + offset_list[c];
-
-            output_sequence.x = batch.alignment_start[read_index];
-            output_sequence.y = output_sequence.x + offset_list[c];
         }
     }
 };
@@ -153,7 +149,6 @@ void build_alignment_windows(firepony_context<system>& context, const alignment_
 {
     // set up the alignment window buffer
     context.alignment_windows.resize(batch.device.num_reads);
-    context.sequence_alignment_windows.resize(batch.device.num_reads);
     // compute alignment windows
     parallel<system>::for_each(context.active_read_list.begin(),
                      context.active_read_list.end(),

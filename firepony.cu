@@ -28,7 +28,7 @@
 #include <map>
 
 #include "alignment_data.h"
-#include "sequence_data.h"
+#include "sequence_database.h"
 #include "variant_data.h"
 
 #include "types.h"
@@ -194,7 +194,7 @@ int main(int argc, char **argv)
     data_io.start();
 
     // load the reference genome
-    ref_h = reference_file_handle::open(command_line_options.reference, SequenceDataMask::BASES | SequenceDataMask::NAMES, compute_devices.size());
+    ref_h = reference_file_handle::open(command_line_options.reference, compute_devices.size());
 
     if (ref_h == nullptr)
     {

@@ -28,7 +28,7 @@
 #pragma once
 
 #include "../types.h"
-#include "../sequence_data.h"
+#include "../sequence_database.h"
 
 #include <fstream>
 #include <map>
@@ -46,8 +46,7 @@ struct reference_file_handle
     std::map<uint32, size_t> reference_index;
     bool index_available;
 
-    sequence_data_host sequence_data;
-    uint32 data_mask;
+    sequence_database_host sequence_data;
     // list of mutexes that protect sequence_data, one per consumer thread
     std::deque<std::mutex> sequence_mutexes;
     // number of consumer threads
@@ -55,13 +54,13 @@ struct reference_file_handle
 
     bool make_sequence_available(const std::string& sequence_name);
 
-    static reference_file_handle *open(const std::string filename, uint32 data_mask, uint32 consumers);
+    static reference_file_handle *open(const std::string filename, uint32 consumers);
 
     void consumer_lock(const uint32 consumer_id);
     void consumer_unlock(const uint32 consumer_id);
 
 private:
-    reference_file_handle(const std::string filename, uint32 data_mask, uint32 consumers);
+    reference_file_handle(const std::string filename, uint32 consumers);
 
     void producer_lock(void);
     void producer_unlock(void);

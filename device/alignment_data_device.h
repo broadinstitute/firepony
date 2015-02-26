@@ -82,7 +82,7 @@ struct alignment_batch_device : public alignment_batch_storage<system>
         uint32 num_reads;
         uint32 max_read_size;
 
-        typename vector<system, uint32>::const_view chromosome;
+        typename vector<system, uint16>::const_view chromosome;
         typename vector<system, uint32>::const_view alignment_start;
         typename vector<system, uint32>::const_view alignment_stop;
         typename vector<system, uint32>::const_view mate_chromosome;

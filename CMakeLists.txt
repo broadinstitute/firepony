@@ -98,6 +98,7 @@ set(firepony_common_sources
     io_thread.h
     runtime_options.h
     segmented_database.h
+    sequence_database.h
     string_database.cu
     string_database.h
     types.h

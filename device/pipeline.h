@@ -50,8 +50,8 @@ struct firepony_pipeline
     virtual void setup(io_thread *reader,
                        const runtime_options *options,
                        alignment_header_host *header,
-                       sequence_data_host *h_reference,
-                       variant_database_host *h_dbsnp) = 0;
+                       sequence_data_host *h_reference
+                       /* variant_database_host *h_dbsnp */) = 0;
 
     virtual void start(void) = 0;
     virtual void join(void) = 0;

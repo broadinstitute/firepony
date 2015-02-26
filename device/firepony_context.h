@@ -121,7 +121,9 @@ struct firepony_context
     const runtime_options& options;
 
     const alignment_header<system>& bam_header;
+#if 0
     const variant_database<system>& variant_db;
+#endif
     const sequence_data<system>& reference;
 
     // sorted list of active reads
@@ -148,7 +150,9 @@ struct firepony_context
     d_vector_u8<system>  temp_u8;
 
     // various pipeline states go here
+#if 0
     snp_filter_context<system> snp_filter;
+#endif
     cigar_context<system> cigar;
     baq_context<system> baq;
     covariates_context<system> covariates;
@@ -160,19 +164,21 @@ struct firepony_context
     firepony_context(const int compute_device,
                      const runtime_options& options,
                      const alignment_header<system>& bam_header,
-                     const sequence_data<system>& reference,
-                     const variant_database<system>& variant_db)
+                     const sequence_data<system>& reference
+                     /* const variant_database<system>& variant_db */ )
         : compute_device(compute_device),
           options(options),
           bam_header(bam_header),
-          reference(reference),
-          variant_db(variant_db)
+          reference(reference)
+//          variant_db(variant_db)
     { }
 
     struct view
     {
         typename alignment_header_device<system>::const_view    bam_header;
+#if 0
         typename variant_database_device<system>::const_view    variant_db;
+#endif
         typename sequence_data_device<system>::const_view       reference;
         typename d_vector_u32<system>::view                       active_read_list;
         typename d_vector_u32_2<system>::view                     alignment_windows;
@@ -185,7 +191,9 @@ struct firepony_context
         typename d_vector_u32<system>::view                       temp_u32_3;
         typename d_vector_u32<system>::view                       temp_u32_4;
         typename d_vector_u8<system>::view                        temp_u8;
+#if 0
         typename snp_filter_context<system>::view               snp_filter;
+#endif
         typename cigar_context<system>::view                    cigar;
         typename baq_context<system>::view                      baq;
         typename covariates_context<system>::view               covariates;
@@ -196,7 +204,9 @@ struct firepony_context
     {
         view v = {
             bam_header.device,
+#if 0
             variant_db.device,
+#endif
             reference.device,
             active_read_list,
             alignment_windows,
@@ -209,7 +219,9 @@ struct firepony_context
             temp_u32_3,
             temp_u32_4,
             temp_u8,
+#if 0
             snp_filter,
+#endif
             cigar,
             baq,
             covariates,

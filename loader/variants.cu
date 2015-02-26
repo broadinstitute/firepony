@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if 0
+
 #include <gamgee/variant/variant_reader.h>
 
 #include <string>
@@ -191,3 +193,5 @@ bool load_vcf(variant_database_host *output, reference_file_handle *reference_ha
 }
 
 } // namespace firepony
+
+#endif

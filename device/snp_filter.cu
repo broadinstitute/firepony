@@ -161,6 +161,8 @@ void build_alignment_windows(firepony_context<system>& context, const alignment_
 }
 INSTANTIATE(build_alignment_windows);
 
+#if 0
+
 template <target_system system>
 struct compute_vcf_ranges : public lambda<system>
 {
@@ -419,6 +421,7 @@ void filter_known_snps(firepony_context<system>& context, const alignment_batch<
                                filter_bps<system>(context, batch.device));
 }
 INSTANTIATE(filter_known_snps);
+#endif
 
 } // namespace firepony
 

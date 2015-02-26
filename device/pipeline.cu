@@ -93,10 +93,12 @@ void firepony_process_batch(firepony_context<system>& context, const alignment_b
         filter_bases(context, batch);
         bp_filter.stop();
 
+#if 0
         // filter known SNPs from active_loc_list
         snp_filter.start();
         filter_known_snps(context, batch);
         snp_filter.stop();
+#endif
 
         // compute the base alignment quality for each read
         baq.start();
@@ -233,10 +235,10 @@ void debug_read(firepony_context<system>& context, const alignment_batch<system>
             h_batch.alignment_start[read_index],
             alignment_window.x,
             alignment_window.y);
-
+#if 0
     const uint2 vcf_range = context.snp_filter.active_vcf_ranges[read_index];
     fprintf(stderr, "  active VCF range: [%u, %u[\n", vcf_range.x, vcf_range.y);
-
+#endif
     fprintf(stderr, "\n");
 }
 INSTANTIATE(debug_read);

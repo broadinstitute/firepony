@@ -32,8 +32,8 @@
 #include "device/primitives/parallel.h"
 
 #include "alignment_data_device.h"
-#include "sequence_data_device.h"
-#include "variant_data_device.h"
+#include "../sequence_database.h"
+#include "../variant_database.h"
 
 #include "baq.h"
 #include "firepony_context.h"
@@ -227,9 +227,8 @@ void debug_read(firepony_context<system>& context, const alignment_batch<system>
     debug_baq(context, batch, read_index);
 
     const uint2 alignment_window = context.alignment_windows[read_index];
-    fprintf(stderr, "  sequence name [%s]\n  sequence base [%lu]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
-            context.reference.host.sequence_names.lookup(h_batch.chromosome[read_index]).c_str(),
-            context.reference.host.sequence_bp_start[h_batch.chromosome[read_index]],
+    fprintf(stderr, "  sequence name [%s]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
+            context.reference_db.host.sequence_names.lookup(h_batch.chromosome[read_index]).c_str(),
             h_batch.alignment_start[read_index],
             alignment_window.x,
             alignment_window.y);

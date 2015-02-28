@@ -22,12 +22,10 @@ read_filters.cu
 read_filters.h
 read_group_table.cu
 read_group_table.h
-sequence_data_device.h
 snp_filter.cu
 snp_filter.h
 util.cu
 util.h
-variant_data_device.h
 
 covariates/bit_packers/bit_packing.h
 covariates/bit_packers/context.h

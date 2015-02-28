@@ -33,6 +33,7 @@
 #include "types.h"
 #include "string_database.h"
 #include "device/primitives/vector.h"
+#include "sequence_database.h"
 
 namespace firepony {
 
@@ -141,7 +142,7 @@ struct alignment_batch_storage
     uint32 data_mask;
 
     // chromosome index of the read
-    vector<system, uint32> chromosome;
+    vector<system, uint16> chromosome;
     // the reference position of the first base in the read
     vector<system, uint32> alignment_start;
     // (1-based and inclusive) alignment stop position
@@ -187,8 +188,8 @@ struct alignment_batch_host : public alignment_batch_storage<host>
 {
     // data that never gets copied to the device
     h_vector<std::string> name;
-    // which generation of the reference data does this batch require?
-    uint32 reference_generation;
+    // map of chromosomes referenced by this batch
+    resident_segment_map chromosome_map;
 
     const CRQ_index crq_index(uint32 read_id) const
     {
@@ -200,12 +201,11 @@ struct alignment_batch_host : public alignment_batch_storage<host>
                          qual_len[read_id]);
     }
 
-    void reset(uint32 data_mask, uint32 batch_size)
+    void reset(uint32 data_mask, uint32 batch_size, sequence_database_host& reference)
     {
         num_reads = 0;
         max_read_size = 0;
         this->data_mask = data_mask;
-        reference_generation = uint32(-1);
 
         name.clear();
         chromosome.clear();
@@ -302,6 +302,8 @@ struct alignment_batch_host : public alignment_batch_storage<host>
         {
             read_group.reserve(batch_size);
         }
+
+        chromosome_map = reference.empty_segment_map();
     }
 };
 

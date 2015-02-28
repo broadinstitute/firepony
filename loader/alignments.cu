@@ -130,7 +130,7 @@ bool alignment_file::next_batch(alignment_batch_host *batch, uint32 data_mask, r
 {
     uint32 read_id;
 
-    batch->reset(data_mask, batch_size);
+    batch->reset(data_mask, batch_size, reference->sequence_data);
 
     for(read_id = 0; read_id < batch_size; read_id++, ++iterator)
     {
@@ -150,9 +150,11 @@ bool alignment_file::next_batch(alignment_batch_host *batch, uint32 data_mask, r
 
             if (seq_valid)
             {
-                batch->chromosome.push_back(reference->sequence_data.sequence_names.lookup(sequence_name));
+                uint16 seq_id = reference->sequence_data.sequence_names.lookup(sequence_name);
+                batch->chromosome.push_back(seq_id);
+                batch->chromosome_map.mark_resident(seq_id);
             } else {
-                batch->chromosome.push_back(uint32(-1));
+                batch->chromosome.push_back(uint16(-1));
             }
         }
 
@@ -279,7 +281,6 @@ bool alignment_file::next_batch(alignment_batch_host *batch, uint32 data_mask, r
     if (read_id == 0)
         return false;
 
-    batch->reference_generation = reference->sequence_data.generation;
     return true;
 }
 

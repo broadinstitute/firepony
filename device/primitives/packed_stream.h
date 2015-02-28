@@ -214,6 +214,12 @@ struct packed_stream
         return m_size;
     }
 
+    // returns a copy of the current stream with an offset applied to the index
+    CUDA_HOST_DEVICE packed_stream offset(const sindex_type offset) const
+    {
+        return type(m_stream, m_size, m_index + offset);
+    }
+
 private:
     stream_type m_stream;
     size_t m_size;

@@ -27,8 +27,11 @@
 
 #pragma once
 
+#include "../variant_database.h"
+#include "../sequence_database.h"
+
 namespace firepony {
 
-bool load_vcf(variant_database_host *output, reference_file_handle *reference_handle, const char *filename, uint32 data_mask);
+bool load_vcf(variant_database_host *output, reference_file_handle *reference_handle, const char *filename);
 
 } // namespace firepony

@@ -29,78 +29,83 @@
 
 #include "types.h"
 #include "string_database.h"
+#include "segmented_database.h"
 
 namespace firepony {
 
-namespace SequenceDataMask
-{
-    enum
-    {
-        BASES       = 0x001,
-        QUALITIES   = 0x002,
-        NAMES       = 0x004,
-    };
-}
-
+// sequence storage for a single chromosome
 template <target_system system>
-struct sequence_data_storage
+struct sequence_storage
 {
-    // the generation counter is used to check if the GPU vs CPU versions are out of date
-    uint32 generation;
-
-    uint32 data_mask;
-    uint32 num_sequences;
-
     packed_vector<system, 4> bases;
-    vector<system, uint8> qualities;
 
-    vector<system, uint32> sequence_id;
-    // note: bases and quality indexes may not match if sequences are padded to dword length
-    vector<system, uint64> sequence_bp_start;
-    vector<system, uint64> sequence_bp_len;
-    vector<system, uint64> sequence_qual_start;
-    vector<system, uint64> sequence_qual_len;
-
-    CUDA_HOST sequence_data_storage()
-        : generation(0),
-          num_sequences(0)
-    { }
+    sequence_storage<system>& operator=(const sequence_storage<host>& other)
+    {
+        bases = other.bases;
+        return *this;
+    }
 
     struct const_view
     {
-        uint32 data_mask;
-        uint32 num_sequences;
-
         typename packed_vector<system, 4>::const_view bases;
-        typename vector<system, uint8>::const_view qualities;
-        typename vector<system, uint32>::const_view sequence_id;
-        typename vector<system, uint64>::const_view sequence_bp_start;
-        typename vector<system, uint64>::const_view sequence_bp_len;
-        typename vector<system, uint64>::const_view sequence_qual_start;
-        typename vector<system, uint64>::const_view sequence_qual_len;
     };
 
-    CUDA_HOST operator const_view() const
+    operator const_view() const
     {
         const_view v = {
-                data_mask,
-                num_sequences,
-                bases,
-                qualities,
-                sequence_id,
-                sequence_bp_start,
-                sequence_bp_len,
-                sequence_qual_start,
-                sequence_qual_len,
+            bases,
         };
 
         return v;
     }
 };
 
-struct sequence_data_host : public sequence_data_storage<host>
+template <target_system system>
+struct sequence_database_storage : public segmented_database_storage<system, sequence_storage>
 {
+    // shorthand for base type
+    typedef segmented_database_storage<system, sequence_storage> base;
+    using base::storage;
+    using base::views;
+
+    struct const_view : public base::const_view
+    {
+        // grab a reference to the sequence stream at a given coordinate
+        CUDA_HOST_DEVICE
+        typename packed_vector<system, 4>::const_stream_type get_sequence_data(uint16 id, uint32 offset)
+        {
+            auto& d = base::const_view::get_chromosome(id);
+            return d.bases.offset(offset);
+        }
+    };
+
+    const_view view() const
+    {
+        base::update_views();
+
+        const_view v;
+        v.data = views;
+        return v;
+    }
+
+    operator const_view() const
+    {
+        return view();
+    }
+};
+
+struct sequence_database_host : public sequence_database_storage<host>
+{
+    // host-only data
     string_database sequence_names;
 };
+
+// device storage is identical to the generic version
+template <target_system system>
+using sequence_database_device = sequence_database_storage<system>;
+
+// define the sequence_database type as a segmented_database for the storage types defined above
+template <target_system system>
+using sequence_database = segmented_database<system, sequence_database_host, sequence_database_device>;
 
 } // namespace firepony

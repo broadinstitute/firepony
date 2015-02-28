@@ -163,7 +163,17 @@ struct compute_vcf_ranges : public lambda<system>
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const auto& db = ctx.variant_db.get_chromosome(batch.chromosome[read_index]);
+        // check if we know the chromosome for this read
+        auto ch = batch.chromosome[read_index];
+        if (ch >= ctx.variant_db.data.size())
+        {
+            // dbsnp does not reference this chromosome
+            // mark read as inactive for VCF search and exit
+            ctx.snp_filter.active_vcf_ranges[read_index] = make_uint2(uint32(-1), uint32(-1));
+            return;
+        }
+
+        const auto& db = ctx.variant_db.get_chromosome(ch);
 
         // figure out the genome alignment window for this read
         const ushort2& reference_window_clipped = ctx.cigar.reference_window_clipped[read_index];

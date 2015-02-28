@@ -227,7 +227,10 @@ public:
     void update_resident_set(const segmented_database_storage<host, chromosome_storage>& db,
                              const resident_segment_map& target_resident_set)
     {
-        assert(db.storage.size() == target_resident_set.size());
+        // note: the resident segment map can in some cases be larger than the current database
+        // this can happen if a chromosome referenced in the alignment input is present in the reference
+        // but not the dbsnp
+        assert(target_resident_set.size() >= db.storage.size());
 
         // make sure we have enough slots in the database
         if (storage.size() != db.storage.size())
@@ -245,7 +248,7 @@ public:
             }
         }
 
-        for(uint32 i = 0; i < target_resident_set.size(); i++)
+        for(uint32 i = 0; i < db.storage.size(); i++)
         {
             if (target_resident_set.is_resident(i))
             {

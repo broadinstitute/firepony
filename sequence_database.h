@@ -85,6 +85,8 @@ struct sequence_database_storage : public segmented_database_storage<system, seq
 
     const_view view() const
     {
+        base::update_views();
+
         const_view v;
         v.data = views;
         return v;

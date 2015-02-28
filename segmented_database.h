@@ -140,6 +140,48 @@ struct segmented_database_storage
     vector<system, chromosome_storage<system> *> storage;
     // vector with views that are used for device code
     vector<system, chromosome_view> views;
+    // indicates whether the views need updating
+    bool views_dirty;
+
+    segmented_database_storage()
+    {
+        dirty();
+    }
+
+    // marks the storage as dirty, meaning that the views are out of date
+    void dirty(void)
+    {
+        views_dirty = true;
+    }
+
+    // updates all views and clears the dirty bit
+    void update_views(void)
+    {
+        if (views_dirty)
+        {
+            views.resize(storage.size());
+
+            for(size_t i = 0; i < storage.size(); i++)
+            {
+                if (storage[i] == nullptr)
+                {
+                    views[i] = chromosome_view();
+                } else {
+                    views[i] = *storage[i];
+                }
+            }
+
+            views_dirty = false;
+        }
+    }
+
+    void update_views(void) const
+    {
+        // this is semantically a const operation, but the compiler doesn't know it
+        // cast away our constness
+        auto *me = const_cast<segmented_database_storage<system, chromosome_storage> *>(this);
+        me->update_views();
+    }
 
     // creates an entry for a given sequence ID
     // returns nullptr if the given ID already exists in the database
@@ -163,12 +205,15 @@ struct segmented_database_storage
 
         chromosome_storage<system> *ret = new chromosome_storage<system>();
         storage[id] = ret;
+        dirty();
         return ret;
     }
 
     // look up a sequence in the database and return a reference
     chromosome_storage<system>& get_sequence(uint16 id)
     {
+        // assume that the storage is going to be changed and set the dirty bit
+        dirty();
         return *storage[id];
     }
 
@@ -186,8 +231,10 @@ private:
         {
             delete storage[i];
             storage[i] = nullptr;
-            // this implicitly creates an invalid view (view.id == -1)
-            views[i] = chromosome_view();
+
+            // note: we update the views immediately to avoid setting the dirty bit
+            // this prevents us from having to rebuild the views array every time
+            views[i] = chromosome_view(); // implicitly creates an invalid view (view.id == -1)
         }
     }
 
@@ -201,7 +248,9 @@ private:
             storage[i] = new chromosome_storage<system>();
             // copy to device
             *storage[i] = *db.storage[i];
-            // set up the corresponding view
+
+            // note: we update the views immediately to avoid setting the dirty bit
+            // this prevents us from having to rebuild the views array every time
             views[i] = *storage[i];
         }
     }
@@ -220,6 +269,7 @@ public:
             size_t old_size = storage.size();
             storage.resize(db.storage.size());
             views.resize(db.storage.size());
+            dirty();
 
             for(size_t i = old_size; i < db.storage.size(); i++)
             {
@@ -261,6 +311,8 @@ public:
     // explicit conversion to const_view
     const_view view() const
     {
+        update_views();
+
         // note: initializer list construction doesn't work here because we don't know what the derived type constructor is
         const_view v;
         v.data = views;

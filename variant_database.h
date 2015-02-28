@@ -86,25 +86,6 @@ template <target_system system>
 using variant_database_device = variant_database_storage<system>;
 
 template <target_system system>
-struct variant_database
-{
-    const variant_database_host& host;
-    variant_database_device<system> device;
-
-    variant_database(const variant_database_host& host)
-        : host(host)
-    { }
-
-    resident_segment_map empty_segment_map(void) const
-    {
-        return host.empty_segment_map();
-    }
-
-    void update_resident_set(const resident_segment_map& target_resident_set)
-    {
-        device.update_resident_set(host, target_resident_set);
-    }
-};
+using variant_database = segmented_database<system, variant_database_host, variant_database_device>;
 
 } // namespace firepony
-

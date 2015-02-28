@@ -35,7 +35,7 @@ namespace firepony {
 
 typedef segmented_coordinate<uint32> sequence_coordinate;
 
-// data type for the segmented database
+// sequence storage for a single chromosome
 template <target_system system>
 struct sequence_storage : public segmented_storage<system>
 {
@@ -104,28 +104,12 @@ struct sequence_database_host : public sequence_database_storage<host>
     string_database sequence_names;
 };
 
+// device storage is identical to the generic version
 template <target_system system>
 using sequence_database_device = sequence_database_storage<system>;
 
+// define the sequence_database type as a segmented_database for the storage types defined above
 template <target_system system>
-struct sequence_database
-{
-    const sequence_database_host& host;
-    sequence_database_device<system> device;
-
-    sequence_database(const sequence_database_host& host)
-        : host(host)
-    { }
-
-    resident_segment_map empty_segment_map(void) const
-    {
-        return host.empty_segment_map();
-    }
-
-    void update_resident_set(const resident_segment_map& target_resident_set)
-    {
-        device.update_resident_set(host, target_resident_set);
-    }
-};
+using sequence_database = segmented_database<system, sequence_database_host, sequence_database_device>;
 
 } // namespace firepony

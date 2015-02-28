@@ -651,8 +651,8 @@ struct hmm_glocal : public lambda<system>
         // xxxnsubtil: hmm_reference_window.x is expected to be negative for most cases
         // reads aligning to the start of a chromosome will yield undefined results here
         // it's unclear to me how GATK handles this case
-        referenceBases = ctx.reference_db.get_sequence_data({batch.chromosome[read_index],
-                                                             batch.alignment_start[read_index] + hmm_reference_window.x});
+        referenceBases = ctx.reference_db.get_sequence_data(batch.chromosome[read_index],
+                                                            batch.alignment_start[read_index] + hmm_reference_window.x);
 
         inputQualities = &batch.qualities[idx.qual_start] + queryStart;
 

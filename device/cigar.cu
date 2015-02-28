@@ -636,8 +636,8 @@ struct compute_error_vectors : public lambda<system>
         const CRQ_index idx = batch.crq_index(read_index);
         const bool negative_strand = batch.flags[read_index] & AlignmentFlags::REVERSE;
 
-        auto reference = ctx.reference_db.get_sequence_data({ batch.chromosome[read_index],
-                                                              batch.alignment_start[read_index] });
+        auto reference = ctx.reference_db.get_sequence_data(batch.chromosome[read_index],
+                                                            batch.alignment_start[read_index]);
 
         const auto read_window_clipped = ctx.cigar.read_window_clipped[read_index];
         const auto reference_window_clipped = ctx.cigar.reference_window_clipped[read_index];
@@ -1093,8 +1093,8 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
     }
     fprintf(stderr, "]\n");
 
-    auto reference = context.reference_db.host.view().get_sequence_data({ h_batch.chromosome[read_index],
-                                                                          h_batch.alignment_start[read_index] });
+    auto reference = context.reference_db.host.view().get_sequence_data(h_batch.chromosome[read_index],
+                                                                        h_batch.alignment_start[read_index]);
 
     fprintf(stderr, "    reference sequence data     = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)

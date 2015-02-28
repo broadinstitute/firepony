@@ -32,13 +32,6 @@
 
 namespace firepony {
 
-template <typename T>
-struct segmented_coordinate
-{
-    uint16 id;
-    T coordinate;
-};
-
 // base struct for per-chromosome data
 template <target_system system>
 struct segmented_storage
@@ -298,13 +291,6 @@ public:
         const typename chromosome_storage<system>::const_view& get_chromosome(uint16 id)
         {
             return data[id];
-        }
-
-        template <typename T>
-        CUDA_HOST_DEVICE
-        const typename chromosome_storage<system>::const_view& get_chromosome(segmented_coordinate<T> coord)
-        {
-            return get_chromosome(coord.id);
         }
     };
 

@@ -33,8 +33,6 @@
 
 namespace firepony {
 
-typedef segmented_coordinate<uint32> sequence_coordinate;
-
 // sequence storage for a single chromosome
 template <target_system system>
 struct sequence_storage : public segmented_storage<system>
@@ -76,10 +74,10 @@ struct sequence_database_storage : public segmented_database_storage<system, seq
     {
         // grab a reference to the sequence stream at a given coordinate
         CUDA_HOST_DEVICE
-        typename packed_vector<system, 4>::const_stream_type get_sequence_data(sequence_coordinate coord)
+        typename packed_vector<system, 4>::const_stream_type get_sequence_data(uint16 id, uint32 offset)
         {
-            auto& d = base::const_view::get_chromosome(coord.id);
-            return d.bases.offset(coord.coordinate);
+            auto& d = base::const_view::get_chromosome(id);
+            return d.bases.offset(offset);
         }
     };
 

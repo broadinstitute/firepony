@@ -32,32 +32,6 @@
 
 namespace firepony {
 
-// base struct for per-chromosome data
-template <target_system system>
-struct segmented_storage
-{
-    // sequence ID for this entry
-    uint16 id;
-
-    segmented_storage()
-        : id(uint16(-1))
-    { }
-
-    struct const_view
-    {
-        uint16 id;
-    };
-
-    operator const_view() const
-    {
-        const_view v = {
-            id,
-        };
-
-        return v;
-    }
-};
-
 // represents a resident set for the segmented database
 struct resident_segment_map
 {
@@ -120,8 +94,8 @@ struct resident_segment_map
 };
 
 // a generic database segmented by chromosome, used for both reference and variant data
-// storage type is meant to be a structure derived from segmented_storage that holds the data
-// for a given chromosome
+// storage type is meant to be a structure that holds the data for a given chromosome
+// it must contain a const_view type and implement the appropriate conversion operator
 template <target_system system,
           template <target_system __unused> class chromosome_storage>
 struct segmented_database_storage

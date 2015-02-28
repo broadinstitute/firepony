@@ -35,29 +35,27 @@ namespace firepony {
 
 // sequence storage for a single chromosome
 template <target_system system>
-struct sequence_storage : public segmented_storage<system>
+struct sequence_storage
 {
-    typedef segmented_storage<system> base;
-
     packed_vector<system, 4> bases;
 
     sequence_storage<system>& operator=(const sequence_storage<host>& other)
     {
-        base::id = other.id;
         bases = other.bases;
         return *this;
     }
 
-    struct const_view : public segmented_storage<system>::const_view
+    struct const_view
     {
         typename packed_vector<system, 4>::const_view bases;
     };
 
     operator const_view() const
     {
-        const_view v;
-        v.id = base::id;
-        v.bases = bases;
+        const_view v = {
+            bases,
+        };
+
         return v;
     }
 };

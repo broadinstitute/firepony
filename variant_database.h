@@ -37,10 +37,8 @@ namespace firepony {
 
 // data type for the segmented database
 template <target_system system>
-struct variant_storage : public segmented_storage<system>
+struct variant_storage
 {
-    typedef segmented_storage<system> base;
-
     vector<system, uint32> feature_start;           // feature start position in the reference
     vector<system, uint32> feature_stop;            // feature stop position in the reference
 
@@ -50,7 +48,6 @@ struct variant_storage : public segmented_storage<system>
 
     variant_storage<system>& operator=(const variant_storage<host>& other)
     {
-        base::id = other.id;
         feature_start = other.feature_start;
         feature_stop = other.feature_stop;
         // xxxnsubtil: recompute this instead of moving across PCIE?
@@ -58,7 +55,7 @@ struct variant_storage : public segmented_storage<system>
         return *this;
     }
 
-    struct const_view : public segmented_storage<system>::const_view
+    struct const_view
     {
         typename vector<system, uint32>::const_view feature_start;
         typename vector<system, uint32>::const_view feature_stop;
@@ -67,11 +64,12 @@ struct variant_storage : public segmented_storage<system>
 
     operator const_view() const
     {
-        const_view v;
-        v.id = base::id;
-        v.feature_start = feature_start;
-        v.feature_stop = feature_stop;
-        v.max_end_point_left = max_end_point_left;
+        const_view v = {
+            feature_start,
+            feature_stop,
+            max_end_point_left,
+        };
+
         return v;
     }
 };

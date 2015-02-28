@@ -30,12 +30,11 @@
 #include "../types.h"
 #include "alignment_data_device.h"
 #include "../sequence_database.h"
-#include "variant_data_device.h"
+#include "../variant_database.h"
 #include "util.h"
 
 namespace firepony {
 
-#if 0
 template <target_system system>
 struct snp_filter_context
 {
@@ -59,14 +58,10 @@ struct snp_filter_context
         return v;
     }
 };
-#endif
 
 template <target_system system> void build_read_offset_list(firepony_context<system>& context, const alignment_batch<system>& batch);
 template <target_system system> void build_alignment_windows(firepony_context<system>& context, const alignment_batch<system>& batch);
-
-#if 0
 template <target_system system> void filter_known_snps(struct firepony_context<system>& context, const alignment_batch<system>& batch);
-#endif
 
 } // namespace firepony
 

@@ -167,12 +167,12 @@ struct segmented_database_storage
     }
 
     // look up a sequence in the database and return a reference
-    const chromosome_storage<system>& get_sequence(uint16 id)
+    chromosome_storage<system>& get_sequence(uint16 id)
     {
         return *storage[id];
     }
 
-    // returns a resident segment map of the right size for the current databasewith all entries marked non-resident
+    // returns a resident segment map of the right size for the current database with all entries marked non-resident
     resident_segment_map empty_segment_map(void) const
     {
         return resident_segment_map(storage.size());

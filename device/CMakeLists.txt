@@ -26,7 +26,6 @@ snp_filter.cu
 snp_filter.h
 util.cu
 util.h
-variant_data_device.h
 
 covariates/bit_packers/bit_packing.h
 covariates/bit_packers/context.h

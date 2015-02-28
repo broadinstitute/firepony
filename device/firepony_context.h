@@ -32,7 +32,7 @@
 
 #include "alignment_data_device.h"
 #include "../sequence_database.h"
-#include "variant_data_device.h"
+#include "../variant_database.h"
 #include "snp_filter.h"
 #include "covariates.h"
 #include "cigar.h"
@@ -121,9 +121,7 @@ struct firepony_context
     const runtime_options& options;
 
     const alignment_header<system>& bam_header;
-#if 0
     const variant_database<system>& variant_db;
-#endif
     const sequence_database<system>& reference_db;
 
     // sorted list of active reads
@@ -148,9 +146,7 @@ struct firepony_context
     vector<system, uint8>  temp_u8;
 
     // various pipeline states go here
-#if 0
     snp_filter_context<system> snp_filter;
-#endif
     cigar_context<system> cigar;
     baq_context<system> baq;
     covariates_context<system> covariates;
@@ -162,25 +158,23 @@ struct firepony_context
     firepony_context(const int compute_device,
                      const runtime_options& options,
                      const alignment_header<system>& bam_header,
-                     const sequence_database<system>& reference_db
-                     /* const variant_database<system>& variant_db */ )
+                     const sequence_database<system>& reference_db,
+                     const variant_database<system>& variant_db)
         : compute_device(compute_device),
           options(options),
           bam_header(bam_header),
-          reference_db(reference_db)
-//          variant_db(variant_db)
+          reference_db(reference_db),
+          variant_db(variant_db)
     { }
 
     struct view
     {
         typename alignment_header_device<system>::const_view    bam_header;
-#if 0
         typename variant_database_device<system>::const_view    variant_db;
-#endif
         typename sequence_database_device<system>::const_view   reference_db;
         typename vector<system, uint32>::view                   active_read_list;
         typename vector<system, uint2>::view                    alignment_windows;
-        typename d_vector_active_location_list<system>::view      active_location_list;
+        typename d_vector_active_location_list<system>::view    active_location_list;
         typename vector<system, uint16>::view                   read_offset_list;
         typename vector<system, uint8>::view                    temp_storage;
         typename vector<system, uint32>::view                   temp_u32;
@@ -188,9 +182,7 @@ struct firepony_context
         typename vector<system, uint32>::view                   temp_u32_3;
         typename vector<system, uint32>::view                   temp_u32_4;
         typename vector<system, uint8>::view                    temp_u8;
-#if 0
         typename snp_filter_context<system>::view               snp_filter;
-#endif
         typename cigar_context<system>::view                    cigar;
         typename baq_context<system>::view                      baq;
         typename covariates_context<system>::view               covariates;
@@ -201,9 +193,7 @@ struct firepony_context
     {
         view v = {
             bam_header.device,
-#if 0
             variant_db.device,
-#endif
             reference_db.device,
             active_read_list,
             alignment_windows,
@@ -215,9 +205,7 @@ struct firepony_context
             temp_u32_3,
             temp_u32_4,
             temp_u8,
-#if 0
             snp_filter,
-#endif
             cigar,
             baq,
             covariates,

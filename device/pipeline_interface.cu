@@ -29,7 +29,7 @@
 
 #include "alignment_data_device.h"
 #include "../sequence_database.h"
-#include "variant_data_device.h"
+#include "../variant_database.h"
 
 #include "device/primitives/backends.h"
 
@@ -59,9 +59,7 @@ struct firepony_device_pipeline : public firepony_pipeline
 
     alignment_header<system> *header;
     sequence_database<system> *reference;
-#if 0
     variant_database<system> *dbsnp;
-#endif
 
     firepony_context<system> *context;
     alignment_batch<system> *batch;
@@ -95,8 +93,8 @@ struct firepony_device_pipeline : public firepony_pipeline
     virtual void setup(io_thread *reader,
                        const runtime_options *options,
                        alignment_header_host *h_header,
-                       sequence_database_host *h_reference
-                       /* variant_database_host *h_dbsnp */ ) override
+                       sequence_database_host *h_reference,
+                       variant_database_host *h_dbsnp) override
     {
 #if ENABLE_CUDA_BACKEND
         if (system == cuda)
@@ -109,16 +107,11 @@ struct firepony_device_pipeline : public firepony_pipeline
 
         header = new alignment_header<system>(*h_header);
         reference = new sequence_database<system>(*h_reference);
-#if 0
         dbsnp = new variant_database<system>(*h_dbsnp);
-#endif
 
         header->download();
-#if 0
-        dbsnp->download();
-#endif
 
-        context = new firepony_context<system>(compute_device, *options, *header, *reference /* , *dbsnp */);
+        context = new firepony_context<system>(compute_device, *options, *header, *reference, *dbsnp);
         batch = new alignment_batch<system>();
     }
 
@@ -200,8 +193,9 @@ private:
                 break;
             }
 
-            // download/evict reference segments
-            reference->device.update_resident_set(reference->host, h_batch->chromosome_map);
+            // download/evict reference and dbsnp segments
+            reference->update_resident_set(h_batch->chromosome_map);
+            dbsnp->update_resident_set(h_batch->chromosome_map);
 
             // download alignment data to the device
             batch->download(h_batch);

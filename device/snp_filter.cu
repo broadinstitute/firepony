@@ -156,8 +156,6 @@ void build_alignment_windows(firepony_context<system>& context, const alignment_
 }
 INSTANTIATE(build_alignment_windows);
 
-#if 0
-
 template <target_system system>
 struct compute_vcf_ranges : public lambda<system>
 {
@@ -165,15 +163,12 @@ struct compute_vcf_ranges : public lambda<system>
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const auto& db = ctx.variant_db;
+        const auto& db = ctx.variant_db.get_chromosome(batch.chromosome[read_index]);
 
         // figure out the genome alignment window for this read
         const ushort2& reference_window_clipped = ctx.cigar.reference_window_clipped[read_index];
 
-        const uint32 ref_sequence_id = batch.chromosome[read_index];
-        const uint32 ref_sequence_base = ctx.reference.sequence_bp_start[ref_sequence_id];
-        const uint32 ref_sequence_offset = ref_sequence_base + batch.alignment_start[read_index];
-
+        const uint32 ref_sequence_offset = batch.alignment_start[read_index];
         const uint2 alignment_window = make_uint2(ref_sequence_offset + uint32(reference_window_clipped.x),
                                                   ref_sequence_offset + uint32(reference_window_clipped.y));
 
@@ -236,16 +231,11 @@ struct filter_bps : public lambda<system>
 public:
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const auto& db = ctx.variant_db;
+        const auto& db = ctx.variant_db.get_chromosome(batch.chromosome[read_index]);
 
         const CRQ_index& idx = batch.crq_index(read_index);
         const ushort2& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
         const ushort2& reference_window_clipped = ctx.cigar.reference_window_clipped[read_index];
-
-        // figure out the genome alignment window for this read
-        const uint32 ref_sequence_id = batch.chromosome[read_index];
-        const uint32 ref_sequence_base = ctx.reference.sequence_bp_start[ref_sequence_id];
-        const uint32 ref_sequence_offset = ref_sequence_base + batch.alignment_start[read_index];
 
         uint2 vcf_db_range = ctx.snp_filter.active_vcf_ranges[read_index];
 
@@ -256,8 +246,8 @@ public:
         for(uint32 feature = vcf_db_range.x; feature <= vcf_db_range.y; feature++)
         {
             // compute the feature range as offset from alignment start
-            const int feature_start = db.feature_start[feature] - ref_sequence_offset;
-            const int feature_end = db.feature_stop[feature] - ref_sequence_offset;
+            const int feature_start = db.feature_start[feature];
+            const int feature_end = db.feature_stop[feature];
 
             // locate a starting point for matching the feature along the read: search for the first read bp with a known reference coordinate inside our feature
             uint32 ev;
@@ -416,7 +406,5 @@ void filter_known_snps(firepony_context<system>& context, const alignment_batch<
                                filter_bps<system>(context, batch.device));
 }
 INSTANTIATE(filter_known_snps);
-#endif
 
 } // namespace firepony
-

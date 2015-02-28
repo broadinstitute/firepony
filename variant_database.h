@@ -31,87 +31,67 @@
 #include "string_database.h"
 #include "segmented_database.h"
 
-namespace firepony {
+#include <vector>
 
-typedef segmented_coordinate<uint32> sequence_coordinate;
+namespace firepony {
 
 // data type for the segmented database
 template <target_system system>
-struct sequence_storage : public segmented_storage<system>
+struct variant_storage : public segmented_storage<system>
 {
     typedef segmented_storage<system> base;
 
-    packed_vector<system, 4> bases;
+    vector<system, uint32> feature_start;           // feature start position in the reference
+    vector<system, uint32> feature_stop;            // feature stop position in the reference
 
-    sequence_storage<system>& operator=(const sequence_storage<host>& other)
+    // contains a prefix scan of the end points using max as the operator
+    // each element encodes the maximum end point of any feature to the left of it
+    vector<system, uint32> max_end_point_left;
+
+    variant_storage<system>& operator=(const variant_storage<host>& other)
     {
         base::id = other.id;
-        bases = other.bases;
+        feature_start = other.feature_start;
+        feature_stop = other.feature_stop;
+        // xxxnsubtil: recompute this instead of moving across PCIE?
+        max_end_point_left = other.max_end_point_left;
         return *this;
     }
 
     struct const_view : public segmented_storage<system>::const_view
     {
-        typename packed_vector<system, 4>::const_view bases;
+        typename vector<system, uint32>::const_view feature_start;
+        typename vector<system, uint32>::const_view feature_stop;
+        typename vector<system, uint32>::const_view max_end_point_left;
     };
 
     operator const_view() const
     {
         const_view v;
         v.id = base::id;
-        v.bases = bases;
+        v.feature_start = feature_start;
+        v.feature_stop = feature_stop;
+        v.max_end_point_left = max_end_point_left;
         return v;
     }
 };
 
+// variant database storage reduces to a specialization of segmented_database_storage
 template <target_system system>
-struct sequence_database_storage : public segmented_database_storage<system, sequence_storage>
-{
-    // shorthand for base type
-    typedef segmented_database_storage<system, sequence_storage> base;
-    using base::storage;
-    using base::views;
+using variant_database_storage = segmented_database_storage<system, variant_storage>;
 
-    struct const_view : public base::const_view
-    {
-        // grab a reference to the sequence stream at a given coordinate
-        CUDA_HOST_DEVICE
-        typename packed_vector<system, 4>::const_stream_type get_sequence_data(sequence_coordinate coord)
-        {
-            auto& d = base::const_view::get_chromosome(coord.id);
-            return d.bases.offset(coord.coordinate);
-        }
-    };
-
-    const_view view() const
-    {
-        const_view v;
-        v.data = views;
-        return v;
-    }
-
-    operator const_view() const
-    {
-        return view();
-    }
-};
-
-struct sequence_database_host : public sequence_database_storage<host>
-{
-    // host-only data
-    string_database sequence_names;
-};
+typedef variant_database_storage<host> variant_database_host;
 
 template <target_system system>
-using sequence_database_device = sequence_database_storage<system>;
+using variant_database_device = variant_database_storage<system>;
 
 template <target_system system>
-struct sequence_database
+struct variant_database
 {
-    const sequence_database_host& host;
-    sequence_database_device<system> device;
+    const variant_database_host& host;
+    variant_database_device<system> device;
 
-    sequence_database(const sequence_database_host& host)
+    variant_database(const variant_database_host& host)
         : host(host)
     { }
 
@@ -127,3 +107,4 @@ struct sequence_database
 };
 
 } // namespace firepony
+

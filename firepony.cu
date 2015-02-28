@@ -29,8 +29,6 @@
 
 #include "alignment_data.h"
 #include "sequence_database.h"
-#include "variant_data.h"
-
 #include "types.h"
 #include "command_line.h"
 #include "io_thread.h"
@@ -40,6 +38,7 @@
 #include "loader/variants.h"
 
 #include "device/pipeline.h"
+#include "variant_database.h"
 
 #include "version.h"
 
@@ -157,9 +156,7 @@ int main(int argc, char **argv)
 
     reference_file_handle *ref_h;
     variant_database_host h_dbsnp;
-#if 0
     bool ret;
-#endif
 
     fprintf(stderr, "Firepony v%d.%d.%d\n", FIREPONY_VERSION_MAJOR, FIREPONY_VERSION_MINOR, FIREPONY_VERSION_REV);
     parse_command_line(argc, argv);
@@ -202,11 +199,9 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-#if 0
     fprintf(stderr, "loading variant database %s...", command_line_options.snp_database);
     fflush(stderr);
-    ret = load_vcf(&h_dbsnp, ref_h, command_line_options.snp_database,
-                   VariantDataMask::CHROMOSOME | VariantDataMask::ALIGNMENT);
+    ret = load_vcf(&h_dbsnp, ref_h, command_line_options.snp_database);
     fprintf(stderr, "\n");
 
     if (ret == false)
@@ -214,7 +209,6 @@ int main(int argc, char **argv)
         fprintf(stderr, "failed to load variant database %s\n", command_line_options.snp_database);
         exit(1);
     }
-#endif
 
     data_io.stop();
 
@@ -239,8 +233,8 @@ int main(int argc, char **argv)
         d->setup(&reader,
                  &command_line_options,
                  &reader.file.header,
-                 &ref_h->sequence_data
-                 /* &h_dbsnp */);
+                 &ref_h->sequence_data,
+                 &h_dbsnp);
     }
 
     fprintf(stderr, "processing file %s...\n", command_line_options.input);

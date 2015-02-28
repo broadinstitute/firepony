@@ -185,48 +185,50 @@ void reference_file_handle::producer_unlock(void)
 
 bool reference_file_handle::make_sequence_available(const std::string& sequence_name)
 {
-    if (!index_available)
+    // check if we already loaded the requested sequence
+    if (sequence_data.sequence_names.lookup(sequence_name) != uint32(-1))
     {
-        return (sequence_data.sequence_names.lookup(sequence_name) != uint32(-1));
-    } else {
-        if (sequence_data.sequence_names.lookup(sequence_name) != uint32(-1))
-        {
-            // sequence already loaded
-            return true;
-        }
-
-        // search for the sequence name in our index
-        auto it = reference_index.find(string_database::hash(sequence_name));
-        if (it == reference_index.end())
-        {
-            // sequence not found in index, can't load
-            return false;
-        }
-
-        // found it, grab the offset
-        size_t offset = it->second;
-
-        // we must seek backwards to the beginning of the header
-        // (faidx points at the beginning of the sequence data, but gamgee needs to parse the header)
-        char c;
-        do {
-            file_handle.seekg(offset);
-            file_handle >> c;
-            file_handle.seekg(offset);
-
-            if (c != '>')
-                offset--;
-        } while(c != '>');
-
-        producer_lock();
-        load_one_sequence(&sequence_data, filename, offset);
-        producer_unlock();
-
-        fprintf(stderr, "+");
-        fflush(stderr);
-
+        // nothing to do
         return true;
     }
+
+    if (!index_available)
+    {
+        // if the index is not available, we can't load sequences on demand
+        return false;
+    }
+
+    // search for the sequence name in the reference file index
+    auto it = reference_index.find(string_database::hash(sequence_name));
+    if (it == reference_index.end())
+    {
+        // sequence not found in index, can't load
+        return false;
+    }
+
+    // found it, grab the offset
+    size_t offset = it->second;
+
+    // we must seek backwards to the beginning of the header
+    // (faidx points at the beginning of the sequence data, but gamgee needs to parse the header)
+    char c;
+    do {
+        file_handle.seekg(offset);
+        file_handle >> c;
+        file_handle.seekg(offset);
+
+        if (c != '>')
+            offset--;
+    } while(c != '>');
+
+    producer_lock();
+    load_one_sequence(&sequence_data, filename, offset);
+    producer_unlock();
+
+    fprintf(stderr, "+");
+    fflush(stderr);
+
+    return true;
 }
 
 } // namespace firepony

@@ -237,6 +237,8 @@ public:
         const ushort2& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
         const ushort2& reference_window_clipped = ctx.cigar.reference_window_clipped[read_index];
 
+        const auto alignment_start = batch.alignment_start[read_index];
+
         uint2 vcf_db_range = ctx.snp_filter.active_vcf_ranges[read_index];
 
         const uint32 cigar_start = ctx.cigar.cigar_offsets[idx.cigar_start];
@@ -246,8 +248,8 @@ public:
         for(uint32 feature = vcf_db_range.x; feature <= vcf_db_range.y; feature++)
         {
             // compute the feature range as offset from alignment start
-            const int feature_start = db.feature_start[feature];
-            const int feature_end = db.feature_stop[feature];
+            const int feature_start = db.feature_start[feature] - alignment_start;
+            const int feature_end = db.feature_stop[feature] - alignment_start;
 
             // locate a starting point for matching the feature along the read: search for the first read bp with a known reference coordinate inside our feature
             uint32 ev;

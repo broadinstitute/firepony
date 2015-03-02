@@ -16,4 +16,4 @@ ExternalProject_Add(tbb
     )
 
 include_directories(${tbb_INSTALL}/include)
-set(tbb_LIB ${tbb_INSTALL}/lib/libtbb.so)
+set(tbb_LIB ${tbb_INSTALL}/lib/libtbb.a)

@@ -20,6 +20,10 @@ TARGET_INC_DIRECTORY="$tbb_INSTALL/include"
 mkdir -p $TARGET_LIB_DIRECTORY || true
 cp -a $tbb_SRC/build/$BUILD_DIRECTORY/* $TARGET_LIB_DIRECTORY/
 
+# create the static library
+# xxxnsubtil: this is a gigantic hack and won't work in the general case, but works for firepony
+ar cr $TARGET_LIB_DIRECTORY/libtbb.a $TARGET_LIB_DIRECTORY/*.o
+
 # install headers
 mkdir -p $TARGET_INC_DIRECTORY || true
 cp -a $tbb_SRC/include/. $TARGET_INC_DIRECTORY/.

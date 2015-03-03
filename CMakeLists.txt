@@ -61,7 +61,12 @@ find_package(CUDA 7.0 REQUIRED)
 # enable C++11 support
 set(CUDA_NVCC_FLAGS "-std=c++11")
 # build for Kepler
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} --gpu-architecture=sm_35 -use_fast_math)
+set(CUDA_NVCC_FLAGS
+    ${CUDA_NVCC_FLAGS}
+    --generate-code arch=compute_30,code=sm_30
+    --generate-code arch=compute_35,code=sm_35
+    --generate-code arch=compute_37,code=sm_37
+    -use_fast_math)
 
 if (USE_EXTERNAL_THRUST)
     # inject our Thrust include path to override the CUDA toolkit include path

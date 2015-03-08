@@ -6,8 +6,8 @@ set(tbb_SRC ${tbb_PREFIX}/src/tbb)
 
 ExternalProject_Add(tbb
     PREFIX ${tbb_PREFIX}
-    URL "https://www.threadingbuildingblocks.org/sites/default/files/software_releases/source/tbb43_20140724oss_src.tgz"
-    URL_MD5 0791e5fc7d11b27360080ea4521e32bb
+    GIT_REPOSITORY "https://github.com/nsubtil/tbb.git"
+    GIT_TAG "4.3-20140724"
     BUILD_IN_SOURCE 1
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ${MAKE}

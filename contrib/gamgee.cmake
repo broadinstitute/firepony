@@ -17,6 +17,8 @@ ExternalProject_Add(gamgee
     GIT_REPOSITORY "https://github.com/broadinstitute/gamgee.git"
     GIT_TAG "d923b5301e477e2f42347a202482e6cd1428c635"
     INSTALL_DIR ${gamgee_INSTALL}
+    # relax the gamgee CMake version requirements
+    PATCH_COMMAND patch -p1 -t -N < ${PROJECT_SOURCE_DIR}/contrib/gamgee-fix-cmake-version.patch
     CMAKE_ARGS ${BOOST_CMAKE_ARGS}
                -DINSTALL_DEPENDENCIES=ON
                -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}

@@ -20,6 +20,10 @@ option(ENABLE_CPU_BACKEND
        "Enable the CPU backend based on Intel Threading Building Blocks"
        ON)
 
+option(FORCE_TSX_OFF
+       "Forcibly disable TSX instruction set support for TBB (useful for building on older systems)"
+       OFF)
+
 if (ENABLE_CUDA_BACKEND)
     add_definitions(-DENABLE_CUDA_BACKEND=1)
 endif()

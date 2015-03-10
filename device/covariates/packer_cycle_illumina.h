@@ -89,9 +89,9 @@ struct covariate_packer_cycle_illumina
             // ReadGroup, QualityScore, CovariateValue, CovariateName, EventType, EmpiricalQuality, Observations, Errors
             const char *fmt_string =
 #if DISABLE_OUTPUT_ROUNDING
-                   "%s\t%d\t\t%d\t\t%s\t\t%c\t\t%.64f\t\t%d\t\t%.64f\n";
+                   "%s\t%d\t\t%d\t\t%s\t\t%c\t\t%.64f\t\t%lu\t\t%.64f\n";
 #else
-                   "%s\t%d\t\t%d\t\t%s\t\t%c\t\t%.4f\t\t%d\t\t%.2f\n";
+                   "%s\t%d\t\t%d\t\t%s\t\t%c\t\t%.4f\t\t%lu\t\t%.2f\n";
 #endif
 
             printf(fmt_string,

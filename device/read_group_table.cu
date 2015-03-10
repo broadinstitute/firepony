@@ -116,9 +116,9 @@ void output_read_group_table(firepony_context<system>& context)
         // ReadGroup, EventType, EmpiricalQuality, EstimatedQReported, Observations, Errors
         const char *fmt_string =
 #if DISABLE_OUTPUT_ROUNDING
-                "%s\t%c\t\t%.64f\t\t\t%.64f\t\t\t%d\t\t%.64f\n";
+                "%s\t%c\t\t%.64f\t\t\t%.64f\t\t\t%lu\t\t%.64f\n";
 #else
-                "%s\t%c\t\t%.4f\t\t\t%.4f\t\t\t%d\t\t%.2f\n";
+                "%s\t%c\t\t%.4f\t\t\t%.4f\t\t\t%lu\t\t%.2f\n";
 #endif
         printf(fmt_string,
                rg_name.c_str(),

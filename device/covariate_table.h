@@ -36,7 +36,7 @@ typedef uint32 covariate_key;
 // the value for each row of a covariate observation table
 struct covariate_observation_value
 {
-    uint32 observations;
+    uint64 observations;
     float mismatches;
 };
 
@@ -44,7 +44,7 @@ struct covariate_observation_value
 // this includes all the info in the covariate observation table plus computed values
 struct covariate_empirical_value
 {
-    uint32 observations;
+    uint64 observations;
     double mismatches;
     double expected_errors;
     double estimated_quality;

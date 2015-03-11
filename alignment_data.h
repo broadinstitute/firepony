@@ -152,7 +152,7 @@ struct alignment_batch_storage
     // (1-based and inclusive) mate's alignment start position
     vector<system, uint32> mate_alignment_start;
     // inferred insert size
-    vector<system, int16> inferred_insert_size;
+    vector<system, int32> inferred_insert_size;
 
     // cigar ops
     vector<system, cigar_op> cigars;

@@ -87,7 +87,7 @@ struct alignment_batch_device : public alignment_batch_storage<system>
         typename vector<system, uint32>::const_view alignment_stop;
         typename vector<system, uint32>::const_view mate_chromosome;
         typename vector<system, uint32>::const_view mate_alignment_start;
-        typename vector<system, int16>::const_view inferred_insert_size;
+        typename vector<system, int32>::const_view inferred_insert_size;
         typename vector<system, cigar_op>::const_view cigars;
         typename vector<system, uint32>::const_view cigar_start;
         typename vector<system, uint32>::const_view cigar_len;

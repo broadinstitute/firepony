@@ -12,6 +12,6 @@ boost_INSTALL=$2
 for f in $boost_SRC/src/boost/libs/*/include
 do
     cd $f
-    tar cf - . | (cd $boost_INSTALL/include && tar spxvf -)
+    tar cf - . | (cd $boost_INSTALL/include && tar xvf -)
 done
 

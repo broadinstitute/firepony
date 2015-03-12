@@ -34,6 +34,8 @@
 #include "covariates/packer_quality_score.h"
 #include "expected_error.h"
 
+#include "../table_formatter.h"
+
 #include <thrust/reduce.h>
 
 namespace firepony {
@@ -88,48 +90,52 @@ void build_read_group_table(firepony_context<system>& context)
 INSTANTIATE(build_read_group_table);
 
 template <target_system system>
-void output_read_group_table(firepony_context<system>& context)
+static void output_read_group_table_loop(firepony_context<system>& context, covariate_empirical_table<host>& table, table_formatter& fmt)
 {
     typedef covariate_packer_quality_score<system> packer;
-
-    covariate_empirical_table<host> table;
-    table.copyfrom(context.covariates.read_group);
-
-    const char *fmt_string_header =
-#if DISABLE_OUTPUT_ROUNDING
-            "#:GATKTable:6:%lu:%%s:%%s:%%.64f:%%.64f:%%d:%%.64f:;\n";
-#else
-            "#:GATKTable:6:%lu:%%s:%%s:%%.4f:%%.4f:%%d:%%.2f:;\n";
-#endif
-
-    printf(fmt_string_header, table.size());
-    printf("#:GATKTable:RecalTable0:\n");
-    printf("ReadGroup\tEventType\tEmpiricalQuality\tEstimatedQReported\tObservations\tErrors\n");
 
     for(uint32 i = 0; i < table.size(); i++)
     {
         uint32 rg_id = packer::decode(table.keys[i], packer::ReadGroup);
         const std::string& rg_name = context.bam_header.host.read_groups_db.lookup(rg_id);
 
-        covariate_empirical_value val = table.values[i];
+        const char ev = cigar_event::ascii(packer::decode(table.keys[i], packer::EventTracker));
+        const covariate_empirical_value& val = table.values[i];
 
-        // ReadGroup, EventType, EmpiricalQuality, EstimatedQReported, Observations, Errors
-        const char *fmt_string =
-#if DISABLE_OUTPUT_ROUNDING
-                "%s\t%c\t\t%.64f\t\t\t%.64f\t\t\t%lu\t\t%.64f\n";
-#else
-                "%s\t%c\t\t%.4f\t\t\t%.4f\t\t\t%lu\t\t%.2f\n";
-#endif
-        printf(fmt_string,
-               rg_name.c_str(),
-               cigar_event::ascii(packer::decode(table.keys[i], packer::EventTracker)),
-               round_n(val.empirical_quality, 4),
-               round_n(val.estimated_quality, 4),
-               val.observations,
-               round_n(val.mismatches, 2));
+        fmt.start_row();
+
+        fmt.data(rg_name);
+        fmt.data(ev);
+        fmt.data(val.empirical_quality);
+        fmt.data(val.estimated_quality);
+        fmt.data(val.observations);
+        fmt.data(val.mismatches);
+
+        fmt.end_row();
     }
+}
 
-    printf("\n");
+template <target_system system>
+void output_read_group_table(firepony_context<system>& context)
+{
+    covariate_empirical_table<host> table;
+    table.copyfrom(context.covariates.read_group);
+
+    table_formatter fmt("RecalTable0");
+    fmt.add_column("ReadGroup", table_formatter::FMT_STRING);
+    fmt.add_column("EventType", table_formatter::FMT_CHAR);
+    fmt.add_column("EmpiricalQuality", table_formatter::FMT_FLOAT_4);
+    fmt.add_column("EstimatedQReported", table_formatter::FMT_FLOAT_4);
+    fmt.add_column("Observations", table_formatter::FMT_UINT64);
+    fmt.add_column("Errors", table_formatter::FMT_FLOAT_2);
+
+    // preprocess table data to compute column widths
+    output_read_group_table_loop(context, table, fmt);
+    fmt.end_table();
+
+    // output table
+    output_read_group_table_loop(context, table, fmt);
+    fmt.end_table();
 }
 INSTANTIATE(output_read_group_table);
 

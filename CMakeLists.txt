@@ -111,6 +111,8 @@ set(firepony_common_sources
     sequence_database.h
     string_database.cu
     string_database.h
+    table_formatter.cu
+    table_formatter.h
     types.h
     version.h
 
@@ -132,7 +134,7 @@ if (USE_EXTERNAL_THRUST)
 endif()
 
 cuda_add_executable(firepony firepony.cu)
-target_link_libraries(firepony firepony-common firepony-device ${tbb_LIB} ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+target_link_libraries(firepony firepony-device firepony-common ${tbb_LIB} ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
 
 cuda_add_executable(firepony-vcf-convert firepony-vcf-convert.cu)
 target_link_libraries(firepony-vcf-convert ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})

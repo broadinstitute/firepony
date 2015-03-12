@@ -127,11 +127,9 @@ INSTANTIATE(pack_to_1bit);
 double round_n(double val, int n)
 {
     // xxxnsubtil: i suspect this might cause loss of precision if the initial exponent is large
-#if !DISABLE_OUTPUT_ROUNDING
     val = val * pow(10.0, n);
     val = round(val);
     val = val / pow(10.0, n);
-#endif
     return val;
 }
 

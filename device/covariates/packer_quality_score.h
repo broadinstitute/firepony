@@ -31,6 +31,8 @@
 #include "bit_packers/quality_score.h"
 #include "bit_packers/event_tracker.h"
 
+#include "../../table_formatter.h"
+
 namespace firepony {
 
 // defines a covariate chain equivalent to GATK's RecalTable1
@@ -60,21 +62,8 @@ struct covariate_packer_quality_score
         return chain::decode(key, id);
     }
 
-    static void dump_table(firepony_context<system>& context, covariate_empirical_table<system>& d_table)
+    static void dump_table_loop(firepony_context<system>& context, covariate_empirical_table<host>& table, table_formatter& fmt)
     {
-        covariate_empirical_table<host> table;
-        table.copyfrom(d_table);
-
-        const char *fmt_string_header =
-#if DISABLE_OUTPUT_ROUNDING
-               "#:GATKTable:6:%lu:%%s:%%s:%%s:%%.64f:%%d:%%.64f:;\n";
-#else
-               "#:GATKTable:6:%lu:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n";
-#endif
-        printf(fmt_string_header, table.size());
-
-        printf("#:GATKTable:RecalTable1:\n");
-        printf("ReadGroup\tQualityScore\tEventType\tEmpiricalQuality\tObservations\tErrors\n");
         for(uint32 i = 0; i < table.size(); i++)
         {
             // skip null entries in the table
@@ -84,22 +73,47 @@ struct covariate_packer_quality_score
             uint32 rg_id = decode(table.keys[i], ReadGroup);
             const std::string& rg_name = context.bam_header.host.read_groups_db.lookup(rg_id);
 
-            const char *fmt_string =
-#if DISABLE_OUTPUT_ROUNDING
-                   "%s\t%d\t\t%c\t\t%.64f\t\t\t%lu\t\t%.64f\n";
-#else
-                   "%s\t%d\t\t%c\t\t%.4f\t\t\t%lu\t\t%.2f\n";
-#endif
+            const char ev = cigar_event::ascii(decode(table.keys[i], EventTracker));
+            const covariate_empirical_value& val = table.values[i];
 
-            printf(fmt_string,
-                   rg_name.c_str(),
-                   decode(table.keys[i], QualityScore),
-                   cigar_event::ascii(decode(table.keys[i], EventTracker)),
-                   table.values[i].empirical_quality,
-                   table.values[i].observations,
-                   round_n(table.values[i].mismatches, 2));
+            const uint8 qual = decode(table.keys[i], QualityScore);
+            char qual_str[256];
+            snprintf(qual_str, sizeof(qual_str), "%d", qual);
+
+            fmt.start_row();
+
+            fmt.data(rg_name);
+            fmt.data(std::string(qual_str));
+            fmt.data(ev);
+            fmt.data(val.empirical_quality);
+            fmt.data(val.observations);
+            fmt.data(val.mismatches);
+
+            fmt.end_row();
         }
-        printf("\n");
+    }
+
+    static void dump_table(firepony_context<system>& context, covariate_empirical_table<system>& d_table)
+    {
+        covariate_empirical_table<host> table;
+        table.copyfrom(d_table);
+
+        table_formatter fmt("RecalTable1");
+        fmt.add_column("ReadGroup", table_formatter::FMT_STRING);
+        // for some very odd reason, GATK outputs this as a string
+        fmt.add_column("QualityScore", table_formatter::FMT_STRING);
+        fmt.add_column("EventType", table_formatter::FMT_CHAR);
+        fmt.add_column("EmpiricalQuality", table_formatter::FMT_FLOAT_4);
+        fmt.add_column("Observations", table_formatter::FMT_UINT64);
+        fmt.add_column("Errors", table_formatter::FMT_FLOAT_2);
+
+        // preprocess table data to compute column widths
+        dump_table_loop(context, table, fmt);
+        fmt.end_table();
+
+        // output table
+        dump_table_loop(context, table, fmt);
+        fmt.end_table();
     }
 };
 

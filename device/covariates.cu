@@ -39,6 +39,8 @@
 #include "primitives/util.h"
 #include "primitives/parallel.h"
 
+#include "../table_formatter.h"
+
 #include <thrust/functional.h>
 
 namespace firepony {
@@ -282,19 +284,27 @@ void output_covariates(firepony_context<system>& context)
 {
     covariate_packer_quality_score<system>::dump_table(context, context.covariates.empirical_quality);
 
-    const char *fmt_string_header =
-#if DISABLE_OUTPUT_ROUNDING
-            "#:GATKTable:8:%lu:%%s:%%s:%%s:%%s:%%s:%%.64f:%%d:%%.64f:;\n";
-#else
-            "#:GATKTable:8:%lu:%%s:%%s:%%s:%%s:%%s:%%.4f:%%d:%%.2f:;\n";
-#endif
+    table_formatter fmt("RecalTable2");
+    fmt.add_column("ReadGroup", table_formatter::FMT_STRING);
+    // for some odd reason, GATK thinks the quality score is a string...
+    fmt.add_column("QualityScore", table_formatter::FMT_STRING);
+    // CovariateValue has to be sent as string, since the actual data type will vary
+    fmt.add_column("CovariateValue", table_formatter::FMT_STRING);
+    fmt.add_column("CovariateName", table_formatter::FMT_STRING);
+    fmt.add_column("EventType", table_formatter::FMT_CHAR);
+    fmt.add_column("EmpiricalQuality", table_formatter::FMT_FLOAT_4);
+    fmt.add_column("Observations", table_formatter::FMT_UINT64);
+    fmt.add_column("Errors", table_formatter::FMT_FLOAT_2);
 
-    printf(fmt_string_header, context.covariates.context.size() + context.covariates.cycle.size());
-    printf("#:GATKTable:RecalTable2:\n");
-    printf("ReadGroup\tQualityScore\tCovariateValue\tCovariateName\tEventType\tEmpiricalQuality\tObservations\tErrors\n");
-    covariate_packer_context<system>::dump_table(context, context.covariates.empirical_context);
-    covariate_packer_cycle_illumina<system>::dump_table(context, context.covariates.empirical_cycle);
-    printf("\n");
+    // preprocess table data to compute column widths
+    covariate_packer_context<system>::dump_table(context, context.covariates.empirical_context, fmt);
+    covariate_packer_cycle_illumina<system>::dump_table(context, context.covariates.empirical_cycle, fmt);
+    fmt.end_table();
+
+    // output table
+    covariate_packer_context<system>::dump_table(context, context.covariates.empirical_context, fmt);
+    covariate_packer_cycle_illumina<system>::dump_table(context, context.covariates.empirical_cycle, fmt);
+    fmt.end_table();
 }
 INSTANTIATE(output_covariates);
 

@@ -47,6 +47,8 @@ struct runtime_options
 
     // enable debugging
     bool debug;
+    // disable rounding on the output tables
+    bool disable_output_rounding;
 
     // enable/disable the various backends
     bool enable_cuda;
@@ -69,6 +71,7 @@ struct runtime_options
         batch_size = 20000;
 
         debug = false;
+        disable_output_rounding = false;
 
         enable_cuda = true;
         enable_tbb = true;

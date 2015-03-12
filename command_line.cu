@@ -47,6 +47,7 @@ static void usage(void)
     fprintf(stderr, "  --no-reference-mmap\n");
     fprintf(stderr, "  --no-snp-database-mmap                Do not attempt to use system shared memory for reference or dbSNP\n");
     fprintf(stderr, "  -d, --debug                           Enable debugging (*extremely* verbose)\n");
+    fprintf(stderr, "  --disable-rounding                    Disable rounding on the output tables\n");
     fprintf(stderr, "  -b, --batch-size <n>                  Process input in batches of <n> reads\n");
 #if ENABLE_CUDA_BACKEND
     fprintf(stderr, "  --gpu-only                            Use only the CUDA GPU-accelerated backend\n");
@@ -54,6 +55,10 @@ static void usage(void)
 #if ENABLE_TBB_BACKEND
     fprintf(stderr, "  --cpu-only                            Use only the CPU backend\n");
 #endif
+    fprintf(stderr, "\n");
+
+    fprintf(stderr, "  http://github.com/broadinstitute/firepony\n");
+    fprintf(stderr, "  nsubtil@nvidia.com\n");
     fprintf(stderr, "\n");
 
     exit(1);
@@ -104,6 +109,7 @@ void parse_command_line(int argc, char **argv)
             { "no-reference-mmap", no_argument, NULL, 'k' },
             { "no-snp-database-mmap", no_argument, NULL, 'l' },
             { "debug", no_argument, NULL, 'd' },
+            { "disable-rounding", no_argument, NULL, 'n' },
             { "batch-size", required_argument, NULL, 'b' },
 #if ENABLE_CUDA_BACKEND
             { "gpu-only", no_argument, NULL, 'g' },
@@ -144,6 +150,11 @@ void parse_command_line(int argc, char **argv)
         case 'd':
             // -d, --debug
             command_line_options.debug = true;
+            break;
+
+        case 'n':
+            // --disable-rounding
+            command_line_options.disable_output_rounding = true;
             break;
 
         case 'b':

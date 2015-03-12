@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include "../../table_formatter.h"
 #include "bit_packers/read_group.h"
 #include "bit_packers/quality_score.h"
 #include "bit_packers/event_tracker.h"
@@ -78,7 +79,9 @@ struct covariate_packer_context
         return chain::decode(key, id);
     }
 
-    static void dump_table(firepony_context<system>& context, covariate_empirical_table<system>& d_table)
+    static void dump_table(firepony_context<system>& context,
+                           covariate_empirical_table<system>& d_table,
+                           table_formatter& fmt)
     {
         covariate_empirical_table<host> table;
         table.copyfrom(d_table);
@@ -91,6 +94,9 @@ struct covariate_packer_context
 
             uint32 rg_id = decode(table.keys[i], ReadGroup);
             const std::string& rg_name = context.bam_header.host.read_groups_db.lookup(rg_id);
+
+            const char ev = cigar_event::ascii(decode(table.keys[i], EventTracker));
+            const covariate_empirical_value& val = table.values[i];
 
             // decode the context separately
             covariate_key raw_context = decode(table.keys[i], Context);
@@ -106,23 +112,20 @@ struct covariate_packer_context
             }
             sequence[size] = 0;
 
-            // ReadGroup, QualityScore, CovariateValue, CovariateName, EventType, EmpiricalQuality, Observations, Errors
-            const char *fmt_string =
-#if DISABLE_OUTPUT_ROUNDING
-                   "%s\t%d\t\t%s\t\t%s\t\t%c\t\t%.64f\t\t%lu\t\t%.64f\n";
-#else
-                   "%s\t%d\t\t%s\t\t%s\t\t%c\t\t%.4f\t\t%lu\t\t%.2f\n";
-#endif
+            uint8 qual = decode(table.keys[i], QualityScore);
 
-            printf(fmt_string,
-                   rg_name.c_str(),
-                   decode(table.keys[i], QualityScore),
-                   sequence,
-                   "Context",
-                   cigar_event::ascii(decode(table.keys[i], EventTracker)),
-                   table.values[i].empirical_quality,
-                   table.values[i].observations,
-                   round_n(table.values[i].mismatches, 2));
+            fmt.start_row();
+
+            fmt.data(rg_name);
+            fmt.data_int_as_string(qual);
+            fmt.data(std::string(sequence));
+            fmt.data(std::string("Context"));
+            fmt.data(ev);
+            fmt.data(val.empirical_quality);
+            fmt.data(val.observations);
+            fmt.data(val.mismatches);
+
+            fmt.end_row();
         }
     }
 };

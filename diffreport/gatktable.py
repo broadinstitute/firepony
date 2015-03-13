@@ -1,5 +1,6 @@
 import re
 import operator
+from textfile import ParseError
 
 class GATKTable:
     def __read_data_line(self, fp):

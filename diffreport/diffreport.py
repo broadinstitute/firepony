@@ -133,6 +133,11 @@ exit_code = 0
 
 # iterate through the list of tables in A
 for table_A in report_A.tables:
+
+    if table_A.name == "Quantized":
+        # the quality quantization table is a no-op in firepony, skip
+        continue
+
     # find corresponding table in B
     table_B = report_B.get_table(table_A.name)
     if table_B == None:

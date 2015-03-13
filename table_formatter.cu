@@ -99,7 +99,7 @@ void table_formatter::end_table(void)
             case FMT_FLOAT_2:
                 if (command_line_options.disable_output_rounding)
                 {
-                    printf("%%.64f");
+                    printf("%%.64f:");
                 } else {
                     printf("%%.2f:");
                 }
@@ -109,7 +109,7 @@ void table_formatter::end_table(void)
             case FMT_FLOAT_4:
                 if (command_line_options.disable_output_rounding)
                 {
-                    printf("%%.64f");
+                    printf("%%.64f:");
                 } else {
                     printf("%%.4f:");
                 }
@@ -123,7 +123,10 @@ void table_formatter::end_table(void)
 
         for(uint32 i = 0; i < num_columns; i++)
         {
-            printf("%s", column_names[i].c_str());
+            char fmt_string[256];
+
+            snprintf(fmt_string, sizeof(fmt_string), "%%%ds", column_widths[i]);
+            printf(fmt_string, column_names[i].c_str());
             if (i == num_columns - 1)
             {
                 printf("\n");

@@ -71,12 +71,12 @@ static pingpong_queue<V> make_pingpong_queue(V& source, V& dest)
 }
 
 // prepare temp_storage to store num_elements to be packed into a bit vector
-template <target_system system> void pack_prepare_storage_2bit(d_vector_u8<system>& storage, uint32 num_elements);
-template <target_system system> void pack_prepare_storage_1bit(d_vector_u8<system>& storage, uint32 num_elements);
+template <target_system system> void pack_prepare_storage_2bit(vector<system, uint8>& storage, uint32 num_elements);
+template <target_system system> void pack_prepare_storage_1bit(vector<system, uint8>& storage, uint32 num_elements);
 
 // packs a vector of uint8 into a bit vector
-template <target_system system> void pack_to_2bit(d_packed_vector_2b<system>& dest, d_vector_u8<system>& src);
-template <target_system system> void pack_to_1bit(d_packed_vector_1b<system>& dest, d_vector_u8<system>& src);
+template <target_system system> void pack_to_2bit(packed_vector<system, 2>& dest, vector<system, uint8>& src);
+template <target_system system> void pack_to_1bit(packed_vector<system, 1>& dest, vector<system, uint8>& src);
 
 // round a double to the Nth decimal place
 double round_n(double val, int n);

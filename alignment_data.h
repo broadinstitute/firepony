@@ -187,7 +187,7 @@ struct alignment_batch_storage
 struct alignment_batch_host : public alignment_batch_storage<host>
 {
     // data that never gets copied to the device
-    h_vector<std::string> name;
+    vector<host, std::string> name;
     // map of chromosomes referenced by this batch
     resident_segment_map chromosome_map;
 

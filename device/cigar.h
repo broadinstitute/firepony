@@ -69,48 +69,48 @@ struct cigar_context
     vector<system, uint32> cigar_offsets;
 
     // a vector of cigar "events"
-    d_packed_vector_2b<system> cigar_events;
+    packed_vector<system, 2> cigar_events;
     // the read index for each cigar event
-    d_vector<system, uint32> cigar_event_read_index;
+    vector<system, uint32> cigar_event_read_index;
     // the read coordinate for each cigar event
-    d_vector<system, uint16> cigar_event_read_coordinates;
+    vector<system, uint16> cigar_event_read_coordinates;
     // the reference coordinate for each cigar event, relative to the start of the alignment window
-    d_vector<system, uint16> cigar_event_reference_coordinates;
+    vector<system, uint16> cigar_event_reference_coordinates;
 
     // alignment window in the read, not including clipped bases
-    d_vector_u16_2<system> read_window_clipped;
+    vector<system, ushort2> read_window_clipped;
     // alignment window in the read, not including clipped bases or leading/trailing insertions
-    d_vector_u16_2<system> read_window_clipped_no_insertions;
+    vector<system, ushort2> read_window_clipped_no_insertions;
     // alignment window in the reference, not including clipped bases (relative to base alignment position)
-    d_vector_u16_2<system> reference_window_clipped;
+    vector<system, ushort2> reference_window_clipped;
 
     // bit vector representing SNPs, one per read bp
     // (1 means reference mismatch, 0 means match or non-M cigar event)
-    d_packed_vector_1b<system> is_snp;
+    packed_vector<system, 1> is_snp;
     // bit vector representing insertions, one per read bp (similar to is_snp)
-    d_packed_vector_1b<system> is_insertion;
+    packed_vector<system, 1> is_insertion;
     // bit vector representing deletions, one per read bp
     // note that this only flags the starting base for a deletion and is independent of the other bit vectors
     // in other words, the same bp can have is_deletion and one of is_insertion or is_snp set
-    d_packed_vector_1b<system> is_deletion;
+    packed_vector<system, 1> is_deletion;
 
     // number of errors for each read
-    d_vector<system, uint16> num_errors;
+    vector<system, uint16> num_errors;
 
     struct view
     {
-        typename d_vector<system, uint32>::view cigar_offsets;
-        typename d_packed_vector_2b<system>::view cigar_events;
-        typename d_vector<system, uint32>::view cigar_event_read_index;
-        typename d_vector<system, uint16>::view cigar_event_read_coordinates;
-        typename d_vector<system, uint16>::view cigar_event_reference_coordinates;
-        typename d_vector_u16_2<system>::view read_window_clipped;
-        typename d_vector_u16_2<system>::view read_window_clipped_no_insertions;
-        typename d_vector_u16_2<system>::view reference_window_clipped;
-        typename d_packed_vector_1b<system>::view is_snp;
-        typename d_packed_vector_1b<system>::view is_insertion;
-        typename d_packed_vector_1b<system>::view is_deletion;
-        typename d_vector<system, uint16>::view num_errors;
+        typename vector<system, uint32>::view cigar_offsets;
+        typename packed_vector<system, 2>::view cigar_events;
+        typename vector<system, uint32>::view cigar_event_read_index;
+        typename vector<system, uint16>::view cigar_event_read_coordinates;
+        typename vector<system, uint16>::view cigar_event_reference_coordinates;
+        typename vector<system, ushort2>::view read_window_clipped;
+        typename vector<system, ushort2>::view read_window_clipped_no_insertions;
+        typename vector<system, ushort2>::view reference_window_clipped;
+        typename packed_vector<system, 1>::view is_snp;
+        typename packed_vector<system, 1>::view is_insertion;
+        typename packed_vector<system, 1>::view is_deletion;
+        typename vector<system, uint16>::view num_errors;
     };
 
     operator view()

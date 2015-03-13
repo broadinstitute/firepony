@@ -130,7 +130,8 @@ struct firepony_context
     vector<system, uint2> alignment_windows;
 
     // list of active BP locations
-    d_vector_active_location_list<system> active_location_list;
+    // we match the BP representation size to avoid RMW hazards at the edges of reads
+    vector_dna16<system> active_location_list;
     // list of read offsets in the reference for each BP (relative to the alignment start position)
     vector<system, uint16> read_offset_list;
 
@@ -174,7 +175,7 @@ struct firepony_context
         typename sequence_database_device<system>::const_view   reference_db;
         typename vector<system, uint32>::view                   active_read_list;
         typename vector<system, uint2>::view                    alignment_windows;
-        typename d_vector_active_location_list<system>::view    active_location_list;
+        typename vector_dna16<system>::view                     active_location_list;
         typename vector<system, uint16>::view                   read_offset_list;
         typename vector<system, uint8>::view                    temp_storage;
         typename vector<system, uint32>::view                   temp_u32;

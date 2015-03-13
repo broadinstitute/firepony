@@ -36,7 +36,7 @@ template <target_system system>
 struct covariates_context
 {
     // read window after clipping low quality ends
-    d_vector_u16_2<system> high_quality_window;
+    vector<system, ushort2> high_quality_window;
 
     covariate_observation_table<system> scratch_table_space;
 
@@ -52,7 +52,7 @@ struct covariates_context
 
     struct view
     {
-        typename d_vector_u16_2<system>::view high_quality_window;
+        typename vector<system, ushort2>::view high_quality_window;
         typename covariate_observation_table<system>::view scratch_table_space;
         typename covariate_observation_table<system>::view quality;
         typename covariate_empirical_table<system>::view empirical_quality;

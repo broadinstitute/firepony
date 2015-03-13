@@ -221,9 +221,9 @@ struct compute_vcf_ranges : public lambda<system>
 template <target_system system>
 struct vcf_active_predicate
 {
-    typename d_vector_u32_2<system>::view vcf_active;
+    typename vector<system, uint2>::view vcf_active;
 
-    vcf_active_predicate(typename d_vector_u32_2<system>::view vcf_active)
+    vcf_active_predicate(typename vector<system, uint2>::view vcf_active)
         : vcf_active(vcf_active)
     { }
 

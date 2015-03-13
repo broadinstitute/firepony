@@ -38,19 +38,19 @@ struct compute_fractional_errors : public lambda<system>
 {
     LAMBDA_INHERIT_MEMBERS;
 
-    typename d_packed_vector_1b<system>::const_view error_vector;
-    typename d_vector<system, double>::view output_vector;
+    typename packed_vector<system, 1>::const_view error_vector;
+    typename vector<system, double>::view output_vector;
 
     compute_fractional_errors(typename firepony_context<system>::view ctx,
                               const typename alignment_batch_device<system>::const_view batch,
-                              const typename d_packed_vector_1b<system>::const_view error_vector,
-                              typename d_vector<system, double>::view output_vector)
+                              const typename packed_vector<system, 1>::const_view error_vector,
+                              typename vector<system, double>::view output_vector)
         : lambda<system>(ctx, batch), error_vector(error_vector), output_vector(output_vector)
     { }
 
     CUDA_HOST_DEVICE void calculateAndStoreErrorsInBlock(const int iii,
                                                          const int blockStartIndex,
-                                                         const typename d_packed_vector_1b<system>::const_view errorArray,
+                                                         const typename packed_vector<system, 1>::const_view errorArray,
                                                          double *fractionalErrors)
     {
         int totalErrors = 0;

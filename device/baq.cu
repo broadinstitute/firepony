@@ -589,8 +589,8 @@ struct hmm_glocal : public lambda<system>
 
     double m[9];
 
-    d_stream_dna16<system> referenceBases;
-    d_stream_dna16<system> queryBases;
+    stream_dna16<system> referenceBases;
+    stream_dna16<system> queryBases;
     const uint8 *inputQualities;
 
     uint8 *outputQualities;

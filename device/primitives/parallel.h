@@ -85,7 +85,7 @@ struct parallel_thrust
                                  size_t len,
                                  OutputIterator result,
                                  Predicate op,
-                                 d_vector_u8<system>& temp_storage)
+                                 vector<system, uint8>& temp_storage)
     {
         // use the fallback thrust version
         OutputIterator out_last;
@@ -98,7 +98,7 @@ struct parallel_thrust
                                       size_t len,
                                       OutputIterator result,
                                       FlagIterator flags,
-                                      d_vector_u8<system>& temp_storage)
+                                      vector<system, uint8>& temp_storage)
     {
         OutputIterator out_last;
         out_last = thrust::copy_if(first, first + len, flags, result, copy_if_flagged());
@@ -108,17 +108,17 @@ struct parallel_thrust
     template <typename InputIterator>
     static inline int64 sum(InputIterator first,
                             size_t len,
-                            d_vector_u8<system>& temp_storage)
+                            vector<system, uint8>& temp_storage)
     {
         return thrust::reduce(first, first + len, int64(0));
     }
 
     template <typename Key, typename Value>
-    static inline void sort_by_key(d_vector<system, Key>& keys,
-                                   d_vector<system, Value>& values,
-                                   d_vector<system, Key>& temp_keys,
-                                   d_vector<system, Value>& temp_values,
-                                   d_vector_u8<system>& temp_storage,
+    static inline void sort_by_key(vector<system, Key>& keys,
+                                   vector<system, Value>& values,
+                                   vector<system, Key>& temp_keys,
+                                   vector<system, Value>& temp_values,
+                                   vector<system, uint8>& temp_storage,
                                    int num_key_bits = sizeof(Key) * 8)
     {
         thrust::sort_by_key(keys.begin(), keys.end(), values.begin());
@@ -182,9 +182,9 @@ struct parallel<cuda> : public parallel_thrust<cuda>
                                  size_t len,
                                  OutputIterator result,
                                  Predicate op,
-                                 d_vector_u8<cuda>& temp_storage)
+                                 vector<cuda, uint8>& temp_storage)
     {
-        d_vector_i32<cuda> num_selected(1);
+        vector<cuda, int32> num_selected(1);
 
         // determine amount of temp storage required
         size_t temp_bytes = 0;
@@ -217,9 +217,9 @@ struct parallel<cuda> : public parallel_thrust<cuda>
                                       size_t len,
                                       OutputIterator result,
                                       FlagIterator flags,
-                                      d_vector_u8<cuda>& temp_storage)
+                                      vector<cuda, uint8>& temp_storage)
     {
-        d_vector<cuda, size_t> num_selected(1);
+        vector<cuda, size_t> num_selected(1);
 
         // determine amount of temp storage required
         size_t temp_bytes = 0;
@@ -251,9 +251,9 @@ struct parallel<cuda> : public parallel_thrust<cuda>
     template <typename InputIterator>
     static inline int64 sum(InputIterator first,
                             size_t len,
-                            d_vector_u8<cuda>& temp_storage)
+                            vector<cuda, uint8>& temp_storage)
     {
-        d_vector_i64<cuda> result(1);
+        vector<cuda, int64> result(1);
 
         size_t temp_bytes = 0;
         cub::DeviceReduce::Sum(nullptr,
@@ -274,11 +274,11 @@ struct parallel<cuda> : public parallel_thrust<cuda>
     }
 
     template <typename Key, typename Value>
-    static inline void sort_by_key(d_vector<cuda, Key>& keys,
-                                   d_vector<cuda, Value>& values,
-                                   d_vector<cuda, Key>& temp_keys,
-                                   d_vector<cuda, Value>& temp_values,
-                                   d_vector_u8<cuda>& temp_storage,
+    static inline void sort_by_key(vector<cuda, Key>& keys,
+                                   vector<cuda, Value>& values,
+                                   vector<cuda, Key>& temp_keys,
+                                   vector<cuda, Value>& temp_values,
+                                   vector<cuda, uint8>& temp_storage,
                                    int num_key_bits = sizeof(Key) * 8)
     {
         const size_t len = keys.size();

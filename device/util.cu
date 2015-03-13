@@ -36,89 +36,68 @@
 
 namespace firepony {
 
-// the following two structures are the result of a couple of hours trying to do this with templates...
-template <target_system system>
-struct pack_uint8_to_2bit_vector
+// packs a uint8 into an N-bit-per-symbol packed vector
+template <target_system system, uint32 N>
+struct pack_uint8
 {
-    typename d_packed_vector_2b<system>::view dest;
-    typename d_vector_u8<system>::view src;
+    typename packed_vector<system, N>::view dest;
+    typename vector<system, uint8>::view src;
 
-    pack_uint8_to_2bit_vector(typename d_packed_vector_2b<system>::view dest,
-                              typename d_vector_u8<system>::view src)
+    pack_uint8(typename packed_vector<system, N>::view dest,
+               typename vector<system, uint8>::view src)
         : dest(dest), src(src)
     { }
 
     CUDA_HOST_DEVICE void operator() (const uint32 word_index)
     {
-        const uint8 *input = &src[word_index * d_packed_vector_2b<system>::SYMBOLS_PER_WORD];
-        for(uint32 i = 0; i < d_packed_vector_2b<system>::SYMBOLS_PER_WORD; i++)
+        const uint8 *input = &src[word_index * packed_vector<system, N>::SYMBOLS_PER_WORD];
+        for(uint32 i = 0; i < packed_vector<system, N>::SYMBOLS_PER_WORD; i++)
         {
-            dest[word_index * d_packed_vector_2b<system>::SYMBOLS_PER_WORD + i] = input[i];
-        }
-    }
-};
-
-template <target_system system>
-struct pack_uint8_to_1bit_vector
-{
-    typename d_packed_vector_1b<system>::view dest;
-    typename d_vector_u8<system>::view src;
-
-    pack_uint8_to_1bit_vector(typename d_packed_vector_1b<system>::view dest,
-                              typename d_vector_u8<system>::view src)
-        : dest(dest), src(src)
-    { }
-
-    CUDA_HOST_DEVICE void operator() (const uint32 word_index)
-    {
-        const uint8 *input = &src[word_index * d_packed_vector_1b<system>::SYMBOLS_PER_WORD];
-        for(uint32 i = 0; i < d_packed_vector_1b<system>::SYMBOLS_PER_WORD; i++)
-        {
-            dest[word_index * d_packed_vector_1b<system>::SYMBOLS_PER_WORD + i] = input[i];
+            dest[word_index * packed_vector<system, N>::SYMBOLS_PER_WORD + i] = input[i];
         }
     }
 };
 
 // prepare temp storage to store num_elements that will be packed into a bit vector
 template <target_system system, typename packed_vector_dest>
-static void pack_prepare_storage(d_vector_u8<system>& src, uint32 num_elements)
+static void pack_prepare_storage(vector<system, uint8>& src, uint32 num_elements)
 {
     src.resize(divide_ri(num_elements, packed_vector_dest::SYMBOLS_PER_WORD) * packed_vector_dest::SYMBOLS_PER_WORD);
 }
 
 // prepare temp_storage to store num_elements to be packed into a 1-bit vector
 template <target_system system>
-void pack_prepare_storage_2bit(d_vector_u8<system>& storage, uint32 num_elements)
+void pack_prepare_storage_2bit(vector<system, uint8>& storage, uint32 num_elements)
 {
-    pack_prepare_storage<system, d_packed_vector_2b<system> >(storage, num_elements);
+    pack_prepare_storage<system, packed_vector<system, 2> >(storage, num_elements);
 }
 INSTANTIATE(pack_prepare_storage_2bit);
 
 // prepare temp_storage to store num_elements to be packed into a 2-bit vector
 template <target_system system>
-void pack_prepare_storage_1bit(d_vector_u8<system>& storage, uint32 num_elements)
+void pack_prepare_storage_1bit(vector<system, uint8>& storage, uint32 num_elements)
 {
-    pack_prepare_storage<system, d_packed_vector_1b<system> >(storage, num_elements);
+    pack_prepare_storage<system, packed_vector<system, 1> >(storage, num_elements);
 }
 INSTANTIATE(pack_prepare_storage_1bit);
 
 template <target_system system>
-void pack_to_2bit(d_packed_vector_2b<system>& dest, d_vector_u8<system>& src)
+void pack_to_2bit(packed_vector<system, 2>& dest, vector<system, uint8>& src)
 {
     dest.resize(src.size());
     parallel<system>::for_each(thrust::make_counting_iterator(0),
-                               thrust::make_counting_iterator(0) + divide_ri(src.size(), d_packed_vector_2b<system>::SYMBOLS_PER_WORD),
-                               pack_uint8_to_2bit_vector<system>(dest, src));
+                               thrust::make_counting_iterator(0) + divide_ri(src.size(), packed_vector<system, 2>::SYMBOLS_PER_WORD),
+                               pack_uint8<system, 2>(dest, src));
 }
 INSTANTIATE(pack_to_2bit);
 
 template <target_system system>
-void pack_to_1bit(d_packed_vector_1b<system>& dest, d_vector_u8<system>& src)
+void pack_to_1bit(packed_vector<system, 1>& dest, vector<system, uint8>& src)
 {
     dest.resize(src.size());
     parallel<system>::for_each(thrust::make_counting_iterator(0),
-                               thrust::make_counting_iterator(0) + divide_ri(src.size(), d_packed_vector_1b<system>::SYMBOLS_PER_WORD),
-                               pack_uint8_to_1bit_vector<system>(dest, src));
+                               thrust::make_counting_iterator(0) + divide_ri(src.size(), packed_vector<system, 1>::SYMBOLS_PER_WORD),
+                               pack_uint8<system, 1>(dest, src));
 }
 INSTANTIATE(pack_to_1bit);
 

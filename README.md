@@ -8,3 +8,5 @@ It is meant to act as a fast drop-in replacement for GATK BQSR in sequence analy
 
 Firepony can run on both x86 CPUs and NVIDIA GPUs. Because it was designed from the ground-up in a data-parallel fashion, Firepony scales extremely well across both architectures.
 
+<https://github.com/broadinstitute/firepony/wiki>
+

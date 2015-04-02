@@ -263,7 +263,7 @@ firepony_pipeline *firepony_pipeline::create(target_system system, uint32 device
 #if ENABLE_TBB_BACKEND
     case firepony::intel_tbb:
         // reserve device threads for other devices and I/O
-        num_tbb_threads = tbb::task_scheduler_init::default_num_threads() - device - 1;
+        num_tbb_threads = tbb::task_scheduler_init::default_num_threads() - device;
         tbb_scheduler_init.initialize(num_tbb_threads);
         return new firepony_device_pipeline<firepony::intel_tbb>(consumer_id, num_tbb_threads);
 #endif

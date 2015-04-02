@@ -163,13 +163,10 @@ int main(int argc, char **argv)
 
 #if ENABLE_CUDA_BACKEND
     std::string runtime_version;
-    if (cuda_runtime_init(runtime_version) == false)
+    if (cuda_runtime_init(runtime_version) == true)
     {
-        fprintf(stderr, "error loading CUDA runtime: %s\n", runtime_version.c_str());
-        exit(1);
+        fprintf(stderr, "CUDA runtime version %s\n", runtime_version.c_str());
     }
-
-    fprintf(stderr, "CUDA runtime version %s\n", runtime_version.c_str());
 #endif
 
     compute_devices = enumerate_compute_devices();

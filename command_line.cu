@@ -49,6 +49,7 @@ static void usage(void)
     fprintf(stderr, "  -d, --debug                           Enable debugging (*extremely* verbose)\n");
     fprintf(stderr, "  --disable-rounding                    Disable rounding on the output tables\n");
     fprintf(stderr, "  -b, --batch-size <n>                  Process input in batches of <n> reads\n");
+    fprintf(stderr, "  --mmap                                Load reference/dbsnp from system shared memory if present\n");
 #if ENABLE_CUDA_BACKEND
     fprintf(stderr, "  --gpu-only                            Use only the CUDA GPU-accelerated backend\n");
 #endif
@@ -111,6 +112,7 @@ void parse_command_line(int argc, char **argv)
             { "debug", no_argument, NULL, 'd' },
             { "disable-rounding", no_argument, NULL, 'n' },
             { "batch-size", required_argument, NULL, 'b' },
+            { "mmap", no_argument, NULL, 'm' },
 #if ENABLE_CUDA_BACKEND
             { "gpu-only", no_argument, NULL, 'g' },
 #endif
@@ -167,6 +169,11 @@ void parse_command_line(int argc, char **argv)
                 usage();
             }
 
+            break;
+
+        case 'm':
+            // --mmap
+            command_line_options.try_mmap = true;
             break;
 
 #if ENABLE_CUDA_BACKEND

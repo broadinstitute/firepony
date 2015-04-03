@@ -32,6 +32,6 @@
 
 namespace firepony {
 
-bool load_vcf(variant_database_host *output, reference_file_handle *reference_handle, const char *filename);
+bool load_vcf(variant_database_host *output, reference_file_handle *reference_handle, const char *filename, bool try_mmap);
 
 } // namespace firepony

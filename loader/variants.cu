@@ -33,40 +33,60 @@
 #include "reference.h"
 #include "../variant_database.h"
 
+#include "../mmap.h"
+#include "../serialization.h"
+
 namespace firepony {
 
-bool load_vcf(variant_database_host *output, reference_file_handle *reference_handle, const char *filename)
+bool load_vcf(variant_database_host *output, reference_file_handle *reference_handle, const char *filename, bool try_mmap)
 {
-    std::vector<std::string> gamgee_chromosomes(0);
+    bool loaded = false;
 
-    for(auto& record : gamgee::VariantReader<gamgee::VariantIterator>{std::string(filename)})
+    if (try_mmap)
     {
-        // header.chromosomes() and record.chromosome_name() are *very* slow
-        // unfortunately, gamgee does not really expose a better way of implementing this
-        auto gamgee_chromosome_id = record.chromosome();
-        if (gamgee_chromosome_id >= gamgee_chromosomes.size())
+        shared_memory_file shmem;
+
+        loaded = shared_memory_file::open(&shmem, filename);
+        if (loaded == true)
         {
-            // reload the list of chromosomes from gamgee
-            gamgee_chromosomes = record.header().chromosomes();
+            serialization::unserialize(output, shmem.data);
+            shmem.unmap();
         }
+    }
 
-        const std::string& chromosome_name = gamgee_chromosomes[gamgee_chromosome_id];
-        reference_handle->make_sequence_available(chromosome_name);
+    if (!loaded)
+    {
+        std::vector<std::string> gamgee_chromosomes(0);
 
-        uint32 id = reference_handle->sequence_data.sequence_names.lookup(chromosome_name);
-        if (id == uint32(-1))
+        for(auto& record : gamgee::VariantReader<gamgee::VariantIterator>{std::string(filename)})
         {
-            fprintf(stderr, "WARNING: chromosome %s not found in reference data, skipping\n", chromosome_name.c_str());
-            continue;
+            // header.chromosomes() and record.chromosome_name() are *very* slow
+            // unfortunately, gamgee does not really expose a better way of implementing this
+            auto gamgee_chromosome_id = record.chromosome();
+            if (gamgee_chromosome_id >= gamgee_chromosomes.size())
+            {
+                // reload the list of chromosomes from gamgee
+                gamgee_chromosomes = record.header().chromosomes();
+            }
+
+            const std::string& chromosome_name = gamgee_chromosomes[gamgee_chromosome_id];
+            reference_handle->make_sequence_available(chromosome_name);
+
+            uint32 id = reference_handle->sequence_data.sequence_names.lookup(chromosome_name);
+            if (id == uint32(-1))
+            {
+                fprintf(stderr, "WARNING: chromosome %s not found in reference data, skipping\n", chromosome_name.c_str());
+                continue;
+            }
+
+            // make sure we have storage for the chromosome
+            output->new_entry(id);
+            auto& chromosome = output->get_sequence(id);
+
+            // note: VCF positions are 1-based, but we convert to 0-based
+            chromosome.feature_start.push_back(record.alignment_start() - 1);
+            chromosome.feature_stop.push_back(record.alignment_stop() - 1);
         }
-
-        // make sure we have storage for the chromosome
-        output->new_entry(id);
-        auto& chromosome = output->get_sequence(id);
-
-        // note: VCF positions are 1-based, but we convert to 0-based
-        chromosome.feature_start.push_back(record.alignment_start() - 1);
-        chromosome.feature_stop.push_back(record.alignment_stop() - 1);
     }
 
     // generate the search index for each chromosome

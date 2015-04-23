@@ -64,6 +64,18 @@ static void load_record(sequence_database_host *output, const gamgee::Fastq& rec
 
     std::string sequence = record.sequence();
 
+    // xxxnsubtil: this *seems* to mimic gatk behavior, but it's unclear whether this is what gatk really does
+    for(size_t i = 0; i < sequence.size(); i++)
+    {
+        if (sequence[i] != 'A' &&
+            sequence[i] != 'C' &&
+            sequence[i] != 'G' &&
+            sequence[i] != 'T')
+        {
+            sequence[i] = 'N';
+        }
+    }
+
     h->bases.resize(sequence.size());
     assign(sequence.size(),
            thrust::make_transform_iterator(sequence.begin(), iupac16()),

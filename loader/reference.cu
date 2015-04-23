@@ -43,6 +43,9 @@
 #include "../device/util.h"
 #include "../device/from_nvbio/dna.h"
 
+#include "../mmap.h"
+#include "../serialization.h"
+
 namespace firepony {
 
 #include <thrust/iterator/transform_iterator.h>
@@ -83,12 +86,29 @@ static void load_record(sequence_database_host *output, const gamgee::Fastq& rec
 }
 
 // loader for sequence data
-static void load_reference(sequence_database_host *output, const char *filename)
+static void load_reference(sequence_database_host *output, const char *filename, bool try_mmap)
 {
-    for (gamgee::Fastq& record : gamgee::FastqReader(std::string(filename)))
+    bool loaded = false;
+
+    if (try_mmap)
     {
-        load_record(output, record);
-   }
+        shared_memory_file shmem;
+
+        loaded = shared_memory_file::open(&shmem, filename);
+        if (loaded == true)
+        {
+            serialization::unserialize(output, shmem.data);
+            shmem.unmap();
+        }
+    }
+
+    if (!loaded)
+    {
+        for (gamgee::Fastq& record : gamgee::FastqReader(std::string(filename)))
+        {
+            load_record(output, record);
+        }
+    }
 }
 
 static void load_one_sequence(sequence_database_host *output, const std::string filename, size_t file_offset)
@@ -159,7 +179,7 @@ bool reference_file_handle::load_index()
     return true;
 }
 
-reference_file_handle *reference_file_handle::open(const std::string filename, uint32 consumers)
+reference_file_handle *reference_file_handle::open(const std::string filename, uint32 consumers, bool try_mmap)
 {
     reference_file_handle *handle = new reference_file_handle(filename, consumers);
 
@@ -167,7 +187,7 @@ reference_file_handle *reference_file_handle::open(const std::string filename, u
     {
         // no index present, load entire reference
         fprintf(stderr, "WARNING: index not available for reference file %s, loading entire reference\n", filename.c_str());
-        load_reference(&handle->sequence_data, filename.c_str());
+        load_reference(&handle->sequence_data, filename.c_str(), try_mmap);
     } else {
         fprintf(stderr, "loaded index for %s\n", filename.c_str());
 
@@ -177,6 +197,19 @@ reference_file_handle *reference_file_handle::open(const std::string filename, u
             fprintf(stderr, "error opening %s\n", filename.c_str());
             delete handle;
             return nullptr;
+        }
+
+        if (try_mmap)
+        {
+            shared_memory_file shmem;
+            bool ret;
+
+            ret = shared_memory_file::open(&shmem, filename.c_str());
+            if (ret == true)
+            {
+                serialization::unserialize(&handle->sequence_data, shmem.data);
+                shmem.unmap();
+            }
         }
     }
 

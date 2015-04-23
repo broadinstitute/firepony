@@ -54,6 +54,9 @@ struct runtime_options
     bool enable_cuda;
     bool enable_tbb;
 
+    // enable the shared memory reference/dbsnp loader
+    bool try_mmap;
+
     void disable_all_backends(void)
     {
         enable_cuda = false;
@@ -75,6 +78,8 @@ struct runtime_options
 
         enable_cuda = true;
         enable_tbb = true;
+
+        try_mmap = false;
     }
 };
 

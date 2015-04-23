@@ -106,9 +106,13 @@ set(firepony_common_sources
     command_line.h
     io_thread.cu
     io_thread.h
+    mmap.cu
+    mmap.h
     runtime_options.h
     segmented_database.h
     sequence_database.h
+    serialization.h
+    serialization_inl.h
     string_database.cu
     string_database.h
     table_formatter.cu
@@ -139,5 +143,9 @@ target_link_libraries(firepony firepony-device firepony-common ${tbb_LIB} ${gamg
 cuda_add_executable(firepony-vcf-convert firepony-vcf-convert.cu)
 target_link_libraries(firepony-vcf-convert ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
 add_dependencies(firepony-vcf-convert gamgee zlib)
+
+cuda_add_executable(firepony-loader firepony-loader.cu)
+target_link_libraries(firepony-loader firepony-common ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+add_dependencies(firepony-loader firepony-common gamgee zlib)
 
 cuda_build_clean_target()

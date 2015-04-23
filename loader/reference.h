@@ -54,7 +54,7 @@ struct reference_file_handle
 
     bool make_sequence_available(const std::string& sequence_name);
 
-    static reference_file_handle *open(const std::string filename, uint32 consumers);
+    static reference_file_handle *open(const std::string filename, uint32 consumers, bool try_mmap);
 
     void consumer_lock(const uint32 consumer_id);
     void consumer_unlock(const uint32 consumer_id);

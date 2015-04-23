@@ -38,6 +38,8 @@ namespace firepony {
 // utility struct to keep track of string identifiers using integers
 struct string_database
 {
+    friend struct serialization;
+
     // returns the id of string if it exists in the database, otherwise returns -1
     uint32 lookup(const std::string& string) const;
     // returns the string corresponding to the given integer id

@@ -1460,9 +1460,9 @@ void debug_baq(firepony_context<system>& context, const alignment_batch<system>&
         uint8 q = context.baq.qualities[i];
         if (q == uint8(-1))
         {
-            fprintf(stderr, "  - ");
+            fprintf(stderr, "   - ");
         } else {
-            fprintf(stderr, "% 3d ", q);
+            fprintf(stderr, "% 4d ", q);
         }
     }
     fprintf(stderr, " ]\n");

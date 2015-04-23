@@ -958,28 +958,28 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
     fprintf(stderr, "                                    ");
     for(uint32 i = 0; i < cigar_end - cigar_start; i++)
     {
-        fprintf(stderr, "% 3d ", i);
+        fprintf(stderr, "% 4d ", i);
     }
     fprintf(stderr, "\n");
 
     fprintf(stderr, "    event list                  = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
-        fprintf(stderr, "  %c ", cigar_event::ascii(ctx.cigar_events[i]));
+        fprintf(stderr, "   %c ", cigar_event::ascii(ctx.cigar_events[i]));
     }
     fprintf(stderr, "]\n");
 
     fprintf(stderr, "    event idx -> read coords    = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
-        fprintf(stderr, "% 3d ", (int16) ctx.cigar_event_read_coordinates[i]);
+        fprintf(stderr, "% 4d ", (int16) ctx.cigar_event_read_coordinates[i]);
     }
     fprintf(stderr, "]\n");
 
     fprintf(stderr, "    event reference coordinates = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
-        fprintf(stderr, "% 3d ", (int16) ctx.cigar_event_reference_coordinates[i]);
+        fprintf(stderr, "% 4d ", (int16) ctx.cigar_event_reference_coordinates[i]);
     }
     fprintf(stderr, "]\n");
 
@@ -989,9 +989,9 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
         uint16 read_bp_idx = ctx.cigar_event_read_coordinates[i];
         if (read_bp_idx == uint16(-1))
         {
-            fprintf(stderr, "  - ");
+            fprintf(stderr, "   - ");
         } else {
-            fprintf(stderr, "%s", (uint8) ctx.is_snp[idx.read_start + read_bp_idx] ? "  1 " : "  . ");
+            fprintf(stderr, "%s", (uint8) ctx.is_snp[idx.read_start + read_bp_idx] ? "   1 " : "   . ");
         }
     }
     fprintf(stderr, "]\n");
@@ -1002,9 +1002,9 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
         uint16 read_bp_idx = ctx.cigar_event_read_coordinates[i];
         if (read_bp_idx == uint16(-1))
         {
-            fprintf(stderr, "  - ");
+            fprintf(stderr, "   - ");
         } else {
-            fprintf(stderr, "%s", (uint8) ctx.is_insertion[idx.read_start + read_bp_idx] ? "  1 " : "  . ");
+            fprintf(stderr, "%s", (uint8) ctx.is_insertion[idx.read_start + read_bp_idx] ? "   1 " : "   . ");
         }
     }
     fprintf(stderr, "]\n");
@@ -1015,9 +1015,9 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
         uint16 read_bp_idx = ctx.cigar_event_read_coordinates[i];
         if (read_bp_idx == uint16(-1))
         {
-            fprintf(stderr, "  - ");
+            fprintf(stderr, "   - ");
         } else {
-            fprintf(stderr, "%s", (uint8) ctx.is_deletion[idx.read_start + read_bp_idx] ? "  1 " : "  . ");
+            fprintf(stderr, "%s", (uint8) ctx.is_deletion[idx.read_start + read_bp_idx] ? "   1 " : "   . ");
         }
     }
     fprintf(stderr, "]\n");
@@ -1030,12 +1030,12 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
         uint16 bp_offset = ctx.cigar_event_read_coordinates[i];
         if (bp_offset == uint16(-1))
         {
-            fprintf(stderr, "  - ");
+            fprintf(stderr, "   - ");
         } else {
             if (context.active_location_list[idx.read_start + bp_offset] == 0)
-                fprintf(stderr, "% 3d ", 1);
+                fprintf(stderr, "% 4d ", 1);
             else
-                fprintf(stderr, "  . ");
+                fprintf(stderr, "   . ");
         }
     }
     fprintf(stderr, "]\n");
@@ -1048,13 +1048,13 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
         uint16 bp_offset = ctx.cigar_event_read_coordinates[i];
         if (bp_offset == uint16(-1))
         {
-            fprintf(stderr, "  - ");
+            fprintf(stderr, "   - ");
         } else {
             double err = context.fractional_error.snp_errors[idx.qual_start + bp_offset];
             if (err == 0.0)
-                fprintf(stderr, "  . ");
+                fprintf(stderr, "   . ");
             else
-                fprintf(stderr, " %.1f", err);
+                fprintf(stderr, " %.2f", err);
         }
     }
     fprintf(stderr, "]\n");
@@ -1065,13 +1065,13 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
         uint16 bp_offset = ctx.cigar_event_read_coordinates[i];
         if (bp_offset == uint16(-1))
         {
-            fprintf(stderr, "  - ");
+            fprintf(stderr, "   - ");
         } else {
             double err = context.fractional_error.insertion_errors[idx.qual_start + bp_offset];
             if (err == 0.0)
-                fprintf(stderr, "  . ");
+                fprintf(stderr, "   . ");
             else
-                fprintf(stderr, " %.1f", err);
+                fprintf(stderr, " %.2f", err);
         }
     }
     fprintf(stderr, "]\n");
@@ -1082,13 +1082,13 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
         uint16 bp_offset = ctx.cigar_event_read_coordinates[i];
         if (bp_offset == uint16(-1))
         {
-            fprintf(stderr, "  - ");
+            fprintf(stderr, "   - ");
         } else {
             double err = context.fractional_error.deletion_errors[idx.qual_start + bp_offset];
             if (err == 0.0)
-                fprintf(stderr, "  . ");
+                fprintf(stderr, "   . ");
             else
-                fprintf(stderr, " %.1f", err);
+                fprintf(stderr, " %.2f", err);
         }
     }
     fprintf(stderr, "]\n");
@@ -1100,7 +1100,7 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
     for(uint32 i = cigar_start; i < cigar_end; i++)
     {
         const uint16 ref_bp = ctx.cigar_event_reference_coordinates[i];
-        fprintf(stderr, "  %c ", ref_bp == uint16(-1) ? '-' : from_nvbio::iupac16_to_char(reference[ref_bp]));
+        fprintf(stderr, "   %c ", ref_bp == uint16(-1) ? '-' : from_nvbio::iupac16_to_char(reference[ref_bp]));
     }
     fprintf(stderr, "]\n");
 
@@ -1122,7 +1122,7 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
             }
         }
 
-        fprintf(stderr, "  %c ", base);
+        fprintf(stderr, "   %c ", base);
     }
     fprintf(stderr, "]\n");
 
@@ -1133,9 +1133,9 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
 
         if (read_bp == uint16(-1))
         {
-            fprintf(stderr, "  - ");
+            fprintf(stderr, "   - ");
         } else {
-            fprintf(stderr, "% 3d ", h_batch.qualities[idx.qual_start + read_bp]);
+            fprintf(stderr, "% 4d ", h_batch.qualities[idx.qual_start + read_bp]);
         }
     }
     fprintf(stderr, "]\n");
@@ -1147,9 +1147,9 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
 
         if (read_bp == uint16(-1))
         {
-            fprintf(stderr, "  - ");
+            fprintf(stderr, "   - ");
         } else {
-            fprintf(stderr, "  %c ", h_batch.qualities[idx.qual_start + read_bp] + '!');
+            fprintf(stderr, "   %c ", h_batch.qualities[idx.qual_start + read_bp] + '!');
         }
     }
     fprintf(stderr, "]\n");

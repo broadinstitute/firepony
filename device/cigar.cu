@@ -941,6 +941,8 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
     const CRQ_index idx = h_batch.crq_index(read_index);
     const auto& ctx = context.cigar;
 
+    ushort2 read_window_clipped = ctx.read_window_clipped[read_index];
+
     fprintf(stderr, "  cigar info:\n");
 
     fprintf(stderr, "    cigar                       = [");
@@ -975,6 +977,21 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
         fprintf(stderr, "% 4d ", (int16) ctx.cigar_event_read_coordinates[i]);
     }
     fprintf(stderr, "]\n");
+
+    fprintf(stderr, "             ... clipped        = [ ");
+    for(uint32 i = cigar_start; i < cigar_end; i++)
+    {
+        int16 coord = ctx.cigar_event_read_coordinates[i] - read_window_clipped.x;
+
+        if (coord >= 0)
+        {
+            fprintf(stderr, "% 4d ", coord);
+        } else {
+            fprintf(stderr, "   - ");
+        }
+    }
+    fprintf(stderr, "]\n");
+
 
     fprintf(stderr, "    event reference coordinates = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)
@@ -1154,7 +1171,6 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
     }
     fprintf(stderr, "]\n");
 
-    ushort2 read_window_clipped = ctx.read_window_clipped[read_index];
     fprintf(stderr, "    clipped read window         = [ % 3d, % 3d ]\n", read_window_clipped.x, read_window_clipped.y);
 
     ushort2 read_window_clipped_no_insertions = ctx.read_window_clipped_no_insertions[read_index];

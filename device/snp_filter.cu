@@ -311,6 +311,12 @@ public:
                     ev_feature_start--;
                 }
 
+                // if we landed in an insertion region, move backwards to the beginning of the insertion region
+                while (ev_feature_start > cigar_start && ctx.cigar.cigar_events[ev_feature_start - 1] == cigar_event::I)
+                {
+                    ev_feature_start--;
+                }
+
                 // if the matching event has no read coordinate, move forward again until we find the first read coordinate inside the feature range
                 while (ev_feature_start < cigar_end && ctx.cigar.cigar_event_read_coordinates[ev_feature_start] == uint16(-1))
                 {

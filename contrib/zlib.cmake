@@ -8,6 +8,7 @@ ExternalProject_Add(zlib
 #    GIT_TAG "e176b3c23ace88d5ded5b8f8371bbab6d7b02ba8"
     GIT_REPOSITORY "https://github.com/madler/zlib.git"
     GIT_TAG "v1.2.8"
+    UPDATE_COMMAND ""
     BUILD_IN_SOURCE 1
     CONFIGURE_COMMAND ${zlib_PREFIX}/src/zlib/configure --prefix=${zlib_INSTALL} --static
     INSTALL_DIR ${zlib_INSTALL}

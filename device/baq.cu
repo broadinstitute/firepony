@@ -836,6 +836,15 @@ struct hmm_glocal : public lambda<system>
 
 //                printf("(%d,%d;%d): %.32f,%.32f,%.32f\n", i, k, u, fi[u], fi[u+1], fi[u+2]);
 //                printf(" .. u = %d v11 = %d v01 = %d v10 = %d e = %f\n", u, v11, v01, v10, e);
+//                printf("HMM: %d, %d, %d, %d, %d, %d, %d, %d, %d, %.32f, %.32f, %.32f, %.32f, %.32f, %.32f, %.32f, %.32f, %.32f, %.32f, %.32f\n",
+//                       i, k, u,
+//                       from_nvbio::iupac16_to_char(uint8(referenceBases[k-1])), from_nvbio::iupac16_to_char(qyi), uint8(inputQualities[queryStart+i-1]),
+//                       v01, v10, v11,
+//                       e,
+//                       fi1[v01+0], fi1[v01+1],
+//                       fi1[v10+0], fi1[v10+1],
+//                       fi1[v11+0], fi1[v11+1], fi1[v11+2],
+//                       fi[u+0], fi[u+1], fi[u+2]);
             }
 
             // rescale
@@ -1437,6 +1446,10 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
 
     baq_postprocess.start();
 
+#if PRESERVE_BAQ_STATE
+    context.baq.state = baq_state;
+#endif
+
     // for any reads that we did *not* compute a BAQ, mark the base pairs as having no BAQ uncertainty
     parallel<system>::for_each(context.active_read_list.begin(),
                                context.active_read_list.end(),
@@ -1489,6 +1502,21 @@ void debug_baq(firepony_context<system>& context, const alignment_batch<system>&
         }
     }
     fprintf(stderr, " ]\n");
+
+#if PRESERVE_BAQ_STATE
+    fprintf(stderr, "    BAQ state                   = [ ");
+    for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
+    {
+        uint8 q = context.baq.state[i];
+        if (q == uint8(-1))
+        {
+            fprintf(stderr, "   - ");
+        } else {
+            fprintf(stderr, "% 4d ", q);
+        }
+    }
+    fprintf(stderr, " ]\n");
+#endif
 
     fprintf(stderr, "\n");
 }

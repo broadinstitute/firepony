@@ -34,6 +34,9 @@ namespace firepony {
 
 #define NO_BAQ_UNCERTAINTY 64
 
+// set to 1 to store BAQ state in the context, useful for debugging
+#define PRESERVE_BAQ_STATE 0
+
 template <target_system system>
 struct baq_context
 {
@@ -45,6 +48,10 @@ struct baq_context
 
     // BAQ'ed qualities for each read, same size as each read
     vector<system, uint8> qualities;
+#if PRESERVE_BAQ_STATE
+    // BAQ state, for debugging
+    vector<system, uint32> state;
+#endif
 
     // forward and backward HMM matrices
     // each read requires read_len * 6 * (bandWidth + 1)

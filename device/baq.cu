@@ -73,6 +73,11 @@ namespace firepony {
 #define GUARD_BAND(z) (z)
 #endif
 
+static CUDA_HOST_DEVICE inline uint32 abs(int32 val)
+{
+    return (val < 0 ? uint32(-val) : uint32(val));
+}
+
 template <target_system system>
 struct compute_hmm_windows : public lambda<system>
 {
@@ -648,11 +653,18 @@ struct hmm_glocal : public lambda<system>
 
         queryBases = batch.reads + idx.read_start + queryStart;
 
-        // xxxnsubtil: hmm_reference_window.x is expected to be negative for most cases
-        // reads aligning to the start of a chromosome will yield undefined results here
-        // it's unclear to me how GATK handles this case
-        referenceBases = ctx.reference_db.get_sequence_data(batch.chromosome[read_index],
-                                                            batch.alignment_start[read_index] + hmm_reference_window.x);
+        // compute the starting offset of the HMM window inside the reference
+        // this handles the case where a read aligns to the start of a chromosome by clamping the resulting offset to zero
+        uint32 hmm_reference_offset;
+        if (hmm_reference_window.x < 0 && batch.alignment_start[read_index] < abs(hmm_reference_window.x))
+        {
+            hmm_reference_offset = 0;
+            referenceLength -= abs(hmm_reference_window.x);
+        } else {
+            hmm_reference_offset = batch.alignment_start[read_index] + hmm_reference_window.x;
+        }
+
+        referenceBases = ctx.reference_db.get_sequence_data(batch.chromosome[read_index], hmm_reference_offset);
 
         inputQualities = &batch.qualities[idx.qual_start] + queryStart;
 
@@ -1118,8 +1130,19 @@ struct cap_baq_qualities : public lambda<system>
         uint32 readI = 0;
         uint32 refI = 0;
         uint32 numD = 0;
-        const int16 refOffset = hmm_reference_window.x - reference_window_clipped.x;
 
+        // compute the shift applied to the reference during BAQ setup
+        // this happens if the computed HMM window start lies before the chromosome start (i.e., the start coordinate is negative)
+        int16 reference_shift;
+        if (hmm_reference_window.x < 0 && batch.alignment_start[read_index] < abs(hmm_reference_window.x))
+        {
+            reference_shift = abs(hmm_reference_window.x);
+        } else {
+            reference_shift = 0;
+        }
+
+        // compute the reference window offset
+        const int16 refOffset = hmm_reference_window.x - reference_window_clipped.x + reference_shift;
 
         for(uint32 i = baq_start; i < cigar_end - cigar_start; i++)
         {

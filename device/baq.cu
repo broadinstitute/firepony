@@ -659,7 +659,10 @@ struct hmm_glocal : public lambda<system>
         if (hmm_reference_window.x < 0 && batch.alignment_start[read_index] < abs(hmm_reference_window.x))
         {
             hmm_reference_offset = 0;
-            referenceLength -= abs(hmm_reference_window.x);
+
+            // this is very likely a problem in GATK: because their reference and read coordinates are off by 1, they end up
+            // subtracting one base from the reference window when the start position is clamped
+            referenceLength--;
         } else {
             hmm_reference_offset = batch.alignment_start[read_index] + hmm_reference_window.x;
         }
@@ -1142,12 +1145,15 @@ struct cap_baq_qualities : public lambda<system>
 
         // compute the shift applied to the reference during BAQ setup
         // this happens if the computed HMM window start lies before the chromosome start (i.e., the start coordinate is negative)
-        int16 reference_shift;
+        // also computes the shift in expected read BP positions that is present in the BAQ state vector
+        int16 reference_shift, read_shift;
         if (hmm_reference_window.x < 0 && batch.alignment_start[read_index] < abs(hmm_reference_window.x))
         {
             reference_shift = abs(hmm_reference_window.x);
+            read_shift = batch.alignment_start[read_index];
         } else {
             reference_shift = 0;
+            read_shift = 0;
         }
 
         // compute the reference window offset
@@ -1190,7 +1196,7 @@ struct cap_baq_qualities : public lambda<system>
             case cigar_event::M:
                 if (update_qualities)
                 {
-                    const uint32 expectedPos = refI - refOffset + (i - numD - baq_start - readI);
+                    const uint32 expectedPos = refI - refOffset + (i - numD - baq_start - readI) + read_shift;
                     ctx.baq.qualities[qual_idx] = capBaseByBAQ(batch.qualities[idx.qual_start + read_bp_idx],
                                                                ctx.baq.qualities[idx.qual_start + read_bp_idx],
                                                                baq_state[idx.qual_start + read_bp_idx],

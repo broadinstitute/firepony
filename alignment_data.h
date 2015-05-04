@@ -118,13 +118,13 @@ namespace AlignmentDataMask
 // CRQ: cigars, reads, qualities
 struct CRQ_index
 {
-    const uint32& cigar_start, cigar_len;
-    const uint32& read_start, read_len;
-    const uint32& qual_start, qual_len;
+    const uint32 cigar_start, cigar_len;
+    const uint32 read_start, read_len;
+    const uint32 qual_start, qual_len;
 
-    CUDA_HOST_DEVICE CRQ_index(const uint32& cigar_start, const uint32& cigar_len,
-                               const uint32& read_start, const uint32& read_len,
-                               const uint32& qual_start, const uint32& qual_len)
+    CUDA_HOST_DEVICE CRQ_index(const uint32 cigar_start, const uint32 cigar_len,
+                               const uint32 read_start, const uint32 read_len,
+                               const uint32 qual_start, const uint32 qual_len)
         : cigar_start(cigar_start),
           cigar_len(cigar_len),
           read_start(read_start),

@@ -1513,7 +1513,7 @@ void debug_baq(firepony_context<system>& context, const alignment_batch<system>&
     fprintf(stderr, "    BAQ state                   = [ ");
     for(uint32 i = idx.qual_start; i < idx.qual_start + idx.qual_len; i++)
     {
-        uint8 q = context.baq.state[i];
+        uint32 q = context.baq.state[i];
         if (q == uint8(-1))
         {
             fprintf(stderr, "   - ");

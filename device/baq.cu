@@ -85,6 +85,10 @@ struct compute_hmm_windows : public lambda<system>
 
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
+        // read_needs_baq is used to avoid disabling reads that don't actually need BAQ if we determine that BAQ can't otherwise be computed
+        // (we still compute HMM windows even for reads that do not need BAQ)
+        const bool read_needs_baq = (ctx.cigar.num_errors[read_index] != 0);
+
         const CRQ_index idx = batch.crq_index(read_index);
 
         const ushort2& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
@@ -112,6 +116,39 @@ struct compute_hmm_windows : public lambda<system>
         hmm_reference_window.x = reference_window_clipped.x - left_insertion - offset;
         hmm_reference_window.y = reference_window_clipped.y + right_insertion + offset;
 
+        // figure out if the HMM window is contained inside the chromosome this read is aligned to
+        auto& reference = ctx.reference_db.get_chromosome(batch.chromosome[read_index]);
+
+        int left_window_shift = 0;
+        if (hmm_reference_window.x < 0 && batch.alignment_start[read_index] < abs(hmm_reference_window.x))
+        {
+            // this is very likely a problem in GATK: because their reference and read coordinates are off by 1, they end up
+            // subtracting one base from the reference window when the start position is clamped
+            left_window_shift = -1;
+        }
+
+        if (read_needs_baq && batch.alignment_start[read_index] + hmm_reference_window.y + left_window_shift >= reference.bases.size())
+        {
+            // HMM window lies beyond the end of the reference sequence
+            // can't compute BAQ, filter out this read
+
+            // clear the cigar event -> read bp offset mapping for this read
+            const uint32 cigar_ev_start = ctx.cigar.cigar_offsets[idx.cigar_start];
+            const uint32 cigar_ev_stop = ctx.cigar.cigar_offsets[idx.cigar_start + idx.cigar_len];
+
+            for(uint32 i = cigar_ev_start; i < cigar_ev_stop; i++)
+            {
+                ctx.cigar.cigar_event_read_index[i] = uint32(-1);
+                ctx.cigar.cigar_event_read_coordinates[i] = uint16(-1);
+            }
+
+            // emit an invalid HMM window
+            // this will cause this read to be removed from the active read list
+            ctx.baq.hmm_reference_windows[read_index] = make_short2(short(-1), short(-1));
+
+            return;
+        }
+
         // write out the result
         ctx.baq.hmm_reference_windows[read_index] = hmm_reference_window;
 
@@ -138,6 +175,23 @@ struct compute_hmm_windows : public lambda<system>
         }
 
         ctx.baq.bandwidth[read_index] = bandWidth;
+    }
+};
+
+template <target_system system>
+struct hmm_window_valid : public lambda<system>
+{
+    LAMBDA_INHERIT;
+
+    CUDA_HOST_DEVICE bool operator() (const uint32 read_index)
+    {
+        if (ctx.baq.hmm_reference_windows[read_index].x == short(-1) &&
+            ctx.baq.hmm_reference_windows[read_index].y == short(-1))
+        {
+            return false;
+        } else {
+            return true;
+        }
     }
 };
 
@@ -1308,6 +1362,7 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
     struct baq_context<system>& baq = context.baq;
     vector<system, uint32>& active_baq_read_list = context.temp_u32;
     vector<system, uint32>& baq_state = context.temp_u32_2;
+    vector<system, uint32>& temp_active_list = context.temp_u32_3;
 
     // check if we can use the lmem kernel
 #if ENABLE_LMEM_PATH
@@ -1341,11 +1396,30 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
     baq.hmm_reference_windows.resize(batch.device.num_reads);
     baq.bandwidth.resize(batch.device.num_reads);
 
-    // compute the alignment frames
+    // compute the HMM windows
     // note: this is used both for real BAQ and flat BAQ, so we use the full active read list
     parallel<system>::for_each(context.active_read_list.begin(),
                                context.active_read_list.end(),
                                compute_hmm_windows<system>(context, batch.device));
+
+    // remove any reads for which we failed to compute the HMM window
+    temp_active_list.resize(active_baq_read_list.size());
+    num_active = parallel<system>::copy_if(active_baq_read_list.begin(),
+                                           active_baq_read_list.size(),
+                                           temp_active_list.begin(),
+                                           hmm_window_valid<system>(context, batch.device),
+                                           context.temp_storage);
+    active_baq_read_list = temp_active_list;
+    active_baq_read_list.resize(num_active);
+
+    temp_active_list.resize(context.active_read_list.size());
+    num_active = parallel<system>::copy_if(context.active_read_list.begin(),
+                                           context.active_read_list.size(),
+                                           temp_active_list.begin(),
+                                           hmm_window_valid<system>(context, batch.device),
+                                           context.temp_storage);
+    context.active_read_list = temp_active_list;
+    context.active_read_list.resize(num_active);
 
 #if ENABLE_LMEM_PATH
     if (!baq_use_lmem)

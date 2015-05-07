@@ -697,9 +697,8 @@ struct compute_error_vectors : public lambda<system>
                     if (off >= 0 && off <= read_window_clipped.y)
                     {
                         ins_vector[idx.read_start + off] = 1;
+                        num_errors++;
                     }
-
-                    num_errors++;
                 }
 
                 break;
@@ -715,15 +714,16 @@ struct compute_error_vectors : public lambda<system>
                     if (!negative_strand)
                     {
                         del_vector[idx.read_start + current_bp_idx] = 1;
+                        num_errors++;
                     } else {
                         uint16 off = current_bp_idx + 1;
                         if (off < idx.read_len)
                         {
                             del_vector[idx.read_start + off] = 1;
+                            num_errors++;
                         }
                     }
 
-                    num_errors++;
                 }
 
                 break;

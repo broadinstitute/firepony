@@ -67,9 +67,30 @@ static void load_record(sequence_database_host *output, const gamgee::Fastq& rec
 
     std::string sequence = record.sequence();
 
-    // xxxnsubtil: this *seems* to mimic gatk behavior, but it's unclear whether this is what gatk really does
     for(size_t i = 0; i < sequence.size(); i++)
     {
+        // convert lower-case base pairs to upper-case
+        if (sequence[i] == 'a')
+        {
+            sequence[i] = 'A';
+        }
+
+        if (sequence[i] == 'c')
+        {
+            sequence[i] = 'C';
+        }
+
+        if (sequence[i] == 'g')
+        {
+            sequence[i] = 'G';
+        }
+
+        if (sequence[i] == 't')
+        {
+            sequence[i] = 'T';
+        }
+
+        // convert everything besides ACGT to N
         if (sequence[i] != 'A' &&
             sequence[i] != 'C' &&
             sequence[i] != 'G' &&

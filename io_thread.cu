@@ -57,9 +57,14 @@ io_thread::~io_thread()
     }
 }
 
-void io_thread::start(void)
+bool io_thread::start(void)
 {
+    if (file.init() == false)
+        return false;
+
     thread = std::thread(&io_thread::run, this);
+
+    return true;
 }
 
 void io_thread::join(void)

@@ -25,9 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <gamgee/variant/variant_reader.h>
-
 #include <string>
+
+#include <htslib/vcf.h>
 
 #include "../command_line.h"
 #include "reference.h"
@@ -56,20 +56,51 @@ bool load_vcf(variant_database_host *output, reference_file_handle *reference_ha
 
     if (!loaded)
     {
-        std::vector<std::string> gamgee_chromosomes(0);
+        htsFile *fp;
+        bcf_hdr_t *bcf_header;
+        bcf1_t *data;
 
-        for(auto& record : gamgee::VariantReader<gamgee::VariantIterator>{std::string(filename)})
+        fp = bcf_open(filename, "r");
+        if (fp == NULL)
         {
-            // header.chromosomes() and record.chromosome_name() are *very* slow
-            // unfortunately, gamgee does not really expose a better way of implementing this
-            auto gamgee_chromosome_id = record.chromosome();
-            if (gamgee_chromosome_id >= gamgee_chromosomes.size())
+            fprintf(stderr, "error opening %s\n", filename);
+            return false;
+        }
+
+        bcf_header = bcf_hdr_read(fp);
+        bcf_hdr_set_samples(bcf_header, nullptr, 0);
+
+        // build a list of chromosomes in the header
+        std::vector<std::string> chromosomes;
+        for(int32 i = 0; i < bcf_header->nhrec; i++)
+        {
+            bcf_hrec_t *r = bcf_header->hrec[i];
+
+            if (r->type == BCF_HL_CTG)
             {
-                // reload the list of chromosomes from gamgee
-                gamgee_chromosomes = record.header().chromosomes();
+                chromosomes.push_back(*r->vals);
+            }
+        }
+
+        data = bcf_init();
+
+        for(;;)
+        {
+            // read the next thing
+            int ret;
+            ret = bcf_read(fp, bcf_header, data);
+
+            if (ret == -1)
+            {
+                break;
             }
 
-            const std::string& chromosome_name = gamgee_chromosomes[gamgee_chromosome_id];
+            // "unpack" up to ALT inclusive
+            bcf_unpack(data, BCF_UN_STR);
+
+            // grab the data we need
+            uint32 chromosome_id = data->rid;
+            const std::string& chromosome_name = chromosomes[chromosome_id];
             reference_handle->make_sequence_available(chromosome_name);
 
             uint32 id = reference_handle->sequence_data.sequence_names.lookup(chromosome_name);
@@ -83,9 +114,8 @@ bool load_vcf(variant_database_host *output, reference_file_handle *reference_ha
             output->new_entry(id);
             auto& chromosome = output->get_sequence(id);
 
-            // note: VCF positions are 1-based, but we convert to 0-based
-            chromosome.feature_start.push_back(record.alignment_start() - 1);
-            chromosome.feature_stop.push_back(record.alignment_stop() - 1);
+            chromosome.feature_start.push_back(data->pos);
+            chromosome.feature_stop.push_back(data->pos + data->rlen - 1);
         }
     }
 

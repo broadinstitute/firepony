@@ -4,10 +4,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake-local")
 
 include(ExternalProject)
 
-option(USE_SYSTEM_BOOST
-       "Use the system-wide installed version of Boost"
-       ON)
-
 option(USE_EXTERNAL_THRUST
        "Build using Thrust from Github (do not use the CUDA toolkit version)"
        ON)
@@ -41,16 +37,10 @@ endif()
 include("gcc.cmake")
 
 # build dependencies
-if (NOT USE_SYSTEM_BOOST)
-    include("contrib/boost.cmake")
-    include_directories(${Boost_INCLUDE_DIR})
-endif()
-
 if (USE_EXTERNAL_THRUST)
     include("contrib/thrust.cmake")
 endif()
 
-include("contrib/gamgee.cmake")
 include("contrib/zlib.cmake")
 include("contrib/cub.cmake")
 include("contrib/htslib.cmake")
@@ -130,7 +120,7 @@ set(firepony_common_sources
     )
 
 cuda_add_library(firepony-common ${firepony_common_sources})
-add_dependencies(firepony-common gamgee zlib)
+add_dependencies(firepony-common zlib htslib)
 if (ENABLE_CPU_BACKEND)
     add_dependencies(firepony-common tbb)
 endif()
@@ -139,10 +129,10 @@ if (USE_EXTERNAL_THRUST)
 endif()
 
 cuda_add_executable(firepony firepony.cu)
-target_link_libraries(firepony firepony-device firepony-common ${tbb_LIB} ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+target_link_libraries(firepony firepony-device firepony-common ${tbb_LIB} ${zlib_LIB} ${htslib_LIB} ${SYSTEM_LINK_LIBRARIES})
 
 cuda_add_executable(firepony-loader firepony-loader.cu)
-target_link_libraries(firepony-loader firepony-common ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
-add_dependencies(firepony-loader firepony-common htslib gamgee zlib)
+target_link_libraries(firepony-loader firepony-common ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+add_dependencies(firepony-loader zlib htslib)
 
 cuda_build_clean_target()

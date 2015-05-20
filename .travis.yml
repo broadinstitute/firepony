@@ -1,0 +1,25 @@
+language: cpp
+compiler: gcc
+
+env:
+  - BUILD_TYPE=Debug
+  - BUILD_TYPE=Release
+
+before_install:
+  - travis_retry sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+  - travis_retry wget -nv "http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1204/x86_64/cuda-repo-ubuntu1204_7.0-28_amd64.deb"
+  - sudo dpkg -i cuda-repo-ubuntu1204_7.0-28_amd64.deb
+  - travis_retry sudo apt-get update -qq
+
+install:
+  - travis_retry sudo apt-get install -qq -y gcc-4.9 g++-4.9 cuda-toolkit-7-0
+  - sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.9 20
+  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.9 20
+
+script:
+  - mkdir build
+  - pushd build
+  - cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DFORCE_TSX_OFF=1 -DUSE_SYSTEM_BOOST=0 ..
+  - make -j2
+  - popd
+

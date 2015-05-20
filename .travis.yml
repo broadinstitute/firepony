@@ -19,7 +19,7 @@ install:
 script:
   - mkdir build
   - pushd build
-  - cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DFORCE_TSX_OFF=1 -DUSE_SYSTEM_BOOST=0 ..
+  - cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DFORCE_TSX_OFF=1 ..
   - make -j2
   - popd
 

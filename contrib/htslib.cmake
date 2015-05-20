@@ -23,5 +23,6 @@ ExternalProject_Add(htslib
     LOG_DOWNLOAD 1
     )
 
+add_dependencies(htslib zlib)
 include_directories(${htslib_INSTALL}/include)
 set(htslib_LIB ${htslib_INSTALL}/lib/libhts.a)

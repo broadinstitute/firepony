@@ -120,7 +120,7 @@ set(firepony_common_sources
     )
 
 cuda_add_library(firepony-common ${firepony_common_sources})
-add_dependencies(firepony-common zlib htslib)
+add_dependencies(firepony-common htslib zlib)
 if (ENABLE_CPU_BACKEND)
     add_dependencies(firepony-common tbb)
 endif()
@@ -129,10 +129,10 @@ if (USE_EXTERNAL_THRUST)
 endif()
 
 cuda_add_executable(firepony firepony.cu)
-target_link_libraries(firepony firepony-device firepony-common ${tbb_LIB} ${zlib_LIB} ${htslib_LIB} ${SYSTEM_LINK_LIBRARIES})
+target_link_libraries(firepony firepony-device firepony-common ${tbb_LIB} ${htslib_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
 
 cuda_add_executable(firepony-loader firepony-loader.cu)
-target_link_libraries(firepony-loader firepony-common ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+target_link_libraries(firepony-loader firepony-common ${htslib_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
 add_dependencies(firepony-loader zlib htslib)
 
 cuda_build_clean_target()

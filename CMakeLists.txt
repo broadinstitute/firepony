@@ -141,10 +141,6 @@ endif()
 cuda_add_executable(firepony firepony.cu)
 target_link_libraries(firepony firepony-device firepony-common ${tbb_LIB} ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
 
-cuda_add_executable(firepony-vcf-convert firepony-vcf-convert.cu)
-target_link_libraries(firepony-vcf-convert ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
-add_dependencies(firepony-vcf-convert htslib gamgee zlib)
-
 cuda_add_executable(firepony-loader firepony-loader.cu)
 target_link_libraries(firepony-loader firepony-common ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
 add_dependencies(firepony-loader firepony-common htslib gamgee zlib)

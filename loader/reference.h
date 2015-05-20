@@ -66,7 +66,7 @@ private:
     void producer_unlock(void);
 
     bool load_index(void);
-    void load_whole_reference(void);
+    bool load_next_sequence(void);
 };
 
 } // namespace firepony

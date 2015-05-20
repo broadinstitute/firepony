@@ -1,5 +1,5 @@
 /*
- * Firepony
+ * Firepequence_nameony
  * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,10 +24,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#include <gamgee/fastq.h>
-#include <gamgee/fastq_iterator.h>
-#include <gamgee/fastq_reader.h>
 
 #include <string>
 #include <sstream>
@@ -57,93 +53,6 @@ struct iupac16 : public thrust::unary_function<char, uint8>
         return from_nvbio::char_to_iupac16(in);
     }
 };
-
-static void load_record(sequence_database_host *output, const gamgee::Fastq& record)
-{
-    sequence_storage<host> *h;
-
-    uint32 seq_id = output->sequence_names.insert(record.name());
-    h = output->new_entry(seq_id);
-
-    std::string sequence = record.sequence();
-
-    for(size_t i = 0; i < sequence.size(); i++)
-    {
-        // convert lower-case base pairs to upper-case
-        if (sequence[i] == 'a')
-        {
-            sequence[i] = 'A';
-        }
-
-        if (sequence[i] == 'c')
-        {
-            sequence[i] = 'C';
-        }
-
-        if (sequence[i] == 'g')
-        {
-            sequence[i] = 'G';
-        }
-
-        if (sequence[i] == 't')
-        {
-            sequence[i] = 'T';
-        }
-
-        // convert everything besides ACGT to N
-        if (sequence[i] != 'A' &&
-            sequence[i] != 'C' &&
-            sequence[i] != 'G' &&
-            sequence[i] != 'T')
-        {
-            sequence[i] = 'N';
-        }
-    }
-
-    h->bases.resize(sequence.size());
-    assign(sequence.size(),
-           thrust::make_transform_iterator(sequence.begin(), iupac16()),
-           h->bases.stream_at_index(0));
-}
-
-// loader for sequence data
-static void load_reference(sequence_database_host *output, const char *filename, bool try_mmap)
-{
-    bool loaded = false;
-
-    if (try_mmap)
-    {
-        shared_memory_file shmem;
-
-        loaded = shared_memory_file::open(&shmem, filename);
-        if (loaded == true)
-        {
-            serialization::unserialize(output, shmem.data);
-            shmem.unmap();
-        }
-    }
-
-    if (!loaded)
-    {
-        for (gamgee::Fastq& record : gamgee::FastqReader(std::string(filename)))
-        {
-            load_record(output, record);
-        }
-    }
-}
-
-static void load_one_sequence(sequence_database_host *output, const std::string filename, size_t file_offset)
-{
-    // note: we can't reuse the existing ifstream as gamgee for some reason wants to take ownership of the pointer and destroy it
-    std::ifstream *file_stream = new std::ifstream();
-    file_stream->open(filename);
-    file_stream->seekg(file_offset);
-
-    gamgee::FastqReader reader(file_stream);
-    gamgee::Fastq record = *(reader.begin());
-
-    load_record(output, record);
-}
 
 reference_file_handle::reference_file_handle(const std::string filename, uint32 consumers)
   : filename(filename), consumers(consumers)
@@ -178,7 +87,7 @@ bool reference_file_handle::load_index()
     std::string line;
     while(std::getline(index_fstream, line))
     {
-        // faidx format: <sequence name> <sequence len> <file offset> <line blen> <line len>
+        // faidx format: <sequence name> <sequence read_len> <file offset> <line blen> <line len>
         // fields are separated by \t
 
         // replace all \t with spaces to ease parsing
@@ -204,21 +113,22 @@ reference_file_handle *reference_file_handle::open(const std::string filename, u
 {
     reference_file_handle *handle = new reference_file_handle(filename, consumers);
 
+    handle->file_handle.open(filename);
+    if (handle->file_handle.fail())
+    {
+        fprintf(stderr, "error opening %s\n", filename.c_str());
+        delete handle;
+        return nullptr;
+    }
+
     if (!handle->load_index())
     {
         // no index present, load entire reference
         fprintf(stderr, "WARNING: index not available for reference file %s, loading entire reference\n", filename.c_str());
-        load_reference(&handle->sequence_data, filename.c_str(), try_mmap);
+        while (handle->load_next_sequence())
+            ;
     } else {
         fprintf(stderr, "loaded index for %s\n", filename.c_str());
-
-        handle->file_handle.open(filename);
-        if (handle->file_handle.fail())
-        {
-            fprintf(stderr, "error opening %s\n", filename.c_str());
-            delete handle;
-            return nullptr;
-        }
 
         if (try_mmap)
         {
@@ -276,7 +186,7 @@ bool reference_file_handle::make_sequence_available(const std::string& sequence_
     size_t offset = it->second;
 
     // we must seek backwards to the beginning of the header
-    // (faidx points at the beginning of the sequence data, but gamgee needs to parse the header)
+    // (faidx points at the beginning of the sequence data, but we need to parse the header)
     char c;
     do {
         file_handle.seekg(offset);
@@ -288,13 +198,133 @@ bool reference_file_handle::make_sequence_available(const std::string& sequence_
     } while(c != '>');
 
     producer_lock();
-    load_one_sequence(&sequence_data, filename, offset);
+    bool ret = load_next_sequence();
     producer_unlock();
 
-    fprintf(stderr, "+");
+    if (ret == false)
+    {
+        fprintf(stderr, "error loading sequence %s\n", sequence_name.c_str());
+    } else {
+        fprintf(stderr, "+");
+    }
+
     fflush(stderr);
 
-    return true;
+    return ret;
+}
+
+// filter carriage returns from a string
+static void filter_cr(std::string& string)
+{
+    if (string[string.size() - 1] == '\r')
+    {
+        string.pop_back();
+    }
+}
+
+bool reference_file_handle::load_next_sequence(void)
+{
+    sequence_storage<host> *h;
+    uint32 seq_id;
+
+    if (file_handle.fail())
+    {
+        return false;
+    }
+
+    std::string sequence_name;
+    if (!std::getline(file_handle, sequence_name))
+    {
+        return false;
+    }
+
+    if (sequence_name[0] != '>')
+    {
+        // we only accept fasta files
+        return false;
+    }
+
+    // remove carriage returns
+    filter_cr(sequence_name);
+    // remove the header delimiter
+    sequence_name.erase(0, 1);
+    // tokenize
+    std::replace(sequence_name.begin(), sequence_name.end(), ' ', '\0');
+
+    // allocate a sequence
+    seq_id = sequence_data.sequence_names.insert(sequence_name);
+    h = sequence_data.new_entry(seq_id);
+
+    std::vector<char> sequence(16 * 1024 * 1024);
+    size_t seq_ptr = 0;
+
+    // read until we get another sequence header or we reach the end of the file
+    std::string line;
+    while(std::getline(file_handle, line))
+    {
+        if (line[0] == '>')
+        {
+            // we read the header for the next sequence
+            // rewind back to the start and break
+            file_handle.seekg(-(line.size() + 1), std::ios_base::cur);
+            break;
+        }
+
+        // remove carriage returns
+        filter_cr(line);
+
+        // make sure we have enough memory to store the sequence
+        if (seq_ptr + line.size() >= sequence.size())
+        {
+            sequence.resize(sequence.size() * 2);
+        }
+
+        // ... and store it
+        memcpy(&sequence[seq_ptr], &line[0], line.size());
+        seq_ptr += line.size();
+    }
+
+    // apply base pair conversions
+    for(size_t i = 0; i < sequence.size(); i++)
+    {
+        // convert lower-case base pairs to upper-case
+        if (sequence[i] == 'a')
+        {
+            sequence[i] = 'A';
+        }
+
+        if (sequence[i] == 'c')
+        {
+            sequence[i] = 'C';
+        }
+
+        if (sequence[i] == 'g')
+        {
+            sequence[i] = 'G';
+        }
+
+        if (sequence[i] == 't')
+        {
+            sequence[i] = 'T';
+        }
+
+        // convert everything besides ACGT to N
+        if (sequence[i] != 'A' &&
+            sequence[i] != 'C' &&
+            sequence[i] != 'G' &&
+            sequence[i] != 'T')
+        {
+            sequence[i] = 'N';
+        }
+    }
+
+    // encode and store the sequence in the output
+    h->bases.resize(seq_ptr);
+    assign(seq_ptr,
+           thrust::make_transform_iterator(sequence.begin(), iupac16()),
+           h->bases.stream_at_index(0));
+
+    return h->bases.size() > 0;
 }
 
 } // namespace firepony

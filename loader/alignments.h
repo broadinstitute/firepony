@@ -27,7 +27,11 @@
 
 #pragma once
 
-#include <gamgee/sam/sam_reader.h>
+#include <string>
+
+#include <htslib/hts.h>
+#include <htslib/sam.h>
+
 #include "../alignment_data.h"
 #include "reference.h"
 
@@ -36,9 +40,13 @@ namespace firepony {
 struct alignment_file
 {
 private:
-    gamgee::SamReader<gamgee::SamIterator> file;
-    gamgee::SamHeader gamgee_header;
-    gamgee::SamIterator iterator;
+    const char *fname;
+    htsFile *fp;
+
+    bam_hdr_t *bam_header;
+    std::string header_text;
+
+    bam1_t *data;
 
     // map read group identifiers in tag data to read group names from the header
     // the read group name is either taken from the platform unit string if present, or else it's just the identifier itself
@@ -49,6 +57,8 @@ public:
 
     alignment_file(const char *fname);
     ~alignment_file();
+
+    bool init(void);
 
     bool next_batch(alignment_batch_host *batch, uint32 data_mask, reference_file_handle *reference, const uint32 batch_size = 100000);
     const char *get_sequence_name(uint32 id);

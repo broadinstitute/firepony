@@ -223,7 +223,10 @@ int main(int argc, char **argv)
                              AlignmentDataMask::READ_GROUP;
 
     io_thread reader(command_line_options.input, data_mask, compute_devices.size(), ref_h);
-    reader.start();
+    if (reader.start() == false)
+    {
+        exit(1);
+    }
 
     for(auto d : compute_devices)
     {

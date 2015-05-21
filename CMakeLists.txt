@@ -4,10 +4,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake-local")
 
 include(ExternalProject)
 
-option(USE_SYSTEM_BOOST
-       "Use the system-wide installed version of Boost"
-       ON)
-
 option(USE_EXTERNAL_THRUST
        "Build using Thrust from Github (do not use the CUDA toolkit version)"
        ON)
@@ -41,18 +37,13 @@ endif()
 include("gcc.cmake")
 
 # build dependencies
-if (NOT USE_SYSTEM_BOOST)
-    include("contrib/boost.cmake")
-    include_directories(${Boost_INCLUDE_DIR})
-endif()
-
 if (USE_EXTERNAL_THRUST)
     include("contrib/thrust.cmake")
 endif()
 
-include("contrib/gamgee.cmake")
 include("contrib/zlib.cmake")
 include("contrib/cub.cmake")
+include("contrib/htslib.cmake")
 
 if (ENABLE_CPU_BACKEND)
     include("contrib/tbb.cmake")
@@ -65,12 +56,19 @@ find_package(CUDA 7.0 REQUIRED)
 # enable C++11 support
 set(CUDA_NVCC_FLAGS "-std=c++11")
 # build for Kepler
-set(CUDA_NVCC_FLAGS
-    ${CUDA_NVCC_FLAGS}
-    --generate-code arch=compute_30,code=sm_30
-    --generate-code arch=compute_35,code=sm_35
-    --generate-code arch=compute_37,code=sm_37
-    -use_fast_math)
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -use_fast_math)
+
+# if the environment variable FIREPONY_GPU_ARCHITECTURE exists, compile for that architecture only
+if (DEFINED ENV{FIREPONY_GPU_ARCHITECTURE})
+    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -arch $ENV{FIREPONY_GPU_ARCHITECTURE})
+else()
+    # otherwise, by default compile for all tested SM versions
+    set(CUDA_NVCC_FLAGS
+        ${CUDA_NVCC_FLAGS}
+        --generate-code arch=compute_30,code=sm_30
+        --generate-code arch=compute_35,code=sm_35
+        --generate-code arch=compute_37,code=sm_37)
+endif()
 
 if (USE_EXTERNAL_THRUST)
     # inject our Thrust include path to override the CUDA toolkit include path
@@ -129,7 +127,7 @@ set(firepony_common_sources
     )
 
 cuda_add_library(firepony-common ${firepony_common_sources})
-add_dependencies(firepony-common gamgee zlib)
+add_dependencies(firepony-common htslib zlib)
 if (ENABLE_CPU_BACKEND)
     add_dependencies(firepony-common tbb)
 endif()
@@ -138,14 +136,10 @@ if (USE_EXTERNAL_THRUST)
 endif()
 
 cuda_add_executable(firepony firepony.cu)
-target_link_libraries(firepony firepony-device firepony-common ${tbb_LIB} ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
-
-cuda_add_executable(firepony-vcf-convert firepony-vcf-convert.cu)
-target_link_libraries(firepony-vcf-convert ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
-add_dependencies(firepony-vcf-convert gamgee zlib)
+target_link_libraries(firepony firepony-device firepony-common ${tbb_LIB} ${htslib_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
 
 cuda_add_executable(firepony-loader firepony-loader.cu)
-target_link_libraries(firepony-loader firepony-common ${gamgee_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
-add_dependencies(firepony-loader firepony-common gamgee zlib)
+target_link_libraries(firepony-loader firepony-common ${htslib_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+add_dependencies(firepony-loader zlib htslib)
 
 cuda_build_clean_target()

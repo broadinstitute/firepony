@@ -120,7 +120,7 @@ struct io_thread
     io_thread(const char *fname, uint32 data_mask, const int consumers, reference_file_handle *reference);
     ~io_thread();
 
-    void start(void);
+    bool start(void);
     void join(void);
 
     alignment_batch_host *get_batch(void);

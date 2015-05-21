@@ -2,8 +2,8 @@ language: cpp
 compiler: gcc
 
 env:
-  - BUILD_TYPE=Debug
-  - BUILD_TYPE=Release
+  - BUILD_TYPE=Debug FIREPONY_GPU_ARCHITECTURE=sm_35
+  - BUILD_TYPE=Release FIREPONY_GPU_ARCHITECTURE=sm_37
 
 before_install:
   - travis_retry sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test

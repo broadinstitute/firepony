@@ -56,12 +56,19 @@ find_package(CUDA 7.0 REQUIRED)
 # enable C++11 support
 set(CUDA_NVCC_FLAGS "-std=c++11")
 # build for Kepler
-set(CUDA_NVCC_FLAGS
-    ${CUDA_NVCC_FLAGS}
-    --generate-code arch=compute_30,code=sm_30
-    --generate-code arch=compute_35,code=sm_35
-    --generate-code arch=compute_37,code=sm_37
-    -use_fast_math)
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -use_fast_math)
+
+# if the environment variable FIREPONY_GPU_ARCHITECTURE exists, compile for that architecture only
+if (DEFINED ENV{FIREPONY_GPU_ARCHITECTURE})
+    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -arch $ENV{FIREPONY_GPU_ARCHITECTURE})
+else()
+    # otherwise, by default compile for all tested SM versions
+    set(CUDA_NVCC_FLAGS
+        ${CUDA_NVCC_FLAGS}
+        --generate-code arch=compute_30,code=sm_30
+        --generate-code arch=compute_35,code=sm_35
+        --generate-code arch=compute_37,code=sm_37)
+endif()
 
 if (USE_EXTERNAL_THRUST)
     # inject our Thrust include path to override the CUDA toolkit include path

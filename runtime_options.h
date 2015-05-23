@@ -54,6 +54,10 @@ struct runtime_options
     bool enable_cuda;
     bool enable_tbb;
 
+    // number of CPU worker threads
+    // (default is -1, meaning use all available cores)
+    int cpu_threads;
+
     // enable the shared memory reference/dbsnp loader
     bool try_mmap;
 
@@ -78,6 +82,8 @@ struct runtime_options
 
         enable_cuda = true;
         enable_tbb = true;
+
+        cpu_threads = -1;
 
         try_mmap = false;
     }

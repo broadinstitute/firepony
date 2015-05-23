@@ -30,6 +30,7 @@
 #include "alignment_data_device.h"
 #include "../sequence_database.h"
 #include "../variant_database.h"
+#include "../command_line.h"
 
 #include "device/primitives/backends.h"
 
@@ -263,7 +264,13 @@ firepony_pipeline *firepony_pipeline::create(target_system system, uint32 device
 #if ENABLE_TBB_BACKEND
     case firepony::intel_tbb:
         // reserve device threads for other devices and I/O
-        num_tbb_threads = tbb::task_scheduler_init::default_num_threads() - device;
+        if (command_line_options.cpu_threads == -1)
+        {
+            num_tbb_threads = tbb::task_scheduler_init::default_num_threads() - device;
+        } else {
+            num_tbb_threads = command_line_options.cpu_threads;
+        }
+
         tbb_scheduler_init.initialize(num_tbb_threads);
         return new firepony_device_pipeline<firepony::intel_tbb>(consumer_id, num_tbb_threads);
 #endif

@@ -55,6 +55,7 @@ static void usage(void)
 #endif
 #if ENABLE_TBB_BACKEND
     fprintf(stderr, "  --cpu-only                            Use only the CPU backend\n");
+    fprintf(stderr, "  --cpu-threads                         Number of CPU worker threads to run\n");
 #endif
     fprintf(stderr, "\n");
 
@@ -99,6 +100,20 @@ static void parse_env_vars(void)
         }
 #endif
     }
+
+#if ENABLE_TBB_BACKEND
+    char *cpu_threads = getenv("FIREPONY_CPU_THREADS");
+    if (cpu_threads)
+    {
+        errno = 0;
+        command_line_options.cpu_threads = strtol(cpu_threads, NULL, 10);
+        if (errno != 0)
+        {
+            fprintf(stderr, "WARNING: error parsing FIREPONY_CPU_THREADS\n");
+            command_line_options.cpu_threads = -1;
+        }
+    }
+#endif
 }
 
 void parse_command_line(int argc, char **argv)
@@ -118,6 +133,7 @@ void parse_command_line(int argc, char **argv)
 #endif
 #if ENABLE_TBB_BACKEND
             { "cpu-only", no_argument, NULL, 'c' },
+            { "cpu-threads", required_argument, NULL, 't' },
 #endif
             { 0 },
     };
@@ -189,6 +205,18 @@ void parse_command_line(int argc, char **argv)
             // --cpu-only
             command_line_options.disable_all_backends();
             command_line_options.enable_tbb = true;
+            break;
+
+        case 't':
+            // --cpu-threads
+            errno = 0;
+            command_line_options.cpu_threads = strtol(optarg, NULL, 10);
+            if (errno != 0)
+            {
+                fprintf(stderr, "error: invalid number of cpu threads\n");
+                usage();
+            }
+
             break;
 #endif
 

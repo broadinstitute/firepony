@@ -20,6 +20,15 @@ option(FORCE_TSX_OFF
        "Forcibly disable TSX instruction set support for TBB (useful for building on older systems)"
        OFF)
 
+# if the environment variable FIREPONY_GPU_ARCHITECTURE exists, take the list of architectures from it
+if (DEFINED ENV{FIREPONY_GPU_ARCHITECTURE})
+    set(GPU_ARCHITECTURE $ENV{FIREPONY_GPU_ARCHITECTURE})
+else ()
+    # allow setting the list of GPU architectures on the command line
+    set(GPU_ARCHITECTURE "sm_30,sm_35,sm_37" CACHE STRING
+        "GPU architectures to generate code for (defaults to all tested architectures")
+endif ()
+
 if (ENABLE_CUDA_BACKEND)
     add_definitions(-DENABLE_CUDA_BACKEND=1)
 endif()
@@ -58,17 +67,14 @@ set(CUDA_NVCC_FLAGS "-std=c++11")
 # build for Kepler
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -use_fast_math)
 
-# if the environment variable FIREPONY_GPU_ARCHITECTURE exists, compile for that architecture only
-if (DEFINED ENV{FIREPONY_GPU_ARCHITECTURE})
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -arch $ENV{FIREPONY_GPU_ARCHITECTURE})
-else()
-    # otherwise, by default compile for all tested SM versions
+# add nvcc flags to generate code for all enabled architectures
+string(REPLACE "," ";" GPU_ARCHITECTURE ${GPU_ARCHITECTURE})
+foreach(ARCH IN LISTS GPU_ARCHITECTURE)
+    string(REPLACE "sm_" "compute_" COMPUTE ${ARCH})
     set(CUDA_NVCC_FLAGS
         ${CUDA_NVCC_FLAGS}
-        --generate-code arch=compute_30,code=sm_30
-        --generate-code arch=compute_35,code=sm_35
-        --generate-code arch=compute_37,code=sm_37)
-endif()
+        --generate-code arch=${COMPUTE},code=${ARCH})
+endforeach(ARCH)
 
 if (USE_EXTERNAL_THRUST)
     # inject our Thrust include path to override the CUDA toolkit include path

@@ -22,11 +22,10 @@ option(FORCE_TSX_OFF
 
 # if the environment variable FIREPONY_GPU_ARCHITECTURE exists, take the list of architectures from it
 if (DEFINED ENV{FIREPONY_GPU_ARCHITECTURE})
-    set(GPU_ARCHITECTURE $ENV{FIREPONY_GPU_ARCHITECTURE})
+    set(GPU_ARCHITECTURE $ENV{FIREPONY_GPU_ARCHITECTURE} CACHE STRING "GPU architectures to generate code for (defaults to all tested architectures")
 else ()
     # allow setting the list of GPU architectures on the command line
-    set(GPU_ARCHITECTURE "sm_30,sm_35,sm_37" CACHE STRING
-        "GPU architectures to generate code for (defaults to all tested architectures")
+    set(GPU_ARCHITECTURE "sm_30,sm_35,sm_37" CACHE STRING "GPU architectures to generate code for (defaults to all tested architectures")
 endif ()
 
 if (ENABLE_CUDA_BACKEND)

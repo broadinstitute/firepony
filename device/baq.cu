@@ -1413,13 +1413,13 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
     active_baq_read_list.resize(num_active);
 
     temp_active_list.resize(context.active_read_list.size());
-    num_active = parallel<system>::copy_if(context.active_read_list.begin(),
-                                           context.active_read_list.size(),
-                                           temp_active_list.begin(),
-                                           hmm_window_valid<system>(context, batch.device),
-                                           context.temp_storage);
+    uint32 temp_num_active = parallel<system>::copy_if(context.active_read_list.begin(),
+                                                       context.active_read_list.size(),
+                                                       temp_active_list.begin(),
+                                                       hmm_window_valid<system>(context, batch.device),
+                                                       context.temp_storage);
     context.active_read_list = temp_active_list;
-    context.active_read_list.resize(num_active);
+    context.active_read_list.resize(temp_num_active);
 
 #if ENABLE_LMEM_PATH
     if (!baq_use_lmem)

@@ -145,6 +145,9 @@ struct parallel_thrust
 
     static inline void synchronize()
     { }
+
+    static inline void check_errors(void)
+    { }
 };
 
 // default to thrust
@@ -157,8 +160,10 @@ struct parallel : public parallel_thrust<system>
     using parallel_thrust<system>::copy_flagged;
     using parallel_thrust<system>::sum;
     using parallel_thrust<system>::sort_by_key;
-    using parallel_thrust<system>::synchronize;
     using parallel_thrust<system>::reduce_by_key;
+
+    using parallel_thrust<system>::synchronize;
+    using parallel_thrust<system>::check_errors;
 };
 
 #if ENABLE_CUDA_BACKEND
@@ -369,6 +374,21 @@ struct parallel<cuda> : public parallel_thrust<cuda>
     static inline void synchronize(void)
     {
         cudaDeviceSynchronize();
+    }
+
+    static inline void check_errors(void)
+    {
+        synchronize();
+
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess)
+        {
+            int device;
+            cudaGetDevice(&device);
+
+            fprintf(stderr, "CUDA device %d: error %d (%s)\n", device, err, cudaGetErrorString(err));
+            abort();
+        }
     }
 };
 #endif

@@ -143,7 +143,6 @@ struct firepony_context
     vector<system, uint32> temp_u32_2;
     vector<system, uint32> temp_u32_3;
     vector<system, uint32> temp_u32_4;
-    vector<system, float> temp_f32;
     vector<system, uint8>  temp_u8;
 
     // various pipeline states go here

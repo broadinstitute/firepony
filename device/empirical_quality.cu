@@ -71,17 +71,17 @@ static CUDA_HOST_DEVICE double log10Gamma(const double x)
     return lnToLog10(lgammaf(x));
 }
 
-static CUDA_HOST_DEVICE double log10Factorial(const uint32 x)
+static CUDA_HOST_DEVICE double log10Factorial(const uint64 x)
 {
     return log10Gamma(x + 1);
 }
 
-static CUDA_HOST_DEVICE double log10BinomialCoefficient(const uint32 n, const uint32 k)
+static CUDA_HOST_DEVICE double log10BinomialCoefficient(const uint64 n, const uint64 k)
 {
     return log10Factorial(n) - log10Factorial(k) - log10Factorial(n - k);
 }
 
-static CUDA_HOST_DEVICE double log10BinomialProbability(const uint32 n, const uint32 k, const double log10p)
+static CUDA_HOST_DEVICE double log10BinomialProbability(const uint64 n, const uint64 k, const double log10p)
 {
     double log10OneMinusP = log10(1 - pow(10.0, log10p));
     return log10BinomialCoefficient(n, k) + log10p * k + log10OneMinusP* (n - k);
@@ -92,10 +92,20 @@ static CUDA_HOST_DEVICE double qualToErrorProbLog10(double qual)
     return qual / -10.0;
 }
 
-static CUDA_HOST_DEVICE double log10QempLikelihood(const double Qempirical, uint32 nObservations, uint32 nErrors)
+static CUDA_HOST_DEVICE double log10QempLikelihood(const double Qempirical, uint64 nObservations, uint64 nErrors)
 {
     if (nObservations == 0)
         return 0.0;
+
+    // mimic GATK's strange behavior
+    // note: MAX_NUMBER_OF_OBSERVATIONS is unsigned but contains a signed limit
+    constexpr uint32 MAX_NUMBER_OF_OBSERVATIONS = std::numeric_limits<int32>::max() - 1;
+    if (nObservations > MAX_NUMBER_OF_OBSERVATIONS)
+    {
+        double fraction = double(MAX_NUMBER_OF_OBSERVATIONS) / double(nObservations);
+        nErrors = round(double(nErrors) * fraction);
+        nObservations = MAX_NUMBER_OF_OBSERVATIONS;
+    }
 
     return log10BinomialProbability(nObservations, nErrors, qualToErrorProbLog10(Qempirical));
 }
@@ -123,7 +133,7 @@ static CUDA_HOST_DEVICE void normalizeFromLog10(double *normalized, const double
     }
 }
 
-static CUDA_HOST_DEVICE double bayesianEstimateOfEmpiricalQuality(const uint32 nObservations, const uint32 nErrors, const double QReported, bool need_rounding)
+static CUDA_HOST_DEVICE double bayesianEstimateOfEmpiricalQuality(const uint64 nObservations, const uint64 nErrors, const double QReported, bool need_rounding)
 {
     constexpr int numBins = (MAX_REASONABLE_Q_SCORE + 1) * int(RESOLUTION_BINS_PER_QUAL);
     double log10Posteriors[numBins];
@@ -151,8 +161,8 @@ static CUDA_HOST_DEVICE double bayesianEstimateOfEmpiricalQuality(const uint32 n
 static CUDA_HOST_DEVICE double calcEmpiricalQuality(const covariate_empirical_value& val, bool need_rounding)
 {
     // smoothing is one error and one non-error observation
-    const uint32 mismatches = uint32(val.mismatches + 0.5) + SMOOTHING_CONSTANT;
-    const uint32 observations = val.observations + SMOOTHING_CONSTANT + SMOOTHING_CONSTANT;
+    const uint64 mismatches = uint64(val.mismatches + 0.5) + SMOOTHING_CONSTANT;
+    const uint64 observations = val.observations + SMOOTHING_CONSTANT + SMOOTHING_CONSTANT;
 
     double empiricalQual = bayesianEstimateOfEmpiricalQuality(observations, mismatches, val.estimated_quality, need_rounding);
     return min(empiricalQual, double(MAX_RECALIBRATED_Q_SCORE));

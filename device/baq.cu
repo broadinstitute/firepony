@@ -1363,6 +1363,7 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
     vector<system, uint32>& active_baq_read_list = context.temp_u32;
     vector<system, uint32>& baq_state = context.temp_u32_2;
     vector<system, uint32>& temp_active_list = context.temp_u32_3;
+    uint32 num_active;
 
     // check if we can use the lmem kernel
 #if ENABLE_LMEM_PATH
@@ -1377,10 +1378,11 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
 #endif
 
     timer<system> baq_setup, baq_hmm, baq_postprocess;
-
     baq_setup.start();
 
-    uint32 num_active;
+    // allocate our output
+    baq.qualities.resize(batch.device.qualities.size());
+    thrust::fill(baq.qualities.begin(), baq.qualities.end(), uint8(-1));
 
     // collect the reads that we need to compute BAQ for
     active_baq_read_list.resize(context.active_read_list.size());
@@ -1393,136 +1395,140 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
 
     active_baq_read_list.resize(num_active);
 
-    baq.hmm_reference_windows.resize(batch.device.num_reads);
-    baq.bandwidth.resize(batch.device.num_reads);
+    if (num_active)
+    {
+        baq.hmm_reference_windows.resize(batch.device.num_reads);
+        baq.bandwidth.resize(batch.device.num_reads);
 
-    // compute the HMM windows
-    // note: this is used both for real BAQ and flat BAQ, so we use the full active read list
-    parallel<system>::for_each(context.active_read_list.begin(),
-                               context.active_read_list.end(),
-                               compute_hmm_windows<system>(context, batch.device));
+        // compute the HMM windows
+        // note: this is used both for real BAQ and flat BAQ, so we use the full active read list
+        parallel<system>::for_each(context.active_read_list.begin(),
+                                   context.active_read_list.end(),
+                                   compute_hmm_windows<system>(context, batch.device));
 
-    // remove any reads for which we failed to compute the HMM window
-    temp_active_list.resize(active_baq_read_list.size());
-    num_active = parallel<system>::copy_if(active_baq_read_list.begin(),
-                                           active_baq_read_list.size(),
-                                           temp_active_list.begin(),
-                                           hmm_window_valid<system>(context, batch.device),
-                                           context.temp_storage);
-    active_baq_read_list = temp_active_list;
-    active_baq_read_list.resize(num_active);
+        // remove any reads for which we failed to compute the HMM window
+        temp_active_list.resize(active_baq_read_list.size());
+        num_active = parallel<system>::copy_if(active_baq_read_list.begin(),
+                                               active_baq_read_list.size(),
+                                               temp_active_list.begin(),
+                                               hmm_window_valid<system>(context, batch.device),
+                                               context.temp_storage);
 
-    temp_active_list.resize(context.active_read_list.size());
-    uint32 temp_num_active = parallel<system>::copy_if(context.active_read_list.begin(),
-                                                       context.active_read_list.size(),
-                                                       temp_active_list.begin(),
-                                                       hmm_window_valid<system>(context, batch.device),
-                                                       context.temp_storage);
-    context.active_read_list = temp_active_list;
-    context.active_read_list.resize(temp_num_active);
+        active_baq_read_list = temp_active_list;
+        active_baq_read_list.resize(num_active);
+    }
+
+    if (num_active)
+    {
+        temp_active_list.resize(context.active_read_list.size());
+        uint32 temp_num_active = parallel<system>::copy_if(context.active_read_list.begin(),
+                                                           context.active_read_list.size(),
+                                                           temp_active_list.begin(),
+                                                           hmm_window_valid<system>(context, batch.device),
+                                                           context.temp_storage);
+        context.active_read_list = temp_active_list;
+        context.active_read_list.resize(temp_num_active);
 
 #if ENABLE_LMEM_PATH
-    if (!baq_use_lmem)
+        if (!baq_use_lmem)
 #endif
-    {
-        // compute the index and size of the HMM matrices
-        baq.matrix_index.resize(num_active + 1);
+        {
+            // compute the index and size of the HMM matrices
+            baq.matrix_index.resize(num_active + 1);
+            // first offset is zero
+            thrust::fill_n(baq.matrix_index.begin(), 1, 0);
+            // do an inclusive scan to compute all offsets + the total size
+            parallel<system>::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
+                                                                             compute_hmm_matrix_size<system>(context, batch.device)),
+                                             num_active,
+                                             baq.matrix_index.begin() + 1,
+                                             thrust::plus<uint32>());
+
+            uint32 matrix_len = baq.matrix_index[num_active];
+
+            baq.forward.resize(matrix_len);
+            baq.backward.resize(matrix_len);
+        }
+
+        // compute the index and size of the HMM scaling factors
+        baq.scaling_index.resize(num_active + 1);
         // first offset is zero
-        thrust::fill_n(baq.matrix_index.begin(), 1, 0);
-        // do an inclusive scan to compute all offsets + the total size
+        thrust::fill_n(baq.scaling_index.begin(), 1, 0);
         parallel<system>::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
-                                                                         compute_hmm_matrix_size<system>(context, batch.device)),
+                                                                         compute_hmm_scaling_factor_size<system>(context, batch.device)),
                                          num_active,
-                                         baq.matrix_index.begin() + 1,
+                                         baq.scaling_index.begin() + 1,
                                          thrust::plus<uint32>());
 
-        uint32 matrix_len = baq.matrix_index[num_active];
+        uint32 scaling_len = baq.scaling_index[num_active];
+        baq.scaling.resize(scaling_len);
 
-        baq.forward.resize(matrix_len);
-        baq.backward.resize(matrix_len);
-    }
-
-    // compute the index and size of the HMM scaling factors
-    baq.scaling_index.resize(num_active + 1);
-    // first offset is zero
-    thrust::fill_n(baq.scaling_index.begin(), 1, 0);
-    parallel<system>::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
-                                                                     compute_hmm_scaling_factor_size<system>(context, batch.device)),
-                                     num_active,
-                                     baq.scaling_index.begin() + 1,
-                                     thrust::plus<uint32>());
-
-    uint32 scaling_len = baq.scaling_index[num_active];
-    baq.scaling.resize(scaling_len);
-
-//    fprintf(stderr, "reads: %u\n", batch.num_reads);
-//    fprintf(stderr, "forward len = %u bytes = %lu\n", matrix_len, matrix_len * sizeof(double));
-//    fprintf(stderr, "expected len = %lu expected bytes = %lu\n",
-//            hmm_common::matrix_size(100) * context.active_read_list.size(),
-//            hmm_common::matrix_size(100) * context.active_read_list.size() * sizeof(double));
-//    fprintf(stderr, "per read matrix size = %u bytes = %lu\n", hmm_common::matrix_size(100), hmm_common::matrix_size(100) * sizeof(double));
-//    fprintf(stderr, "matrix index = [ ");
-//    for(uint32 i = 0; i < 20; i++)
-//    {
-//        fprintf(stderr, "%u, ", baq.matrix_index[i] + 0);
-//    }
-//    fprintf(stderr, " ... ");
-//    for(uint32 i = baq.matrix_index.size() - 20; i < baq.matrix_index.size(); i++)
-//    {
-//        fprintf(stderr, "%u, ", baq.matrix_index[i] + 0);
-//    }
-//    fprintf(stderr, "]\n");
-//    fflush(stdout);
+//        fprintf(stderr, "reads: %u\n", batch.num_reads);
+//        fprintf(stderr, "forward len = %u bytes = %lu\n", matrix_len, matrix_len * sizeof(double));
+//        fprintf(stderr, "expected len = %lu expected bytes = %lu\n",
+//                hmm_common::matrix_size(100) * context.active_read_list.size(),
+//                hmm_common::matrix_size(100) * context.active_read_list.size() * sizeof(double));
+//        fprintf(stderr, "per read matrix size = %u bytes = %lu\n", hmm_common::matrix_size(100), hmm_common::matrix_size(100) * sizeof(double));
+//        fprintf(stderr, "matrix index = [ ");
+//        for(uint32 i = 0; i < 20; i++)
+//        {
+//            fprintf(stderr, "%u, ", baq.matrix_index[i] + 0);
+//        }
+//        fprintf(stderr, " ... ");
+//        for(uint32 i = baq.matrix_index.size() - 20; i < baq.matrix_index.size(); i++)
+//        {
+//            fprintf(stderr, "%u, ", baq.matrix_index[i] + 0);
+//        }
+//        fprintf(stderr, "]\n");
+//        fflush(stdout);
 
 
-    baq_state.resize(batch.device.qualities.size());
-    baq.qualities.resize(batch.device.qualities.size());
+        baq_state.resize(batch.device.qualities.size());
+        thrust::fill(baq_state.begin(), baq_state.end(), uint32(-1));
 
-    thrust::fill(baq_state.begin(), baq_state.end(), uint32(-1));
-    thrust::fill(baq.qualities.begin(), baq.qualities.end(), uint8(-1));
-
-    // initialize matrices and scaling factors
+        // initialize matrices and scaling factors
 #if ENABLE_LMEM_PATH
-    if (!baq_use_lmem)
+        if (!baq_use_lmem)
 #endif
-    {
-        thrust::fill_n(baq.forward.begin(), baq.forward.size(), 0.0);
-        thrust::fill_n(baq.backward.begin(), baq.backward.size(), 0.0);
-    }
+        {
+            thrust::fill_n(baq.forward.begin(), baq.forward.size(), 0.0);
+            thrust::fill_n(baq.backward.begin(), baq.backward.size(), 0.0);
+        }
 
-    thrust::fill_n(baq.scaling.begin(), baq.scaling.size(), 0.0);
+        thrust::fill_n(baq.scaling.begin(), baq.scaling.size(), 0.0);
 
-    baq_setup.stop();
+        baq_setup.stop();
 
-    baq_hmm.start();
+        baq_hmm.start();
 
 #if ENABLE_LMEM_PATH
-    if (!baq_use_lmem)
+        if (!baq_use_lmem)
 #endif
-    {
-        // slow path: store the matrices in global memory
-        parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
-                                                                      baq.matrix_index.begin(),
-                                                                      baq.scaling_index.begin())),
-                         thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
-                                                                      baq.matrix_index.end(),
-                                                                      baq.scaling_index.end())),
-                         hmm_glocal<system>(context, batch.device, baq_state));
-    }
+        {
+            // slow path: store the matrices in global memory
+            parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
+                                                                          baq.matrix_index.begin(),
+                                                                          baq.scaling_index.begin())),
+                             thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
+                                                                          baq.matrix_index.end(),
+                                                                          baq.scaling_index.end())),
+                             hmm_glocal<system>(context, batch.device, baq_state));
+        }
 #if ENABLE_LMEM_PATH
-    else {
-        // fast path: use local memory for the matrices
-        parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
-                                                                      baq.matrix_index.begin(),
-                                                                      baq.scaling_index.begin())),
-                         thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
-                                                                      baq.matrix_index.end(),
-                                                                      baq.scaling_index.end())),
-                         hmm_glocal_lmem<system>(context, batch.device, baq_state));
-    }
+        else {
+            // fast path: use local memory for the matrices
+            parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
+                                                                          baq.matrix_index.begin(),
+                                                                          baq.scaling_index.begin())),
+                             thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
+                                                                          baq.matrix_index.end(),
+                                                                          baq.scaling_index.end())),
+                             hmm_glocal_lmem<system>(context, batch.device, baq_state));
+        }
 #endif
 
-    baq_hmm.stop();
+        baq_hmm.stop();
+    }
 
     baq_postprocess.start();
 
@@ -1549,8 +1555,13 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
     context.stats.baq_reads += num_active;
 
     parallel<system>::synchronize();
-    context.stats.baq_setup.add(baq_setup);
-    context.stats.baq_hmm.add(baq_hmm);
+
+    if (num_active)
+    {
+        context.stats.baq_setup.add(baq_setup);
+        context.stats.baq_hmm.add(baq_hmm);
+    }
+
     context.stats.baq_postprocess.add(baq_postprocess);
 }
 INSTANTIATE(baq_reads);

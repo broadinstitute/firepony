@@ -129,6 +129,7 @@ void firepony_process_batch(firepony_context<system>& context, const alignment_b
     context.end_batch(batch);
 
     parallel<system>::synchronize();
+    parallel<system>::check_errors();
 
     context.stats.read_filter.add(read_filter);
 

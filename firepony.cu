@@ -162,10 +162,13 @@ int main(int argc, char **argv)
     parse_command_line(argc, argv);
 
 #if ENABLE_CUDA_BACKEND
-    std::string runtime_version;
-    if (cuda_runtime_init(runtime_version) == true)
+    if (command_line_options.enable_cuda)
     {
-        fprintf(stderr, "CUDA runtime version %s\n", runtime_version.c_str());
+        std::string runtime_version;
+        if (cuda_runtime_init(runtime_version) == true)
+        {
+            fprintf(stderr, "CUDA runtime version %s\n", runtime_version.c_str());
+        }
     }
 #endif
 

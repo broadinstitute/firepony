@@ -36,6 +36,8 @@ static constexpr int MAX_RECALIBRATED_Q_SCORE = 93;
 static constexpr int MAX_REASONABLE_Q_SCORE = 60;
 static constexpr double RESOLUTION_BINS_PER_QUAL = 1.0;
 static constexpr int MAX_GATK_USABLE_Q_SCORE = 40;
+// note: MAX_NUMBER_OF_OBSERVATIONS is unsigned but contains a signed limit
+static constexpr uint32 MAX_NUMBER_OF_OBSERVATIONS = std::numeric_limits<int32>::max() - 1;
 
 static CUDA_HOST_DEVICE double gaussian(double value)
 {
@@ -84,7 +86,7 @@ static CUDA_HOST_DEVICE double log10BinomialCoefficient(const uint64 n, const ui
 static CUDA_HOST_DEVICE double log10BinomialProbability(const uint64 n, const uint64 k, const double log10p)
 {
     double log10OneMinusP = log10(1 - pow(10.0, log10p));
-    return log10BinomialCoefficient(n, k) + log10p * k + log10OneMinusP* (n - k);
+    return log10BinomialCoefficient(n, k) + log10p * k + log10OneMinusP * (n - k);
 }
 
 static CUDA_HOST_DEVICE double qualToErrorProbLog10(double qual)
@@ -98,8 +100,6 @@ static CUDA_HOST_DEVICE double log10QempLikelihood(const double Qempirical, uint
         return 0.0;
 
     // mimic GATK's strange behavior
-    // note: MAX_NUMBER_OF_OBSERVATIONS is unsigned but contains a signed limit
-    constexpr uint32 MAX_NUMBER_OF_OBSERVATIONS = std::numeric_limits<int32>::max() - 1;
     if (nObservations > MAX_NUMBER_OF_OBSERVATIONS)
     {
         double fraction = double(MAX_NUMBER_OF_OBSERVATIONS) / double(nObservations);

@@ -60,7 +60,7 @@ static void usage(void)
     fprintf(stderr, "\n");
 
     fprintf(stderr, "  http://github.com/broadinstitute/firepony\n");
-    fprintf(stderr, "  nsubtil@nvidia.com\n");
+    fprintf(stderr, "  subtil@gmail.com\n");
     fprintf(stderr, "\n");
 
     exit(1);

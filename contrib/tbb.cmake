@@ -13,7 +13,7 @@ endif()
 ExternalProject_Add(tbb
     PREFIX ${tbb_PREFIX}
     GIT_REPOSITORY "https://github.com/nsubtil/tbb.git"
-    GIT_TAG "4.3-20140724"
+    GIT_TAG "4.3-20150611"
     BUILD_IN_SOURCE 1
     PATCH_COMMAND ${TBB_PATCH_COMMAND}
     CONFIGURE_COMMAND ""

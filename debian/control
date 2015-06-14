@@ -1,0 +1,22 @@
+Source: firepony
+Section: Science
+Priority: extra
+Maintainer: Nuno Subtil <subtil@gmail.com>
+Build-Depends: debhelper (>= 8.0.0), cmake, cuda-toolkit-7-0 (>= 7.0-28), gcc-4.9, git
+Standards-Version: 3.9.2
+Homepage: https://github.com/broadinstitute/firepony
+#Vcs-Git: git://git.debian.org/collab-maint/firepony.git
+#Vcs-Browser: http://git.debian.org/?p=collab-maint/firepony.git;a=summary
+
+Package: firepony
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Suggests: nvidia-driver
+Description: Base quality score recalibrator for NGS data
+ Firepony is a base quality score recalibration tool for aligned NGS read data.
+ It is a reimplementation of the GATK Base Quality Score Recalibrator algorithm
+ in C++ with optional NVIDIA GPU support.
+ .
+ The output of Firepony is compatible with and can be used by GATK directly in
+ a pre-existing NGS processing pipeline.
+ .

@@ -1,5 +1,5 @@
 Source: firepony
-Section: Science
+Section: science
 Priority: extra
 Maintainer: Nuno Subtil <subtil@gmail.com>
 Build-Depends: debhelper (>= 8.0.0), cmake, cuda-toolkit-7-0 (>= 7.0-28), gcc-4.9, git

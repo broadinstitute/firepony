@@ -148,3 +148,7 @@ target_link_libraries(firepony-loader firepony-common ${htslib_LIB} ${zlib_LIB} 
 add_dependencies(firepony-loader zlib htslib)
 
 cuda_build_clean_target()
+
+install(TARGETS firepony firepony-loader
+        RUNTIME DESTINATION bin)
+

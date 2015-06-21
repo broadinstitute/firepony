@@ -1,5 +1,5 @@
 /*
- * Firepequence_nameony
+ * Firepony
  * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

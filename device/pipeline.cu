@@ -35,6 +35,7 @@
 #include "../sequence_database.h"
 #include "../table_formatter.h"
 #include "../variant_database.h"
+#include "../output.h"
 
 #include "baq.h"
 #include "firepony_context.h"
@@ -148,28 +149,28 @@ INSTANTIATE(firepony_process_batch);
 template <target_system system>
 static void output_header(firepony_context<system>& context)
 {
-    printf("%s", "#:GATKReport.v1.1:5\n");
-    printf("%s", "#:GATKTable:2:17:%s:%s:;\n");
-    printf("%s", "#:GATKTable:Arguments:Recalibration argument collection values used in this run\n");
-    printf("%s", "Argument                    Value                                                                   \n");
-    printf("%s", "binary_tag_name             null                                                                    \n");
-    printf("%s", "covariate                   ReadGroupCovariate,QualityScoreCovariate,ContextCovariate,CycleCovariate\n");
-    printf("%s", "default_platform            null                                                                    \n");
-    printf("%s", "deletions_default_quality   45                                                                      \n");
-    printf("%s", "force_platform              null                                                                    \n");
-    printf("%s", "indels_context_size         3                                                                       \n");
-    printf("%s", "insertions_default_quality  45                                                                      \n");
-    printf("%s", "low_quality_tail            2                                                                       \n");
-    printf("%s", "maximum_cycle_value         500                                                                     \n");
-    printf("%s", "mismatches_context_size     2                                                                       \n");
-    printf("%s", "mismatches_default_quality  -1                                                                      \n");
-    printf("%s", "no_standard_covs            false                                                                   \n");
-    printf("%s", "quantizing_levels           16                                                                      \n");
-    printf("%s", "recalibration_report        null                                                                    \n");
-    printf("%s", "run_without_dbsnp           false                                                                   \n");
-    printf("%s", "solid_nocall_strategy       THROW_EXCEPTION                                                         \n");
-    printf("%s", "solid_recal_mode            SET_Q_ZERO                                                              \n");
-    printf("\n");
+    output_printf("%s", "#:GATKReport.v1.1:5\n");
+    output_printf("%s", "#:GATKTable:2:17:%s:%s:;\n");
+    output_printf("%s", "#:GATKTable:Arguments:Recalibration argument collection values used in this run\n");
+    output_printf("%s", "Argument                    Value                                                                   \n");
+    output_printf("%s", "binary_tag_name             null                                                                    \n");
+    output_printf("%s", "covariate                   ReadGroupCovariate,QualityScoreCovariate,ContextCovariate,CycleCovariate\n");
+    output_printf("%s", "default_platform            null                                                                    \n");
+    output_printf("%s", "deletions_default_quality   45                                                                      \n");
+    output_printf("%s", "force_platform              null                                                                    \n");
+    output_printf("%s", "indels_context_size         3                                                                       \n");
+    output_printf("%s", "insertions_default_quality  45                                                                      \n");
+    output_printf("%s", "low_quality_tail            2                                                                       \n");
+    output_printf("%s", "maximum_cycle_value         500                                                                     \n");
+    output_printf("%s", "mismatches_context_size     2                                                                       \n");
+    output_printf("%s", "mismatches_default_quality  -1                                                                      \n");
+    output_printf("%s", "no_standard_covs            false                                                                   \n");
+    output_printf("%s", "quantizing_levels           16                                                                      \n");
+    output_printf("%s", "recalibration_report        null                                                                    \n");
+    output_printf("%s", "run_without_dbsnp           false                                                                   \n");
+    output_printf("%s", "solid_nocall_strategy       THROW_EXCEPTION                                                         \n");
+    output_printf("%s", "solid_recal_mode            SET_Q_ZERO                                                              \n");
+    output_printf("\n");
 
     // output a dummy quantization table, as GATK checks whether it's present
     table_formatter fmt("Quantized", "Quality quantization map");

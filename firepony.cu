@@ -33,6 +33,8 @@
 #include "command_line.h"
 #include "io_thread.h"
 #include "string_database.h"
+#include "output.h"
+
 #include "loader/alignments.h"
 #include "loader/reference.h"
 #include "loader/variants.h"
@@ -186,6 +188,16 @@ int main(int argc, char **argv)
         fprintf(stderr, "  %s\n", d->get_name().c_str());
     }
     fprintf(stderr, "\n");
+
+    if (command_line_options.output)
+    {
+        bool ret;
+        ret = output_open_file(command_line_options.output);
+        if (ret == false)
+        {
+            exit(1);
+        }
+    }
 
     timer<host> data_io;
     data_io.start();

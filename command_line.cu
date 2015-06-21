@@ -53,6 +53,7 @@ static void usage(void)
     fprintf(stderr, "  --disable-rounding                    Disable rounding on the output tables\n");
     fprintf(stderr, "  -b, --batch-size <n>                  Process input in batches of <n> reads\n");
     fprintf(stderr, "  --mmap                                Load reference/dbsnp from system shared memory if present\n");
+    fprintf(stderr, "  -o, --output <output-file-name>       File to write tabulated output to (default is stdout)\n");
 #if ENABLE_CUDA_BACKEND
     fprintf(stderr, "  --gpu-only                            Use only the CUDA GPU-accelerated backend\n");
 #endif
@@ -121,7 +122,7 @@ static void parse_env_vars(void)
 
 void parse_command_line(int argc, char **argv)
 {
-    static const char *options_short = "r:s:db:";
+    static const char *options_short = "r:s:db:o:";
     static struct option options_long[] = {
             { "reference", required_argument, NULL, 'r' },
             { "snp-database", required_argument, NULL, 's' },
@@ -131,6 +132,7 @@ void parse_command_line(int argc, char **argv)
             { "disable-rounding", no_argument, NULL, 'n' },
             { "batch-size", required_argument, NULL, 'b' },
             { "mmap", no_argument, NULL, 'm' },
+            { "output", required_argument, NULL, 'o' },
 #if ENABLE_CUDA_BACKEND
             { "gpu-only", no_argument, NULL, 'g' },
 #endif
@@ -193,6 +195,11 @@ void parse_command_line(int argc, char **argv)
         case 'm':
             // --mmap
             command_line_options.try_mmap = true;
+            break;
+
+        case 'o':
+            // -o, --output
+            command_line_options.output = strdup(optarg);
             break;
 
 #if ENABLE_CUDA_BACKEND

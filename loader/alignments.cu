@@ -26,7 +26,6 @@
  */
 
 #include <string>
-#include <regex>
 
 #include "../alignment_data.h"
 #include "alignments.h"
@@ -60,15 +59,18 @@ struct read_group
     read_group(const std::string& header_line)
     {
         // split string at each tab character
-        std::regex re("\\t+");
+        // note that we don't use std::regex because it seems to be unavailable on common Linux installations
+        const std::string delimiter = "\t";
+        std::string temp = header_line;
+        size_t pos = 0;
+        std::string token;
 
-        auto it = std::sregex_token_iterator(header_line.begin(),
-                                             header_line.end(),
-                                             re, -1);
-
-        for(; it != std::sregex_token_iterator(); it++)
+        pos = temp.find(delimiter);
+        while(pos != std::string::npos)
         {
-            auto token = it->str();
+            token = temp.substr(0, pos);
+            temp.erase(0, pos + delimiter.length());
+
             // skip TG:
             auto value = token.substr(3, token.length() - 3);
 
@@ -107,6 +109,8 @@ struct read_group
 
             if (match_tag(token, "SM"))
                 sample = value;
+
+            pos = temp.find(delimiter);
         }
     }
 };

@@ -30,5 +30,12 @@
 
 #pragma once
 
+#include "types.h"
+
+namespace firepony {
+
 bool output_open_file(const char *fname);
 void output_printf(const char *fmt, ...);
+void output_progress_bar(float progress, uint64 batch_counter, std::time_t time);
+
+} // namespace firepony

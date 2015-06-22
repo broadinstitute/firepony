@@ -30,6 +30,13 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <unistd.h>
+
+#include <ctime>
+
+#include "output.h"
+
+namespace firepony {
 
 static FILE *output_fp = stdout;
 
@@ -52,3 +59,64 @@ void output_printf(const char *fmt, ...)
     vfprintf(output_fp, fmt, args);
     va_end(args);
 }
+
+static int last_progress_bar_len = -1;
+
+void output_progress_bar(float progress, uint64_t batch_counter, std::time_t start)
+{
+    constexpr int LINE_WIDTH = 80;
+    constexpr int BAR_SIZE = LINE_WIDTH - 40;
+    int c;
+
+    if (isatty(2))
+    {
+        if (last_progress_bar_len > 0)
+        {
+            for(c = 0; c < last_progress_bar_len; c++)
+            {
+                fprintf(stderr, "\b");
+            }
+        }
+    }
+
+    // draw the progress bar into a buffer
+    char progress_bar[BAR_SIZE + 1];
+    progress_bar[BAR_SIZE] = '\0';
+
+    int bar_full_len = progress * (BAR_SIZE - 1);
+    memset(progress_bar, '#', bar_full_len);
+    if (bar_full_len < BAR_SIZE - 1)
+        memset(&progress_bar[bar_full_len], ' ', BAR_SIZE - 1 - bar_full_len);
+
+    char eta[1024];
+    eta[0] = '\0';
+
+    if (progress > 0.001)
+    {
+        // compute remaining time
+        std::time_t now = std::time(nullptr);
+        std::time_t elapsed = now - start;
+        std::time_t total_time = elapsed / progress;
+        std::time_t remaining = total_time - elapsed;
+
+        char runtime[1024];
+        strftime(runtime, sizeof(runtime), "%Hh %Mm", std::gmtime(&remaining));
+
+        snprintf(eta, sizeof(eta), " ETA: %s", runtime);
+    } else {
+        eta[0] = '\0';
+    }
+
+    if (isatty(2))
+    {
+        last_progress_bar_len = fprintf(stderr, "[%s] %.02f%% %s", progress_bar, progress * 100.0, eta);
+        fflush(stderr);
+    } else {
+        if (batch_counter % 50 == 0)
+        {
+            fprintf(stderr, "%.02f%% %s\n", progress * 100.0, eta);
+        }
+    }
+}
+
+} // namespace firepony

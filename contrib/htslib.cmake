@@ -13,8 +13,8 @@ endif()
 
 ExternalProject_Add(htslib
     PREFIX ${htslib_PREFIX}
-    GIT_REPOSITORY "https://github.com/samtools/htslib.git"
-    GIT_TAG "1.2.1"
+    GIT_REPOSITORY "https://github.com/nsubtil/htslib.git"
+    GIT_TAG "fix-signed-one-bit-bitfield"
     UPDATE_COMMAND ""
     BUILD_IN_SOURCE 1
     CONFIGURE_COMMAND ""

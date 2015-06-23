@@ -1,6 +1,9 @@
 /*
  * Firepony
- * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ *
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION
+ * Copyright (c) 2015, Nuno Subtil <subtil@gmail.com>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -9,20 +12,20 @@
  *    * Redistributions in binary form must reproduce the above copyright
  *      notice, this list of conditions and the following disclaimer in the
  *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of the NVIDIA CORPORATION nor the
- *      names of its contributors may be used to endorse or promote products
- *      derived from this software without specific prior written permission.
+ *    * Neither the name of the copyright holders nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL NVIDIA CORPORATION BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "pipeline.h"
@@ -164,6 +167,16 @@ struct firepony_device_pipeline : public firepony_pipeline
         }
 #endif
 
+#if ENABLE_TBB_BACKEND
+        // this object must stay alive on the stack for the scheduler to work
+        // this means we have to declare it even for the GPU path
+        tbb::task_scheduler_init init(tbb::task_scheduler_init::deferred);
+        if (system == intel_tbb)
+        {
+            init.initialize(compute_device);
+        }
+#endif
+
         firepony_postprocess(*context);
     }
 
@@ -174,6 +187,16 @@ private:
         if (system == cuda)
         {
             cudaSetDevice(compute_device);
+        }
+#endif
+
+#if ENABLE_TBB_BACKEND
+        // this object must stay alive on the stack for the scheduler to work
+        // this means we have to declare it even for the GPU path
+        tbb::task_scheduler_init init(tbb::task_scheduler_init::deferred);
+        if (system == intel_tbb)
+        {
+            init.initialize(compute_device);
         }
 #endif
 
@@ -206,12 +229,6 @@ private:
 
             // return it to the reader for reuse
             reader->retire_batch(h_batch);
-
-            if (!context->options.debug)
-            {
-                fprintf(stderr, ".");
-                fflush(stderr);
-            }
         }
     }
 };
@@ -235,7 +252,6 @@ std::string firepony_device_pipeline<firepony::cuda>::get_name(void)
 #endif
 
 #if ENABLE_TBB_BACKEND
-tbb::task_scheduler_init tbb_scheduler_init(tbb::task_scheduler_init::deferred);
 static int num_tbb_threads = -1;
 
 template<>
@@ -271,7 +287,6 @@ firepony_pipeline *firepony_pipeline::create(target_system system, uint32 device
             num_tbb_threads = command_line_options.cpu_threads;
         }
 
-        tbb_scheduler_init.initialize(num_tbb_threads);
         return new firepony_device_pipeline<firepony::intel_tbb>(consumer_id, num_tbb_threads);
 #endif
 

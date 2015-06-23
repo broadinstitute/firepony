@@ -26,6 +26,7 @@
  */
 
 #include "table_formatter.h"
+#include "output.h"
 #include "device/util.h"
 
 namespace firepony {
@@ -69,7 +70,7 @@ void table_formatter::end_row(void)
 {
     if (!preprocess)
     {
-        printf("\n");
+        output_printf("\n");
     }
 }
 
@@ -82,26 +83,26 @@ void table_formatter::end_table(void)
         preprocess = false;
 
         // print the table header data
-        printf("#:GATKTable:%d:%d:", num_columns, num_rows);
+        output_printf("#:GATKTable:%d:%d:", num_columns, num_rows);
         for(uint32 i = 0; i < num_columns; i++)
         {
             switch(column_formats[i])
             {
             case FMT_STRING:
             case FMT_CHAR:
-                printf("%%s:");
+                output_printf("%%s:");
                 break;
 
             case FMT_UINT64:
-                printf("%%d:");
+                output_printf("%%d:");
                 break;
 
             case FMT_FLOAT_2:
                 if (command_line_options.disable_output_rounding)
                 {
-                    printf("%%.64f:");
+                    output_printf("%%.64f:");
                 } else {
-                    printf("%%.2f:");
+                    output_printf("%%.2f:");
                 }
 
                 break;
@@ -109,33 +110,33 @@ void table_formatter::end_table(void)
             case FMT_FLOAT_4:
                 if (command_line_options.disable_output_rounding)
                 {
-                    printf("%%.64f:");
+                    output_printf("%%.64f:");
                 } else {
-                    printf("%%.4f:");
+                    output_printf("%%.4f:");
                 }
 
                 break;
             }
         }
-        printf(";\n");
+        output_printf(";\n");
 
-        printf("#:GATKTable:%s:%s\n", table_name.c_str(), description.c_str());
+        output_printf("#:GATKTable:%s:%s\n", table_name.c_str(), description.c_str());
 
         for(uint32 i = 0; i < num_columns; i++)
         {
             char fmt_string[256];
 
             snprintf(fmt_string, sizeof(fmt_string), "%%%ds", column_widths[i]);
-            printf(fmt_string, column_names[i].c_str());
+            output_printf(fmt_string, column_names[i].c_str());
             if (i == num_columns - 1)
             {
-                printf("\n");
+                output_printf("\n");
             } else {
-                printf("  ");
+                output_printf("  ");
             }
         }
     } else {
-        printf("\n");
+        output_printf("\n");
     }
 }
 
@@ -151,11 +152,11 @@ void table_formatter::data(std::string val)
         char fmt_string[256];
 
         snprintf(fmt_string, sizeof(fmt_string), "%%%ds", (column_right_aligned[col_idx] ? 1 : -1) * column_widths[col_idx]);
-        printf(fmt_string, val.c_str());
+        output_printf(fmt_string, val.c_str());
 
         if (col_idx < num_columns - 1)
         {
-            printf("  ");
+            output_printf("  ");
         }
     }
 

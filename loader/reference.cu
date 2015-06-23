@@ -1,5 +1,5 @@
 /*
- * Firepequence_nameony
+ * Firepony
  * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -204,8 +204,6 @@ bool reference_file_handle::make_sequence_available(const std::string& sequence_
     if (ret == false)
     {
         fprintf(stderr, "error loading sequence %s\n", sequence_name.c_str());
-    } else {
-        fprintf(stderr, "+");
     }
 
     fflush(stderr);

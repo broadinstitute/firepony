@@ -111,6 +111,8 @@ set(firepony_common_sources
     io_thread.h
     mmap.cu
     mmap.h
+    output.cu
+    output.h
     runtime_options.h
     segmented_database.h
     sequence_database.h

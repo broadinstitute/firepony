@@ -1,3 +1,11 @@
+firepony (0.9.6-1) unstable; urgency=medium
+
+  * Allow specifying output file name
+  * Display progress bar
+  * Fix --cpu-threads option
+
+ -- Nuno Subtil <subtil@gmail.com>  Mon, 22 Jun 2015 19:53:20 -0700
+
 firepony (0.9.5-1) unstable; urgency=low
 
   * Initial release

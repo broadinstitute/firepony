@@ -167,6 +167,16 @@ struct firepony_device_pipeline : public firepony_pipeline
         }
 #endif
 
+#if ENABLE_TBB_BACKEND
+        // this object must stay alive on the stack for the scheduler to work
+        // this means we have to declare it even for the GPU path
+        tbb::task_scheduler_init init(tbb::task_scheduler_init::deferred);
+        if (system == intel_tbb)
+        {
+            init.initialize(compute_device);
+        }
+#endif
+
         firepony_postprocess(*context);
     }
 
@@ -177,6 +187,16 @@ private:
         if (system == cuda)
         {
             cudaSetDevice(compute_device);
+        }
+#endif
+
+#if ENABLE_TBB_BACKEND
+        // this object must stay alive on the stack for the scheduler to work
+        // this means we have to declare it even for the GPU path
+        tbb::task_scheduler_init init(tbb::task_scheduler_init::deferred);
+        if (system == intel_tbb)
+        {
+            init.initialize(compute_device);
         }
 #endif
 
@@ -232,7 +252,6 @@ std::string firepony_device_pipeline<firepony::cuda>::get_name(void)
 #endif
 
 #if ENABLE_TBB_BACKEND
-tbb::task_scheduler_init tbb_scheduler_init(tbb::task_scheduler_init::deferred);
 static int num_tbb_threads = -1;
 
 template<>
@@ -268,7 +287,6 @@ firepony_pipeline *firepony_pipeline::create(target_system system, uint32 device
             num_tbb_threads = command_line_options.cpu_threads;
         }
 
-        tbb_scheduler_init.initialize(num_tbb_threads);
         return new firepony_device_pipeline<firepony::intel_tbb>(consumer_id, num_tbb_threads);
 #endif
 

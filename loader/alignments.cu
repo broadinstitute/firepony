@@ -283,7 +283,8 @@ bool alignment_file::next_batch(alignment_batch_host *batch, uint32 data_mask, r
                 batch->chromosome.push_back(seq_id);
                 batch->chromosome_map.mark_resident(seq_id);
             } else {
-                batch->chromosome.push_back(uint16(-1));
+                fprintf(stderr, "ERROR: sequence %s not found in reference file\n", sequence_name.c_str());
+                exit(1);
             }
         }
 

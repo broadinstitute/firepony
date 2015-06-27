@@ -127,7 +127,7 @@ void output_read_group_table(firepony_context<system>& context)
     fmt.add_column("EmpiricalQuality", table_formatter::FMT_FLOAT_4);
     fmt.add_column("EstimatedQReported", table_formatter::FMT_FLOAT_4);
     fmt.add_column("Observations", table_formatter::FMT_UINT64);
-    fmt.add_column("Errors", table_formatter::FMT_FLOAT_2);
+    fmt.add_column("Errors", table_formatter::FMT_FLOAT_2, table_formatter::ALIGNMENT_RIGHT, table_formatter::ALIGNMENT_LEFT);
 
     // preprocess table data to compute column widths
     output_read_group_table_loop(context, table, fmt);

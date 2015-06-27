@@ -134,6 +134,10 @@ exit_code = 0
 # iterate through the list of tables in A
 for table_A in report_A.tables:
 
+    if table_A.name == "Arguments":
+        # the arguments table is slightly different and doesn't need to be compared
+        continue
+
     if table_A.name == "Quantized":
         # the quality quantization table is a no-op in firepony, skip
         continue

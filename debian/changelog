@@ -1,3 +1,13 @@
+firepony (0.9.7-1) unstable; urgency=medium
+
+  * Timestamp progress output
+  * Abort if reference sequence for a given read is not found
+  * Fix alignment stop position in loader
+  * Add Firepony version to output
+  * Fix output table alignment
+
+ -- Nuno Subtil <subtil@gmail.com>  Sat, 27 Jun 2015 11:22:25 -0700
+
 firepony (0.9.6-1) unstable; urgency=medium
 
   * Allow specifying output file name

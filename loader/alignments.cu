@@ -274,7 +274,8 @@ bool alignment_file::next_batch(alignment_batch_host *batch, uint32 data_mask, r
 
         if (data_mask & AlignmentDataMask::CHROMOSOME)
         {
-            std::string sequence_name = get_sequence_name(data->core.tid);
+            uint32 tid = data->core.tid;
+            std::string sequence_name = get_sequence_name(tid);
             const bool seq_valid = reference->make_sequence_available(sequence_name);
 
             if (seq_valid)
@@ -283,7 +284,15 @@ bool alignment_file::next_batch(alignment_batch_host *batch, uint32 data_mask, r
                 batch->chromosome.push_back(seq_id);
                 batch->chromosome_map.mark_resident(seq_id);
             } else {
-                batch->chromosome.push_back(uint16(-1));
+                if (tid != uint32(-1))
+                {
+                    // if a valid sequence was noted in the file but we couldn't load it, error out
+                    fprintf(stderr, "ERROR: sequence %s not found in reference file\n", sequence_name.c_str());
+                    exit(1);
+                } else {
+                    // if the read has no sequence, load it and let the filtering stage cull it
+                    batch->chromosome.push_back(uint16(-1));
+                }
             }
         }
 
@@ -294,11 +303,14 @@ bool alignment_file::next_batch(alignment_batch_host *batch, uint32 data_mask, r
 
         if (data_mask & AlignmentDataMask::ALIGNMENT_STOP)
         {
-            batch->alignment_stop.push_back(bam_endpos(data));
+            // bam_endpos returns the first coordinate after the alignment
+            // gatk seems to interpret this as the last aligned coordinate, so we do the same
+            batch->alignment_stop.push_back(bam_endpos(data) - 1);
         }
 
         if (data_mask & AlignmentDataMask::MATE_CHROMOSOME)
         {
+            // note: for the mate chromosome we don't bail out if the sequence doesn't exist
             std::string sequence_name = get_sequence_name(data->core.mtid);
             const bool seq_valid = reference->make_sequence_available(sequence_name);
 

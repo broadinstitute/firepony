@@ -91,10 +91,11 @@ void output_progress_bar(float progress, uint64_t batch_counter, std::time_t sta
     char eta[1024];
     eta[0] = '\0';
 
+    std::time_t now = std::time(nullptr);
+
     if (progress > 0.001)
     {
         // compute remaining time
-        std::time_t now = std::time(nullptr);
         std::time_t elapsed = now - start;
         std::time_t total_time = elapsed / progress;
         std::time_t remaining = total_time - elapsed;
@@ -114,7 +115,9 @@ void output_progress_bar(float progress, uint64_t batch_counter, std::time_t sta
     } else {
         if (batch_counter % 50 == 0)
         {
-            fprintf(stderr, "%.02f%% %s\n", progress * 100.0, eta);
+            char timestamp[1024];
+            strftime(timestamp, sizeof(timestamp), "%c", std::localtime(&now));
+            fprintf(stderr, "[%s] %.02f%% %s\n", timestamp, progress * 100.0, eta);
         }
     }
 }

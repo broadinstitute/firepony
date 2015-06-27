@@ -303,7 +303,9 @@ bool alignment_file::next_batch(alignment_batch_host *batch, uint32 data_mask, r
 
         if (data_mask & AlignmentDataMask::ALIGNMENT_STOP)
         {
-            batch->alignment_stop.push_back(bam_endpos(data));
+            // bam_endpos returns the first coordinate after the alignment
+            // gatk seems to interpret this as the last aligned coordinate, so we do the same
+            batch->alignment_stop.push_back(bam_endpos(data) - 1);
         }
 
         if (data_mask & AlignmentDataMask::MATE_CHROMOSOME)

@@ -46,6 +46,7 @@
 #include "read_group_table.h"
 #include "snp_filter.h"
 #include "util.h"
+#include "version.h"
 
 namespace firepony {
 
@@ -150,7 +151,7 @@ template <target_system system>
 static void output_header(firepony_context<system>& context)
 {
     output_printf("%s", "#:GATKReport.v1.1:5\n");
-    output_printf("%s", "#:GATKTable:2:17:%s:%s:;\n");
+    output_printf("%s", "#:GATKTable:2:18:%s:%s:;\n");
     output_printf("%s", "#:GATKTable:Arguments:Recalibration argument collection values used in this run\n");
     output_printf("%s", "Argument                    Value                                                                   \n");
     output_printf("%s", "binary_tag_name             null                                                                    \n");
@@ -170,6 +171,9 @@ static void output_header(firepony_context<system>& context)
     output_printf("%s", "run_without_dbsnp           false                                                                   \n");
     output_printf("%s", "solid_nocall_strategy       THROW_EXCEPTION                                                         \n");
     output_printf("%s", "solid_recal_mode            SET_Q_ZERO                                                              \n");
+    // this field is a Firepony extension, tracks the software and version number that produced this file
+    output_printf(      "software                    Firepony_%d.%d.%d                                                       \n",
+                  FIREPONY_VERSION_MAJOR, FIREPONY_VERSION_MINOR, FIREPONY_VERSION_REV);
     output_printf("\n");
 
     // output a dummy quantization table, as GATK checks whether it's present

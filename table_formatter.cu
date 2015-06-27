@@ -32,28 +32,33 @@
 namespace firepony {
 
 // adds a column to the table
-void table_formatter::add_column(const std::string& name, output_format fmt, bool force_right_align)
+void table_formatter::add_column(const std::string& name, output_format fmt, output_alignment alignment, output_alignment header_alignment)
 {
     column_names.push_back(std::string(name));
     column_formats.push_back(fmt);
     column_widths.push_back(strlen(name.c_str()));
 
-    if (force_right_align)
+    if (alignment == ALIGNMENT_DEFAULT)
     {
-        column_right_aligned.push_back(true);
-    } else {
         switch(fmt)
         {
         case FMT_STRING:
         case FMT_CHAR:
-            column_right_aligned.push_back(false);
+            alignment = ALIGNMENT_LEFT;
             break;
 
         default:
-            column_right_aligned.push_back(true);
+            alignment = ALIGNMENT_RIGHT;
             break;
         }
     }
+    column_alignments.push_back(alignment);
+
+    if (header_alignment == ALIGNMENT_DEFAULT)
+    {
+        header_alignment = alignment;
+    }
+    header_alignments.push_back(header_alignment);
 
     num_columns++;
 }
@@ -126,7 +131,7 @@ void table_formatter::end_table(void)
         {
             char fmt_string[256];
 
-            snprintf(fmt_string, sizeof(fmt_string), "%%%ds", column_widths[i]);
+            snprintf(fmt_string, sizeof(fmt_string), "%%%ds", (header_alignments[i] == ALIGNMENT_RIGHT ? 1 : -1) * column_widths[i]);
             output_printf(fmt_string, column_names[i].c_str());
             if (i == num_columns - 1)
             {
@@ -151,7 +156,7 @@ void table_formatter::data(std::string val)
         // output the column with the correct width
         char fmt_string[256];
 
-        snprintf(fmt_string, sizeof(fmt_string), "%%%ds", (column_right_aligned[col_idx] ? 1 : -1) * column_widths[col_idx]);
+        snprintf(fmt_string, sizeof(fmt_string), "%%%ds", (column_alignments[col_idx] == ALIGNMENT_RIGHT ? 1 : -1) * column_widths[col_idx]);
         output_printf(fmt_string, val.c_str());
 
         if (col_idx < num_columns - 1)

@@ -52,6 +52,13 @@ struct table_formatter
         // floating point, no rounding (for debugging only)
     } output_format;
 
+    // alignment
+    typedef enum {
+        ALIGNMENT_DEFAULT,
+        ALIGNMENT_LEFT,
+        ALIGNMENT_RIGHT
+    } output_alignment;
+
     std::string table_name;
     std::string description;
 
@@ -61,7 +68,8 @@ struct table_formatter
     std::vector<std::string> column_names;
     std::vector<output_format> column_formats;
     std::vector<uint32> column_widths;
-    std::vector<bool> column_right_aligned;
+    std::vector<output_alignment> column_alignments;
+    std::vector<output_alignment> header_alignments;
 
     // describes the current state of the formatter object
     // output happens in two passes: during the first pass,
@@ -79,7 +87,7 @@ struct table_formatter
     { }
 
     // adds a column to the table
-    void add_column(const std::string& name, output_format fmt, bool force_right_align = false);
+    void add_column(const std::string& name, output_format fmt, output_alignment alignment = ALIGNMENT_DEFAULT, output_alignment header_alignment = ALIGNMENT_DEFAULT);
 
     // start processing a new row
     void start_row(void);

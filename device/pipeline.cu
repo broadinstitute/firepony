@@ -178,9 +178,9 @@ static void output_header(firepony_context<system>& context)
 
     // output a dummy quantization table, as GATK checks whether it's present
     table_formatter fmt("Quantized", "Quality quantization map");
-    fmt.add_column("QualityScore", table_formatter::FMT_STRING, true);
-    fmt.add_column("Count", table_formatter::FMT_STRING, true);
-    fmt.add_column("QuantizedScore", table_formatter::FMT_STRING, true);
+    fmt.add_column("QualityScore", table_formatter::FMT_STRING, table_formatter::ALIGNMENT_RIGHT);
+    fmt.add_column("Count", table_formatter::FMT_STRING, table_formatter::ALIGNMENT_RIGHT);
+    fmt.add_column("QuantizedScore", table_formatter::FMT_STRING, table_formatter::ALIGNMENT_RIGHT);
 
     for(uint32 pass = 0; pass < 2; pass++)
     {

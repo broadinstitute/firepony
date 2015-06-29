@@ -44,6 +44,7 @@ struct firepony_pipeline
     // returns a string with the name of the current pipeline
     virtual std::string get_name(void) = 0;
     virtual int get_compute_device(void) = 0;
+    virtual size_t get_total_memory(void) = 0;
     virtual target_system get_system(void) = 0;
     virtual pipeline_statistics& statistics(void) = 0;
 

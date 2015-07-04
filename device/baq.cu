@@ -185,7 +185,15 @@ struct hmm_window_valid : public lambda<system>
     }
 };
 
-template <target_system system>
+typedef enum
+{
+    hmm_phase_forward = 1,
+    hmm_phase_backward = 2,
+    hmm_phase_map = 4,
+    hmm_phase_all = 4 + 2 + 1,
+} hmm_phase;
+
+template <target_system system, uint32 phase>
 struct hmm_glocal : public lambda<system>
 {
     typename vector<system, uint32>::view baq_state;
@@ -337,12 +345,10 @@ struct hmm_glocal : public lambda<system>
         return e;
     }
 
-    template<typename Tuple>
-    CUDA_HOST_DEVICE void operator() (const Tuple& hmm_index)
+    template <typename Tuple>
+    CUDA_HOST_DEVICE void hmm_forward(const Tuple& hmm_index)
     {
         int i, k;
-
-        setup(hmm_index);
 
 //        const uint32 read_index    = thrust::get<0>(hmm_index);
 //        printf("read %d: hmm_glocal(l_ref=%d qstart=%d, l_query=%d)\n", read_index, referenceLength, queryStart, queryLen);
@@ -491,6 +497,12 @@ struct hmm_glocal : public lambda<system>
 
             scalingFactors[queryLen+1] = sum; // the last scaling factor
         }
+    }
+
+    template <typename Tuple>
+    CUDA_HOST_DEVICE void hmm_backward(const Tuple& hmm_index)
+    {
+        int i, k;
 
         /*** backward ***/
         // b[l_query] (b[l_query+1][0]=1 and thus \tilde{b}[][]=1/s[l_query+1]; this is where s[l_query+1] comes from)
@@ -575,6 +587,12 @@ struct hmm_glocal : public lambda<system>
             backwardMatrix[off(0, set_u(bandWidth, 0, 0))] = sum / scalingFactors[0];
 //            pb = backwardMatrix[off(0, set_u(bandWidth, 0, 0))]; // if everything works as is expected, pb == 1.0
         }
+    }
+
+    template <typename Tuple>
+    CUDA_HOST_DEVICE void hmm_map(const Tuple& hmm_index)
+    {
+        int i, k;
 
         /*** MAP ***/
         for (i = 1; i <= queryLen; ++i)
@@ -634,6 +652,21 @@ struct hmm_glocal : public lambda<system>
 //            printf("(%.4f,%.4f) (%d,%d,%d,%.4f)\n", pb, sum, (i-1), (max_k>>2), (max_k&3), max);
         }
     }
+
+    template <typename Tuple>
+    CUDA_HOST_DEVICE void operator() (const Tuple& hmm_index)
+    {
+        setup(hmm_index);
+
+        if (phase & hmm_phase_forward)
+            hmm_forward(hmm_index);
+
+        if (phase & hmm_phase_backward)
+            hmm_backward(hmm_index);
+
+        if (phase & hmm_phase_map)
+            hmm_map(hmm_index);
+    }
 };
 
 // functor to compute the size required for the forward/backward HMM matrix
@@ -646,7 +679,7 @@ struct compute_hmm_matrix_size : public thrust::unary_function<uint32, uint32>, 
     CUDA_HOST_DEVICE uint32 operator() (const uint32 read_index)
     {
         const CRQ_index idx = batch.crq_index(read_index);
-        return hmm_glocal<system>::matrix_size(idx.read_len, ctx.baq.bandwidth[read_index]);
+        return hmm_glocal<system, hmm_phase_all>::matrix_size(idx.read_len, ctx.baq.bandwidth[read_index]);
     }
 };
 
@@ -926,7 +959,7 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
     vector<system, uint32>& temp_active_list = context.temp_u32_3;
     uint32 num_active;
 
-    timer<system> baq_setup, baq_hmm, baq_postprocess;
+    timer<system> baq_setup, baq_hmm, baq_hmm_forward, baq_hmm_backward, baq_hmm_map, baq_postprocess;
     baq_setup.start();
 
     // allocate our output
@@ -1039,14 +1072,47 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
 
         baq_hmm.start();
 
+#if 0
         // run the HMM itself
         parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
-                                                                      baq.matrix_index.begin(),
-                                                                      baq.scaling_index.begin())),
-                         thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
-                                                                      baq.matrix_index.end(),
-                                                                      baq.scaling_index.end())),
-                         hmm_glocal<system>(context, batch.device, baq_state));
+                                                                                baq.matrix_index.begin(),
+                                                                                baq.scaling_index.begin())),
+                                   thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
+                                                                                baq.matrix_index.end(),
+                                                                                baq.scaling_index.end())),
+                                   hmm_glocal<system, hmm_phase_all>(context, batch.device, baq_state));
+#else
+        // run the HMM split in 3 phases
+        baq_hmm_forward.start();
+        parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
+                                                                                baq.matrix_index.begin(),
+                                                                                baq.scaling_index.begin())),
+                                   thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
+                                                                                baq.matrix_index.end(),
+                                                                                baq.scaling_index.end())),
+                                   hmm_glocal<system, hmm_phase_forward>(context, batch.device, baq_state));
+        baq_hmm_forward.stop();
+
+        baq_hmm_backward.start();
+        parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
+                                                                                baq.matrix_index.begin(),
+                                                                                baq.scaling_index.begin())),
+                                   thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
+                                                                                baq.matrix_index.end(),
+                                                                                baq.scaling_index.end())),
+                                   hmm_glocal<system, hmm_phase_backward>(context, batch.device, baq_state));
+        baq_hmm_backward.stop();
+
+        baq_hmm_map.start();
+        parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
+                                                                                baq.matrix_index.begin(),
+                                                                                baq.scaling_index.begin())),
+                                   thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
+                                                                                baq.matrix_index.end(),
+                                                                                baq.scaling_index.end())),
+                                   hmm_glocal<system, hmm_phase_map>(context, batch.device, baq_state));
+        baq_hmm_map.stop();
+#endif
 
         baq_hmm.stop();
     }

@@ -50,6 +50,8 @@
 
 namespace firepony {
 
+static const uint32 baq_stride = 32;
+
 #define MAX_PHRED_SCORE 93
 #define EM 0.33333333333
 #define EI 0.25
@@ -684,6 +686,47 @@ struct compute_hmm_matrix_size : public thrust::unary_function<uint32, uint32>, 
 };
 
 template <target_system system>
+struct compute_hmm_matrix_size_strided : public lambda<system>
+{
+    LAMBDA_INHERIT_MEMBERS;
+
+    typename vector<system, uint32>::view active_read_list;
+    typename vector<system, uint32>::view matrix_size_output;
+
+    compute_hmm_matrix_size_strided(typename firepony_context<system>::view ctx,
+                                    const typename alignment_batch_device<system>::const_view batch,
+                                    typename vector<system, uint32>::view active_read_list,
+                                    typename vector<system, uint32>::view matrix_size_output)
+        : lambda<system>(ctx, batch),
+          active_read_list(active_read_list),
+          matrix_size_output(matrix_size_output)
+    { }
+
+    CUDA_HOST_DEVICE void operator() (const uint32 index)
+    {
+        uint32 ret = 0;
+
+
+        // smear the max matrix size across the thread group so we can stride it later on
+        const uint32 start_range = index - (index % baq_stride);
+        const uint32 end_range = start_range + baq_stride;
+
+        for(uint32 i = start_range; i < end_range; i++)
+        {
+            if (i < active_read_list.size())
+            {
+                const uint32 read_index = active_read_list[i];
+                const CRQ_index idx = batch.crq_index(read_index);
+                const uint32 size = hmm_glocal<system, hmm_phase_all>::matrix_size(idx.read_len, ctx.baq.bandwidth[read_index]);
+                ret = max(ret, size);
+            }
+        }
+
+        matrix_size_output[index] = ret;
+    }
+};
+
+template <target_system system>
 struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, uint32>, public lambda<system>
 {
     LAMBDA_INHERIT;
@@ -1015,12 +1058,26 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
         baq.matrix_index.resize(num_active + 1);
         // first offset is zero
         thrust::fill_n(baq.matrix_index.begin(), 1, 0);
+#if 0
         // do an inclusive scan to compute all offsets + the total size
         parallel<system>::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
                                                                          compute_hmm_matrix_size<system>(context, batch.device)),
                                          num_active,
                                          baq.matrix_index.begin() + 1,
                                          thrust::plus<uint32>());
+#else
+        temp_active_list.resize(num_active);
+
+        // compute matrix sizes as the maximum size of each baq_stride groups of reads
+        parallel<system>::for_each(thrust::make_counting_iterator(0u),
+                                   thrust::make_counting_iterator(0u) + num_active,
+                                   compute_hmm_matrix_size_strided<system>(context, batch.device, active_baq_read_list, temp_active_list));
+
+        parallel<system>::inclusive_scan(temp_active_list.begin(),
+                                         num_active,
+                                         baq.matrix_index.begin() + 1,
+                                         thrust::plus<uint32>());
+#endif
 
         uint32 matrix_len = baq.matrix_index[num_active];
 

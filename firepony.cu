@@ -163,8 +163,7 @@ static uint32 choose_batch_size(const std::vector<firepony_pipeline *>& devices)
 
     if (min_gpu_memory <= GBYTES(4))
     {
-        // xxxnsubtil: confirm this
-        batch_size = 10000;
+        batch_size = 8000;
     }
 
     if (min_gpu_memory <= GBYTES(2))

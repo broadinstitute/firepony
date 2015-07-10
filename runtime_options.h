@@ -80,7 +80,7 @@ struct runtime_options
 
         reference_use_mmap = true;
         snp_database_use_mmap = true;
-        batch_size = 20000;
+        batch_size = uint32(-1);
 
         debug = false;
         disable_output_rounding = false;

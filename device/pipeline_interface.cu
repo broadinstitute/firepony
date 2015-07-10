@@ -89,6 +89,11 @@ struct firepony_device_pipeline : public firepony_pipeline
         return compute_device;
     }
 
+    virtual size_t get_total_memory(void) override
+    {
+        return size_t(-1);
+    }
+
     virtual pipeline_statistics& statistics(void) override
     {
         return context->stats;
@@ -234,7 +239,7 @@ private:
 };
 
 #if ENABLE_CUDA_BACKEND
-template<>
+template <>
 std::string firepony_device_pipeline<firepony::cuda>::get_name(void)
 {
     cudaDeviceProp prop;
@@ -249,6 +254,17 @@ std::string firepony_device_pipeline<firepony::cuda>::get_name(void)
 
     return std::string(buf);
 }
+
+template <>
+size_t firepony_device_pipeline<firepony::cuda>::get_total_memory(void)
+{
+    cudaDeviceProp prop;
+
+    cudaSetDevice(compute_device);
+    cudaGetDeviceProperties(&prop, compute_device);
+
+    return prop.totalGlobalMem;
+}
 #endif
 
 #if ENABLE_TBB_BACKEND
@@ -261,7 +277,6 @@ std::string firepony_device_pipeline<firepony::intel_tbb>::get_name(void)
     snprintf(buf, sizeof(buf), "CPU (Intel Threading Building Blocks, %d threads)", num_tbb_threads);
     return std::string(buf);
 }
-
 #endif
 
 firepony_pipeline *firepony_pipeline::create(target_system system, uint32 device)

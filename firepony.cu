@@ -101,6 +101,11 @@ static void enumerate_gpus(std::vector<firepony_pipeline *>& ret)
         if (prop.major < 3)
             continue;
 
+        // minimum of 4GB of memory required
+        // (CUDA reports 4095MB for a K5000, so we use that instead of the full 4GB as the limit)
+        if (prop.totalGlobalMem < size_t(4095) * 1024 * 1024)
+            continue;
+
         firepony_pipeline *pipeline = firepony_pipeline::create(firepony::cuda, dev);
         ret.push_back(pipeline);
     }
@@ -127,6 +132,51 @@ static std::vector<firepony_pipeline *> enumerate_compute_devices(void)
 #endif
 
     return ret;
+}
+
+static uint32 choose_batch_size(const std::vector<firepony_pipeline *>& devices)
+{
+    size_t min_gpu_memory = std::numeric_limits<uint32>::max();
+    // max batch is 20k
+    uint32 batch_size = 20000;
+
+#if ENABLE_CUDA_BACKEND
+    for(const auto dev : devices)
+    {
+        if (dev->get_system() == firepony::cuda)
+        {
+            min_gpu_memory = std::min(min_gpu_memory, dev->get_total_memory());
+        }
+    }
+
+#define GBYTES(gb) (uint32(gb) * 1024 * 1024 * 1024)
+    if (min_gpu_memory <= GBYTES(11))
+    {
+        batch_size = 20000;
+    }
+
+    if (min_gpu_memory <= GBYTES(6))
+    {
+        // xxxnsubtil: confirm this
+        batch_size = 18000;
+    }
+
+    if (min_gpu_memory <= GBYTES(4))
+    {
+        batch_size = 8000;
+    }
+
+    if (min_gpu_memory <= GBYTES(2))
+    {
+        // note: this will work, but is very slow compared to larger batch sizes
+        // for testing such low memory GPUs you'll need to disable the memory check in enumerate_gpus
+        batch_size = 8000;
+    }
+#undef GBYTES
+
+#endif // if ENABLE_CUDA_BACKEND
+
+    return batch_size;
 }
 
 static void print_statistics(const timer<host>& wall_clock, const pipeline_statistics& stats, int num_devices = 1)
@@ -188,6 +238,11 @@ int main(int argc, char **argv)
         fprintf(stderr, "  %s\n", d->get_name().c_str());
     }
     fprintf(stderr, "\n");
+
+    if (command_line_options.batch_size == uint32(-1))
+    {
+        command_line_options.batch_size = choose_batch_size(compute_devices);
+    }
 
     if (command_line_options.output)
     {

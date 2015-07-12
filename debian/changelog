@@ -1,3 +1,9 @@
+firepony (0.9.9-1) unstable; urgency=medium
+
+  * Fix invalid batch size selection on < 12GB GPUs
+
+ -- Nuno Subtil <subtil@gmail.com>  Sat, 11 Jul 2015 19:49:19 -0700
+
 firepony (0.9.8-1) unstable; urgency=medium
 
   * Automatic batch size selection

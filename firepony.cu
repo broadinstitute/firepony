@@ -149,7 +149,7 @@ static uint32 choose_batch_size(const std::vector<firepony_pipeline *>& devices)
         }
     }
 
-#define GBYTES(gb) (uint32(gb) * 1024 * 1024 * 1024)
+#define GBYTES(gb) (size_t(gb) * 1024u * 1024u * 1024u)
     if (min_gpu_memory <= GBYTES(11))
     {
         batch_size = 20000;

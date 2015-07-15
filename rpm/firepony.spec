@@ -1,6 +1,6 @@
 Summary:            Quality score recalibrator for DNA sequencing data
 Name:               firepony
-Version:            0.9.9
+Version:            1.0.0
 Release:            21%{?dist}
 License:            BSD
 Group:              Engineering and Scientific
@@ -47,6 +47,9 @@ make VERBOSE=1 %{?_smp_mflags}
 /usr/bin/firepony-loader
 
 %changelog
+* Tue Jul 14 2015 Nuno Subtil <subtil at gmail.com> - 1.0.0
+- No changes from previous release
+
 * Sun Jul 12 2015 Nuno Subtil <subtil at gmail.com> - 0.9.9
 - Initial build of RPM package
 

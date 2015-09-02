@@ -211,8 +211,10 @@ struct hmm_glocal : public lambda<system>
     int referenceStart, referenceLength;
     int queryStart, queryEnd, queryLen;
 
-    double *forwardMatrix;
-    double *backwardMatrix;
+    typedef strided_iterator<double, baq_stride> matrix_iterator;
+
+    matrix_iterator forwardMatrix;
+    matrix_iterator backwardMatrix;
     double *scalingFactors;
 
     double sM, sI, bM, bI;
@@ -238,9 +240,12 @@ struct hmm_glocal : public lambda<system>
 
         const CRQ_index idx = batch.crq_index(read_index);
 
+        const uint32 matrix_offset = matrix_index % baq_stride;
+        const uint32 matrix_base = matrix_index - matrix_offset;
+
         // set up matrix and scaling factor pointers
-        forwardMatrix = &ctx.baq.forward[matrix_index];
-        backwardMatrix = &ctx.baq.backward[matrix_index];
+        forwardMatrix = matrix_iterator(&ctx.baq.forward[matrix_base + matrix_offset]);
+        backwardMatrix = matrix_iterator(&ctx.baq.backward[matrix_base + matrix_offset]);
         scalingFactors = &ctx.baq.scaling[scaling_index];
 
         // get the windows for the current read
@@ -378,7 +383,7 @@ struct hmm_glocal : public lambda<system>
         forwardMatrix[off(0, set_u(bandWidth, 0, 0))] = 1.0;
         scalingFactors[0] = 1.0;
         { // f[1]
-            double *fi = &forwardMatrix[off(1)];
+            matrix_iterator fi(&forwardMatrix[off(1)]);
             double sum;
             int beg = 1;
             int end = referenceLength < bandWidth + 1? referenceLength : bandWidth + 1;
@@ -419,8 +424,8 @@ struct hmm_glocal : public lambda<system>
         // f[2..l_query]
         for (i = 2; i <= queryLen; ++i)
         {
-            double *fi = &forwardMatrix[off(i)];
-            double *fi1 = &forwardMatrix[off(i-1)];
+            matrix_iterator fi(&forwardMatrix[off(i)]);
+            matrix_iterator fi1(&forwardMatrix[off(i-1)]);
             double sum;
 
             int beg = 1;
@@ -511,7 +516,7 @@ struct hmm_glocal : public lambda<system>
         for (k = 1; k <= referenceLength; ++k)
         {
             int u = set_u(bandWidth, queryLen, k);
-            double *bi = &backwardMatrix[off(queryLen)];
+            matrix_iterator bi(&backwardMatrix[off(queryLen)]);
 
             if (u < 3 || u >= bandWidth2*3+3)
                 continue;
@@ -527,8 +532,9 @@ struct hmm_glocal : public lambda<system>
             int end = referenceLength;
             int x, _beg, _end;
 
-            double *bi = &backwardMatrix[off(i)];
-            double *bi1 = &backwardMatrix[off(i+1)];
+            matrix_iterator bi(&backwardMatrix[off(i)]);
+            matrix_iterator bi1(&backwardMatrix[off(i+1)]);
+
             double y = (i > 1)? 1. : 0.;
 
             char qyi1 = queryBases[queryStart+i];
@@ -602,8 +608,8 @@ struct hmm_glocal : public lambda<system>
             double sum = 0.0;
             double max = 0.0;
 
-            const double *fi = &forwardMatrix[off(i)];
-            const double *bi = &backwardMatrix[off(i)];
+            matrix_iterator fi(&forwardMatrix[off(i)]);
+            matrix_iterator bi(&backwardMatrix[off(i)]);
 
             int beg = 1;
             int end = referenceLength;
@@ -706,7 +712,6 @@ struct compute_hmm_matrix_size_strided : public lambda<system>
     {
         uint32 ret = 0;
 
-
         // smear the max matrix size across the thread group so we can stride it later on
         const uint32 start_range = index - (index % baq_stride);
         const uint32 end_range = start_range + baq_stride;
@@ -722,7 +727,27 @@ struct compute_hmm_matrix_size_strided : public lambda<system>
             }
         }
 
+//        printf("matrix index %u size %u\n", index, ret);
         matrix_size_output[index] = ret;
+    }
+};
+
+template <target_system system>
+struct stride_hmm_matrix_index
+{
+    typename vector<system, uint32>::view matrix_index;
+
+    stride_hmm_matrix_index(typename vector<system, uint32>::view matrix_index)
+        : matrix_index(matrix_index)
+    { }
+
+    CUDA_HOST_DEVICE void operator() (const uint32 matrix_group_index)
+    {
+        auto initial_element = matrix_index[matrix_group_index * baq_stride];
+        for(uint32 i = 1; i < baq_stride; i++)
+        {
+            matrix_index[matrix_group_index * baq_stride + i] = initial_element + i;
+        }
     }
 };
 
@@ -1054,11 +1079,12 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
         context.active_read_list = temp_active_list;
         context.active_read_list.resize(temp_num_active);
 
+#if 0
         // compute the index and size of the HMM matrices
         baq.matrix_index.resize(num_active + 1);
         // first offset is zero
         thrust::fill_n(baq.matrix_index.begin(), 1, 0);
-#if 0
+
         // do an inclusive scan to compute all offsets + the total size
         parallel<system>::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
                                                                          compute_hmm_matrix_size<system>(context, batch.device)),
@@ -1066,20 +1092,28 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
                                          baq.matrix_index.begin() + 1,
                                          thrust::plus<uint32>());
 #else
-        temp_active_list.resize(num_active);
+        // round up the number of matrices to a multiple of baq_stride
+        const uint32 num_matrices = ((num_active + baq_stride - 1) / baq_stride) * baq_stride;
+        temp_active_list.resize(num_matrices);
+
+        baq.matrix_index.resize(num_matrices + 1);
 
         // compute matrix sizes as the maximum size of each baq_stride groups of reads
         parallel<system>::for_each(thrust::make_counting_iterator(0u),
-                                   thrust::make_counting_iterator(0u) + num_active,
+                                   thrust::make_counting_iterator(0u) + num_matrices,
                                    compute_hmm_matrix_size_strided<system>(context, batch.device, active_baq_read_list, temp_active_list));
 
         parallel<system>::inclusive_scan(temp_active_list.begin(),
-                                         num_active,
+                                         num_matrices,
                                          baq.matrix_index.begin() + 1,
                                          thrust::plus<uint32>());
+
+        parallel<system>::for_each(thrust::make_counting_iterator(0u),
+                                   thrust::make_counting_iterator(0u) + baq.matrix_index.size() / baq_stride,
+                                   stride_hmm_matrix_index<system>(baq.matrix_index));
 #endif
 
-        uint32 matrix_len = baq.matrix_index[num_active];
+        uint32 matrix_len = baq.matrix_index[baq.matrix_index.size() - 1];
 
         baq.forward.resize(matrix_len);
         baq.backward.resize(matrix_len);

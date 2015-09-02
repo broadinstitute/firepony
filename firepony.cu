@@ -193,12 +193,11 @@ static void print_statistics(const timer<host>& wall_clock, const pipeline_stati
     fprintf(stderr, "     setup: %.4f (%.2f%%)\n", stats.baq_setup.elapsed_time, stats.baq_setup.elapsed_time / stats.baq.elapsed_time * 100.0 / num_devices);
     fprintf(stderr, "     hmm: %.4f (%.2f%%)\n", stats.baq_hmm.elapsed_time, stats.baq_hmm.elapsed_time / stats.baq.elapsed_time * 100.0 / num_devices);
 
-    if (stats.baq_hmm_forward.elapsed_time > 0.0)
-    {
-        fprintf(stderr, "       forward: %.4f (%.2f%%)\n", stats.baq_hmm_forward.elapsed_time, stats.baq_hmm_forward.elapsed_time / stats.baq.elapsed_time * 100.0 / num_devices);
-        fprintf(stderr, "       backward: %.4f (%.2f%%)\n", stats.baq_hmm_backward.elapsed_time, stats.baq_hmm_backward.elapsed_time / stats.baq.elapsed_time * 100.0 / num_devices);
-        fprintf(stderr, "       map: %.4f (%.2f%%)\n", stats.baq_hmm_map.elapsed_time, stats.baq_hmm_map.elapsed_time / stats.baq.elapsed_time * 100.0 / num_devices);
-    }
+#if BAQ_HMM_SPLIT_PHASE
+    fprintf(stderr, "       forward: %.4f (%.2f%%)\n", stats.baq_hmm_forward.elapsed_time, stats.baq_hmm_forward.elapsed_time / stats.baq.elapsed_time * 100.0 / num_devices);
+    fprintf(stderr, "       backward: %.4f (%.2f%%)\n", stats.baq_hmm_backward.elapsed_time, stats.baq_hmm_backward.elapsed_time / stats.baq.elapsed_time * 100.0 / num_devices);
+    fprintf(stderr, "       map: %.4f (%.2f%%)\n", stats.baq_hmm_map.elapsed_time, stats.baq_hmm_map.elapsed_time / stats.baq.elapsed_time * 100.0 / num_devices);
+#endif
 
     fprintf(stderr, "     post: %.4f (%.2f%%)\n", stats.baq_postprocess.elapsed_time, stats.baq_postprocess.elapsed_time / stats.baq.elapsed_time * 100.0 / num_devices);
     fprintf(stderr, "   fractional error: %.4f (%.2f%%)\n", stats.fractional_error.elapsed_time, stats.fractional_error.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);

@@ -65,9 +65,11 @@ struct pipeline_statistics // host-only
 
     time_series baq_setup;
     time_series baq_hmm;
+#if BAQ_HMM_SPLIT_PHASE
     time_series baq_hmm_forward;
     time_series baq_hmm_backward;
     time_series baq_hmm_map;
+#endif
     time_series baq_postprocess;
 
     time_series covariates_gather;

@@ -50,7 +50,21 @@
 
 namespace firepony {
 
-static const uint32 baq_stride = 32;
+template <target_system system>
+struct baq_stride
+{ };
+
+template <>
+struct baq_stride<cuda>
+{
+    static constexpr uint32 stride = 32;
+};
+
+template <>
+struct baq_stride<intel_tbb>
+{
+    static constexpr uint32 stride = 1;
+};
 
 #define MAX_PHRED_SCORE 93
 #define EM 0.33333333333
@@ -211,7 +225,7 @@ struct hmm_glocal : public lambda<system>
     int referenceStart, referenceLength;
     int queryStart, queryEnd, queryLen;
 
-    typedef strided_iterator<double, baq_stride> matrix_iterator;
+    typedef strided_iterator<double, baq_stride<system>::stride> matrix_iterator;
 
     matrix_iterator forwardMatrix;
     matrix_iterator backwardMatrix;
@@ -240,7 +254,7 @@ struct hmm_glocal : public lambda<system>
 
         const CRQ_index idx = batch.crq_index(read_index);
 
-        const uint32 matrix_offset = matrix_index % baq_stride;
+        const uint32 matrix_offset = matrix_index % baq_stride<system>::stride;
         const uint32 matrix_base = matrix_index - matrix_offset;
 
         // set up matrix and scaling factor pointers
@@ -713,8 +727,9 @@ struct compute_hmm_matrix_size_strided : public lambda<system>
         uint32 ret = 0;
 
         // smear the max matrix size across the thread group so we can stride it later on
-        const uint32 start_range = index - (index % baq_stride);
-        const uint32 end_range = start_range + baq_stride;
+        constexpr uint32 stride = baq_stride<system>::stride;
+        const uint32 start_range = index - (index % stride);
+        const uint32 end_range = start_range + stride;
 
         for(uint32 i = start_range; i < end_range; i++)
         {
@@ -743,10 +758,12 @@ struct stride_hmm_matrix_index
 
     CUDA_HOST_DEVICE void operator() (const uint32 matrix_group_index)
     {
-        auto initial_element = matrix_index[matrix_group_index * baq_stride];
-        for(uint32 i = 1; i < baq_stride; i++)
+        constexpr uint32 stride = baq_stride<system>::stride;
+
+        auto initial_element = matrix_index[matrix_group_index * stride];
+        for(uint32 i = 1; i < stride; i++)
         {
-            matrix_index[matrix_group_index * baq_stride + i] = initial_element + i;
+            matrix_index[matrix_group_index * stride + i] = initial_element + i;
         }
     }
 };
@@ -1027,7 +1044,11 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
     vector<system, uint32>& temp_active_list = context.temp_u32_3;
     uint32 num_active;
 
-    timer<system> baq_setup, baq_hmm, baq_hmm_forward, baq_hmm_backward, baq_hmm_map, baq_postprocess;
+    timer<system> baq_setup, baq_hmm, baq_postprocess;
+#if BAQ_HMM_SPLIT_PHASE
+    timer<system> baq_hmm_forward, baq_hmm_backward, baq_hmm_map;
+#endif
+
     baq_setup.start();
 
     // allocate our output
@@ -1079,39 +1100,44 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
         context.active_read_list = temp_active_list;
         context.active_read_list.resize(temp_num_active);
 
-#if 0
-        // compute the index and size of the HMM matrices
-        baq.matrix_index.resize(num_active + 1);
-        // first offset is zero
-        thrust::fill_n(baq.matrix_index.begin(), 1, 0);
+        constexpr uint32 stride = baq_stride<system>::stride;
 
-        // do an inclusive scan to compute all offsets + the total size
-        parallel<system>::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
-                                                                         compute_hmm_matrix_size<system>(context, batch.device)),
-                                         num_active,
-                                         baq.matrix_index.begin() + 1,
-                                         thrust::plus<uint32>());
-#else
-        // round up the number of matrices to a multiple of baq_stride
-        const uint32 num_matrices = ((num_active + baq_stride - 1) / baq_stride) * baq_stride;
-        temp_active_list.resize(num_matrices);
+        if (stride == 1)
+        {
+            // compute the index and size of the HMM matrices
+            baq.matrix_index.resize(num_active + 1);
+            // first offset is zero
+            thrust::fill_n(baq.matrix_index.begin(), 1, 0);
 
-        baq.matrix_index.resize(num_matrices + 1);
+            // do an inclusive scan to compute all offsets + the total size
+            parallel<system>::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
+                                                                             compute_hmm_matrix_size<system>(context, batch.device)),
+                                             num_active,
+                                             baq.matrix_index.begin() + 1,
+                                             thrust::plus<uint32>());
+        } else {
+            // round up the number of matrices to a multiple of baq_stride
+            const uint32 num_matrices = ((num_active + stride - 1) / stride) * stride;
+            temp_active_list.resize(num_matrices);
 
-        // compute matrix sizes as the maximum size of each baq_stride groups of reads
-        parallel<system>::for_each(thrust::make_counting_iterator(0u),
-                                   thrust::make_counting_iterator(0u) + num_matrices,
-                                   compute_hmm_matrix_size_strided<system>(context, batch.device, active_baq_read_list, temp_active_list));
+            baq.matrix_index.resize(num_matrices + 1);
+            // first offset is zero
+            thrust::fill_n(baq.matrix_index.begin(), 1, 0);
 
-        parallel<system>::inclusive_scan(temp_active_list.begin(),
-                                         num_matrices,
-                                         baq.matrix_index.begin() + 1,
-                                         thrust::plus<uint32>());
+            // compute matrix sizes as the maximum size of each baq_stride groups of reads
+            parallel<system>::for_each(thrust::make_counting_iterator(0u),
+                                       thrust::make_counting_iterator(0u) + num_matrices,
+                                       compute_hmm_matrix_size_strided<system>(context, batch.device, active_baq_read_list, temp_active_list));
 
-        parallel<system>::for_each(thrust::make_counting_iterator(0u),
-                                   thrust::make_counting_iterator(0u) + baq.matrix_index.size() / baq_stride,
-                                   stride_hmm_matrix_index<system>(baq.matrix_index));
-#endif
+            parallel<system>::inclusive_scan(temp_active_list.begin(),
+                                             num_matrices,
+                                             baq.matrix_index.begin() + 1,
+                                             thrust::plus<uint32>());
+
+            parallel<system>::for_each(thrust::make_counting_iterator(0u),
+                                       thrust::make_counting_iterator(0u) + baq.matrix_index.size() / stride,
+                                       stride_hmm_matrix_index<system>(baq.matrix_index));
+        }
 
         uint32 matrix_len = baq.matrix_index[baq.matrix_index.size() - 1];
 
@@ -1163,16 +1189,7 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
 
         baq_hmm.start();
 
-#if 0
-        // run the HMM itself
-        parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
-                                                                                baq.matrix_index.begin(),
-                                                                                baq.scaling_index.begin())),
-                                   thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
-                                                                                baq.matrix_index.end(),
-                                                                                baq.scaling_index.end())),
-                                   hmm_glocal<system, hmm_phase_all>(context, batch.device, baq_state));
-#else
+#if BAQ_HMM_SPLIT_PHASE
         // run the HMM split in 3 phases
         baq_hmm_forward.start();
         parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
@@ -1203,6 +1220,15 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
                                                                                 baq.scaling_index.end())),
                                    hmm_glocal<system, hmm_phase_map>(context, batch.device, baq_state));
         baq_hmm_map.stop();
+#else
+        // run the HMM itself
+        parallel<system>::for_each(thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.begin(),
+                                                                                baq.matrix_index.begin(),
+                                                                                baq.scaling_index.begin())),
+                                   thrust::make_zip_iterator(thrust::make_tuple(active_baq_read_list.end(),
+                                                                                baq.matrix_index.end(),
+                                                                                baq.scaling_index.end())),
+                                   hmm_glocal<system, hmm_phase_all>(context, batch.device, baq_state));
 #endif
 
         baq_hmm.stop();
@@ -1238,6 +1264,11 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
     {
         context.stats.baq_setup.add(baq_setup);
         context.stats.baq_hmm.add(baq_hmm);
+#if BAQ_HMM_SPLIT_PHASE
+        context.stats.baq_hmm_forward.add(baq_hmm_forward);
+        context.stats.baq_hmm_backward.add(baq_hmm_backward);
+        context.stats.baq_hmm_map.add(baq_hmm_map);
+#endif
     }
 
     context.stats.baq_postprocess.add(baq_postprocess);

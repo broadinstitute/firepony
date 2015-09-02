@@ -208,8 +208,8 @@ static void print_statistics(const timer<host>& wall_clock, const pipeline_stati
     fprintf(stderr, "     pack: %.4f (%.2f%%)\n", stats.covariates_pack.elapsed_time, stats.covariates_pack.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
     fprintf(stderr, "   post-processing: %.4f (%.2f%%)\n", stats.postprocessing.elapsed_time, stats.postprocessing.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
     fprintf(stderr, "   output: %.4f (%.2f%%)\n", stats.output.elapsed_time, stats.output.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
-    fprintf(stderr, "   batches: %llu (%.2f batches/sec)\n", stats.num_batches, stats.num_batches / wall_clock.elapsed_time());
-    fprintf(stderr, "   reads: %llu (%.2fK reads/sec)\n", stats.total_reads, stats.total_reads / 1000.0 / wall_clock.elapsed_time());
+    fprintf(stderr, "   batches: %lu (%.2f batches/sec)\n", stats.num_batches, stats.num_batches / wall_clock.elapsed_time());
+    fprintf(stderr, "   reads: %lu (%.2fK reads/sec)\n", stats.total_reads, stats.total_reads / 1000.0 / wall_clock.elapsed_time());
 }
 
 int main(int argc, char **argv)
@@ -356,12 +356,12 @@ int main(int argc, char **argv)
         aggregate_stats += d->statistics();
     }
 
-    fprintf(stderr, "%llu reads filtered out of %llu (%f%%)\n",
+    fprintf(stderr, "%lu reads filtered out of %lu (%f%%)\n",
             aggregate_stats.filtered_reads,
             aggregate_stats.total_reads,
             float(aggregate_stats.filtered_reads) / float(aggregate_stats.total_reads) * 100.0);
 
-    fprintf(stderr, "computed base alignment quality for %llu reads out of %llu (%f%%)\n",
+    fprintf(stderr, "computed base alignment quality for %lu reads out of %lu (%f%%)\n",
             aggregate_stats.baq_reads,
             aggregate_stats.total_reads - aggregate_stats.filtered_reads,
             float(aggregate_stats.baq_reads) / float(aggregate_stats.total_reads - aggregate_stats.filtered_reads) * 100.0);

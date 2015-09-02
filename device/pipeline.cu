@@ -236,7 +236,7 @@ void debug_read(firepony_context<system>& context, const alignment_batch<system>
     const uint32 read_index = context.active_read_list[read_id];
     const CRQ_index idx = h_batch.crq_index(read_index);
 
-    fprintf(stderr, "== read %llu index %u\n", context.stats.total_reads + read_id, read_index);
+    fprintf(stderr, "== read %lu index %u\n", context.stats.total_reads + read_id, read_index);
 
     fprintf(stderr, "name = [%s]\n", h_batch.name[read_index].c_str());
     fprintf(stderr, "flags = %d\n", h_batch.flags[read_index]);

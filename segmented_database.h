@@ -97,7 +97,7 @@ struct resident_segment_map
 // storage type is meant to be a structure that holds the data for a given chromosome
 // it must contain a const_view type and implement the appropriate conversion operator
 template <target_system system,
-          template <target_system __unused> class chromosome_storage>
+          template <target_system _unused> class chromosome_storage>
 struct segmented_database_storage
 {
     // shorthand for the view type
@@ -292,7 +292,7 @@ public:
 
 template <target_system system,
           class host_storage,
-          template <target_system __unused> class device_storage>
+          template <target_system _unused> class device_storage>
 struct segmented_database
 {
     const host_storage& host;

@@ -254,8 +254,6 @@ struct vector<system, std::string>
 template<>
 struct vector<host, std::string> : public std::vector<std::string>
 {
-    typedef std::vector<std::string> base;
-    using base::base;
 };
 
 template <target_system sys_dest, target_system sys_source, typename T>

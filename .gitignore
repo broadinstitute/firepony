@@ -32,3 +32,5 @@
 .cproject
 .project
 
+build*/
+

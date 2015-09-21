@@ -229,7 +229,7 @@ struct hmm_glocal : public lambda<system>
 
     matrix_iterator forwardMatrix;
     matrix_iterator backwardMatrix;
-    double *scalingFactors;
+    matrix_iterator scalingFactors;
 
     double sM, sI, bM, bI;
 
@@ -257,10 +257,13 @@ struct hmm_glocal : public lambda<system>
         const uint32 matrix_offset = matrix_index % baq_stride<system>::stride;
         const uint32 matrix_base = matrix_index - matrix_offset;
 
+        const uint32 scaling_offset = scaling_index % baq_stride<system>::stride;
+        const uint32 scaling_base = scaling_index - scaling_offset;
+
         // set up matrix and scaling factor pointers
         forwardMatrix = matrix_iterator(&ctx.baq.forward[matrix_base + matrix_offset]);
         backwardMatrix = matrix_iterator(&ctx.baq.backward[matrix_base + matrix_offset]);
-        scalingFactors = &ctx.baq.scaling[scaling_index];
+        scalingFactors = matrix_iterator(&ctx.baq.scaling[scaling_base + scaling_offset]);
 
         // get the windows for the current read
         const auto& hmm_reference_window = ctx.baq.hmm_reference_windows[read_index];
@@ -742,28 +745,27 @@ struct compute_hmm_matrix_size_strided : public lambda<system>
             }
         }
 
-//        printf("matrix index %u size %u\n", index, ret);
         matrix_size_output[index] = ret;
     }
 };
 
 template <target_system system>
-struct stride_hmm_matrix_index
+struct stride_hmm_index
 {
-    typename vector<system, uint32>::view matrix_index;
+    typename vector<system, uint32>::view index;
 
-    stride_hmm_matrix_index(typename vector<system, uint32>::view matrix_index)
-        : matrix_index(matrix_index)
+    stride_hmm_index(typename vector<system, uint32>::view index)
+        : index(index)
     { }
 
     CUDA_HOST_DEVICE void operator() (const uint32 matrix_group_index)
     {
         constexpr uint32 stride = baq_stride<system>::stride;
 
-        auto initial_element = matrix_index[matrix_group_index * stride];
+        auto initial_element = index[matrix_group_index * stride];
         for(uint32 i = 1; i < stride; i++)
         {
-            matrix_index[matrix_group_index * stride + i] = initial_element + i;
+            index[matrix_group_index * stride + i] = initial_element + i;
         }
     }
 };
@@ -777,6 +779,47 @@ struct compute_hmm_scaling_factor_size : public thrust::unary_function<uint32, u
     {
         const CRQ_index idx = batch.crq_index(read_index);
         return idx.read_len + 2;
+    }
+};
+
+template <target_system system>
+struct compute_hmm_scaling_factor_size_strided : public lambda<system>
+{
+    LAMBDA_INHERIT;
+
+    typename vector<system, uint32>::const_view active_read_list;
+    typename vector<system, uint32>::view scaling_index_output;
+
+    compute_hmm_scaling_factor_size_strided(typename firepony_context<system>::view ctx,
+                                            const typename alignment_batch_device<system>::const_view batch,
+                                            typename vector<system, uint32>::const_view active_read_list,
+                                            typename vector<system, uint32>::view scaling_index_output)
+        : lambda<system>(ctx, batch),
+          active_read_list(active_read_list),
+          scaling_index_output(scaling_index_output)
+    { }
+
+    CUDA_HOST_DEVICE void operator() (const uint32 index)
+    {
+        uint32 ret = 0;
+
+        // smear the max scaling factor size across the thread group so we can stride it later on
+        constexpr uint32 stride = baq_stride<system>::stride;
+        const uint32 start_range = index - (index % stride);
+        const uint32 end_range = start_range + stride;
+
+        for(uint32 i = start_range; i < end_range; i++)
+        {
+            if (i < active_read_list.size())
+            {
+                const uint32 read_index = active_read_list[i];
+                const CRQ_index idx = batch.crq_index(read_index);
+                const uint32 size = idx.read_len + 2;
+                ret = max(ret, size);
+            }
+        }
+
+        scaling_index_output[index] = ret;
     }
 };
 
@@ -1115,14 +1158,27 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
                                              num_active,
                                              baq.matrix_index.begin() + 1,
                                              thrust::plus<uint32>());
+
+            // compute the index and size of the HMM scaling factors
+            baq.scaling_index.resize(num_active + 1);
+            // first offset is zero
+            thrust::fill_n(baq.scaling_index.begin(), 1, 0);
+            parallel<system>::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
+                                                                             compute_hmm_scaling_factor_size<system>(context, batch.device)),
+                                             num_active,
+                                             baq.scaling_index.begin() + 1,
+                                             thrust::plus<uint32>());
         } else {
             // round up the number of matrices to a multiple of baq_stride
             const uint32 num_matrices = ((num_active + stride - 1) / stride) * stride;
             temp_active_list.resize(num_matrices);
 
+            // allocate and initialize the matrix and scaling indices
             baq.matrix_index.resize(num_matrices + 1);
+            baq.scaling_index.resize(num_matrices + 1);
             // first offset is zero
             thrust::fill_n(baq.matrix_index.begin(), 1, 0);
+            thrust::fill_n(baq.scaling_index.begin(), 1, 0);
 
             // compute matrix sizes as the maximum size of each baq_stride groups of reads
             parallel<system>::for_each(thrust::make_counting_iterator(0u),
@@ -1136,25 +1192,28 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
 
             parallel<system>::for_each(thrust::make_counting_iterator(0u),
                                        thrust::make_counting_iterator(0u) + baq.matrix_index.size() / stride,
-                                       stride_hmm_matrix_index<system>(baq.matrix_index));
+                                       stride_hmm_index<system>(baq.matrix_index));
+
+            // compute the scaling index
+            parallel<system>::for_each(thrust::make_counting_iterator(0u),
+                                       thrust::make_counting_iterator(0u) + num_matrices,
+                                       compute_hmm_scaling_factor_size_strided<system>(context, batch.device, active_baq_read_list, temp_active_list));
+
+            parallel<system>::inclusive_scan(temp_active_list.begin(),
+                                             num_matrices,
+                                             baq.scaling_index.begin() + 1,
+                                             thrust::plus<uint32>());
+
+            parallel<system>::for_each(thrust::make_counting_iterator(0u),
+                                       thrust::make_counting_iterator(0u) + baq.scaling_index.size() / stride,
+                                       stride_hmm_index<system>(baq.scaling_index));
         }
 
         uint32 matrix_len = baq.matrix_index[baq.matrix_index.size() - 1];
+        uint32 scaling_len = baq.scaling_index[baq.scaling_index.size() - 1];
 
         baq.forward.resize(matrix_len);
         baq.backward.resize(matrix_len);
-
-        // compute the index and size of the HMM scaling factors
-        baq.scaling_index.resize(num_active + 1);
-        // first offset is zero
-        thrust::fill_n(baq.scaling_index.begin(), 1, 0);
-        parallel<system>::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
-                                                                         compute_hmm_scaling_factor_size<system>(context, batch.device)),
-                                         num_active,
-                                         baq.scaling_index.begin() + 1,
-                                         thrust::plus<uint32>());
-
-        uint32 scaling_len = baq.scaling_index[num_active];
         baq.scaling.resize(scaling_len);
 
 //        fprintf(stderr, "reads: %u\n", batch.num_reads);

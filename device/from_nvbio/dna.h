@@ -57,7 +57,7 @@ inline CUDA_HOST_DEVICE uint8 dna_to_iupac16(const uint8 c)
 ///
 inline CUDA_HOST_DEVICE uint8 iupac16_to_dna(const uint8 c)
 {
-#ifdef CUDA_DEVICE_COMPILATION
+#if CUDA_DEVICE_COMPILATION
     return 31 - __clz(uint32(c));
 #else
     return 31 - __builtin_clz(uint32(c));

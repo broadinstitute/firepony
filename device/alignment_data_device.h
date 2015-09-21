@@ -32,7 +32,6 @@
 
 #include "../types.h"
 #include "../alignment_data.h"
-#include "primitives/cuda.h"
 
 namespace firepony {
 

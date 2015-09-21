@@ -28,7 +28,6 @@
 #pragma once
 
 #include "types.h"
-#include "device/primitives/cuda.h"
 
 namespace firepony {
 

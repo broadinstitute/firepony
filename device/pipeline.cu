@@ -27,9 +27,9 @@
 
 #include "pipeline.h"
 
-#include "device/primitives/backends.h"
-#include "device/primitives/timer.h"
-#include "device/primitives/parallel.h"
+#include <lift/backends.h>
+#include <lift/timer.h>
+#include <lift/parallel.h>
 
 #include "alignment_data_device.h"
 #include "../sequence_database.h"

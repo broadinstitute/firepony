@@ -109,7 +109,7 @@ static void enumerate_gpus(std::vector<firepony_pipeline *>& ret)
         if (prop.totalGlobalMem < size_t(4095) * 1024 * 1024)
             continue;
 
-        firepony_pipeline *pipeline = firepony_pipeline::create(firepony::cuda, dev);
+        firepony_pipeline *pipeline = firepony_pipeline::create(lift::cuda, dev);
         ret.push_back(pipeline);
     }
 }
@@ -129,7 +129,7 @@ static std::vector<firepony_pipeline *> enumerate_compute_devices(void)
     if (command_line_options.enable_tbb)
     {
         firepony_pipeline *dev;
-        dev = firepony_pipeline::create(firepony::intel_tbb, compute_device_count + 1);
+        dev = firepony_pipeline::create(lift::host, compute_device_count + 1);
         ret.push_back(dev);
     }
 #endif

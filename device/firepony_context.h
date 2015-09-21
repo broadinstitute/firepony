@@ -43,7 +43,7 @@
 #include "fractional_errors.h"
 #include "util.h"
 
-#include "device/primitives/timer.h"
+#include <lift/timer.h>
 
 namespace firepony {
 

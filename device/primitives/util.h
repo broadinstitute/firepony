@@ -77,4 +77,24 @@ inline CUDA_HOST_DEVICE T max(const T a, const T b)
     return (a > b ? a : b);
 }
 
+template <target_system sys_dest, target_system sys_source, typename T>
+inline void cross_device_copy(int dest_device, vector<sys_dest, T>& dest, size_t dest_offset,
+                              int source_device, vector<sys_source, T>& source, size_t source_offset,
+                              size_t len)
+{
+#if ENABLE_CUDA_BACKEND
+    if (sys_dest == cuda && sys_source == cuda)
+    {
+        T *ptr_src;
+        T *ptr_dest;
+
+        ptr_src = thrust::raw_pointer_cast(source.data()) + source_offset;
+        ptr_dest = thrust::raw_pointer_cast(dest.data()) + dest_offset;
+
+        cudaMemcpyPeer(ptr_dest, dest_device, ptr_src, source_device, len * sizeof(T));
+    } else
+#endif
+        thrust::copy_n(source.begin() + source_offset, len, dest.begin() + dest_offset);
+}
+
 } // namespace firepony

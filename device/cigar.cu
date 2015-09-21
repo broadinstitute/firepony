@@ -30,14 +30,13 @@
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/functional.h>
 
+#include <lift/parallel.h>
+
 #include "cigar.h"
 #include "device_types.h"
 #include "firepony_context.h"
 #include "alignment_data_device.h"
 #include "util.h"
-
-#include "primitives/cuda.h"
-#include "primitives/parallel.h"
 
 namespace firepony {
 

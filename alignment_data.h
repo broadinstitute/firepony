@@ -32,7 +32,6 @@
 
 #include "types.h"
 #include "string_database.h"
-#include "device/primitives/vector.h"
 #include "sequence_database.h"
 
 namespace firepony {

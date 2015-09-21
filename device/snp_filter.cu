@@ -25,14 +25,14 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <lift/parallel.h>
+
 #include "device_types.h"
 #include "firepony_context.h"
 #include "snp_filter.h"
 #include "cigar.h"
 
 #include "primitives/algorithms.h"
-#include "primitives/cuda.h"
-#include "primitives/parallel.h"
 
 namespace firepony {
 

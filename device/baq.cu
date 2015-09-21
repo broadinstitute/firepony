@@ -35,6 +35,8 @@
 #include <thrust/tuple.h>
 #include <thrust/functional.h>
 
+#include <lift/parallel.h>
+
 #include <stdlib.h>
 #include <math.h>
 
@@ -44,7 +46,6 @@
 #include "firepony_context.h"
 
 #include "primitives/util.h"
-#include "primitives/parallel.h"
 #include "from_nvbio/dna.h"
 #include "from_nvbio/alphabet.h"
 
@@ -61,7 +62,7 @@ struct baq_stride<cuda>
 };
 
 template <>
-struct baq_stride<intel_tbb>
+struct baq_stride<host>
 {
     static constexpr uint32 stride = 1;
 };

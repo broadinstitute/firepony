@@ -37,7 +37,6 @@
 #include "covariates/packer_quality_score.h"
 
 #include "primitives/util.h"
-#include "primitives/parallel.h"
 
 #include "../table_formatter.h"
 

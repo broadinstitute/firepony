@@ -25,11 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <lift/backends.h>
+#include <lift/parallel.h>
+
 #include "../types.h"
 
-#include "primitives/backends.h"
-#include "primitives/cuda.h"
-#include "primitives/parallel.h"
 #include "primitives/util.h"
 
 #include "util.h"

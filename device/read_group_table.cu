@@ -30,13 +30,14 @@
 #include "read_group_table.h"
 #include "empirical_quality.h"
 
-#include "primitives/parallel.h"
 #include "covariates/packer_quality_score.h"
 #include "expected_error.h"
 
 #include "../table_formatter.h"
 
 #include <thrust/reduce.h>
+
+#include <lift/parallel.h>
 
 namespace firepony {
 

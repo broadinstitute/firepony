@@ -25,10 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <lift/parallel.h>
+
 #include "firepony_context.h"
 #include "util.h"
 #include "baq.h"
-#include "primitives/parallel.h"
 
 namespace firepony {
 

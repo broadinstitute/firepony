@@ -27,8 +27,9 @@
 
 #pragma once
 
+#include "../types.h"
+
 #include "util.h"
-#include "vector.h"
 #include "packed_stream.h"
 
 namespace firepony {

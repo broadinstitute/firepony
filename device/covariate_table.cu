@@ -30,10 +30,10 @@
 #include "covariates.h"
 #include "covariate_table.h"
 
-#include "primitives/parallel.h"
-
 #include <thrust/sort.h>
 #include <thrust/reduce.h>
+
+#include <lift/parallel.h>
 
 namespace firepony {
 

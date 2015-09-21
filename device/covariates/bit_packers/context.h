@@ -71,7 +71,7 @@ struct covariate_Context : public covariate<system, PreviousCovariate, 4 + const
                b != from_nvbio::AlphabetTraits<from_nvbio::DNA_IUPAC>::G;
     }
 
-#ifndef CUDA_DEVICE_COMPILATION
+#if !CUDA_DEVICE_COMPILATION
     static uint32 __brev(uint32 x)
     {
         x = ((x & 0xF0F0F0F0) >> 4) | ((x & 0x0F0F0F0F) << 4);

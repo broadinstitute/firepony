@@ -25,11 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <lift/parallel.h>
+
 #include "from_nvbio/alphabet.h"
 
-#include "primitives/parallel.h"
-
-#include "device_types.h"
 #include "firepony_context.h"
 #include "alignment_data_device.h"
 #include "read_filters.h"

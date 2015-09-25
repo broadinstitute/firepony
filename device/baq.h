@@ -36,6 +36,8 @@ namespace firepony {
 
 // set to 1 to store BAQ state in the context, useful for debugging
 #define PRESERVE_BAQ_STATE 0
+// set to 1 to run separate kernels for the various HMM stages
+#define BAQ_HMM_SPLIT_PHASE 1
 
 template <target_system system>
 struct baq_context

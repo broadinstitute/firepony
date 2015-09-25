@@ -39,10 +39,16 @@
 #include <cub/device/device_reduce.cuh>
 #include <cub/device/device_select.cuh>
 // silence warnings from debug code in cub
+#ifdef __GCC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+
 #include <cub/device/device_radix_sort.cuh>
+
+#ifdef __GCC__
 #pragma GCC diagnostic pop
+#endif
 
 namespace firepony {
 

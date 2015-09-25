@@ -80,8 +80,20 @@ static std::string compute_shmem_path(const char *fname)
     ret = std::string("/firepony_") + std::string(abs_path);
     free(abs_path);
 
+#ifdef __APPLE__
+    // shmem on apple... isn't
+    return std::string("/bogus-shm") + ret;
+#else
     return ret;
+#endif
 }
+
+#ifdef __APPLE__
+static int posix_open(const char *fname, int mask, int mode = 0)
+{
+    return open(fname, mask, mode);
+}
+#endif
 
 bool shared_memory_file::open(shared_memory_file *out, const char *fname)
 {
@@ -97,7 +109,12 @@ bool shared_memory_file::open(shared_memory_file *out, const char *fname)
     }
 
     // open it
+#ifdef __APPLE__
+    // shmem on apple isn't really shared
+    out->fd = posix_open(shmem_path.c_str(), O_RDONLY);
+#else
     out->fd = shm_open(shmem_path.c_str(), O_RDONLY, 0);
+#endif
     if (out->fd == -1)
     {
         return false;
@@ -139,7 +156,11 @@ bool shared_memory_file::create(shared_memory_file *out, const char *fname, size
     }
 
     // open it, truncating if the file exists
+#ifdef __APPLE__
+    out->fd = posix_open(shmem_path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
+#else
     out->fd = shm_open(shmem_path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0600);
+#endif
     if (out->fd == -1)
     {
         return false;

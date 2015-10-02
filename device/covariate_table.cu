@@ -124,7 +124,8 @@ void covariate_observation_to_empirical_table(firepony_context<system>& context,
     // copy the keys
     empirical_table.keys = observation_table.keys;
     // transform the values
-    thrust::transform(observation_table.values.begin(),
+    thrust::transform(lift::backend_policy<system>::execution_policy(),
+                      observation_table.values.begin(),
                       observation_table.values.end(),
                       empirical_table.values.begin(),
                       convert_observation_to_empirical());

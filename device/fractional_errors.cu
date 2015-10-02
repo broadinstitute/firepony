@@ -122,9 +122,9 @@ void build_fractional_error_arrays(firepony_context<system>& context, const alig
     frac.insertion_errors.resize(context.baq.qualities.size());
     frac.deletion_errors.resize(context.baq.qualities.size());
 
-    thrust::fill(frac.snp_errors.begin(), frac.snp_errors.end(), 0.0);
-    thrust::fill(frac.insertion_errors.begin(), frac.insertion_errors.end(), 0.0);
-    thrust::fill(frac.deletion_errors.begin(), frac.deletion_errors.end(), 0.0);
+    thrust::fill(lift::backend_policy<system>::execution_policy(), frac.snp_errors.begin(), frac.snp_errors.end(), 0.0);
+    thrust::fill(lift::backend_policy<system>::execution_policy(), frac.insertion_errors.begin(), frac.insertion_errors.end(), 0.0);
+    thrust::fill(lift::backend_policy<system>::execution_policy(), frac.deletion_errors.begin(), frac.deletion_errors.end(), 0.0);
 
     parallel<system>::for_each(context.active_read_list.begin(),
                                context.active_read_list.end(),

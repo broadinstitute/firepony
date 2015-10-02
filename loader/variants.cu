@@ -123,7 +123,8 @@ bool load_vcf(variant_database_host *output, reference_file_handle *reference_ha
     for(auto *chromosome : output->storage)
     {
         chromosome->max_end_point_left.resize(chromosome->feature_stop.size());
-        thrust::inclusive_scan(chromosome->feature_stop.begin(),
+        thrust::inclusive_scan(lift::backend_policy<host>::execution_policy(),
+                               chromosome->feature_stop.begin(),
                                chromosome->feature_stop.end(),
                                chromosome->max_end_point_left.begin(),
                                thrust::maximum<uint32>());

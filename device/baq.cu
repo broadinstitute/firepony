@@ -1097,7 +1097,7 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
 
     // allocate our output
     baq.qualities.resize(batch.device.qualities.size());
-    thrust::fill(baq.qualities.begin(), baq.qualities.end(), uint8(-1));
+    thrust::fill(lift::backend_policy<system>::execution_policy(), baq.qualities.begin(), baq.qualities.end(), uint8(-1));
 
     // collect the reads that we need to compute BAQ for
     active_baq_read_list.resize(context.active_read_list.size());
@@ -1151,7 +1151,7 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
             // compute the index and size of the HMM matrices
             baq.matrix_index.resize(num_active + 1);
             // first offset is zero
-            thrust::fill_n(baq.matrix_index.begin(), 1, 0);
+            thrust::fill_n(lift::backend_policy<system>::execution_policy(), baq.matrix_index.begin(), 1, 0);
 
             // do an inclusive scan to compute all offsets + the total size
             parallel<system>::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
@@ -1163,7 +1163,7 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
             // compute the index and size of the HMM scaling factors
             baq.scaling_index.resize(num_active + 1);
             // first offset is zero
-            thrust::fill_n(baq.scaling_index.begin(), 1, 0);
+            thrust::fill_n(lift::backend_policy<system>::execution_policy(), baq.scaling_index.begin(), 1, 0);
             parallel<system>::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
                                                                              compute_hmm_scaling_factor_size<system>(context, batch.device)),
                                              num_active,
@@ -1178,8 +1178,8 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
             baq.matrix_index.resize(num_matrices + 1);
             baq.scaling_index.resize(num_matrices + 1);
             // first offset is zero
-            thrust::fill_n(baq.matrix_index.begin(), 1, 0);
-            thrust::fill_n(baq.scaling_index.begin(), 1, 0);
+            thrust::fill_n(lift::backend_policy<system>::execution_policy(), baq.matrix_index.begin(), 1, 0);
+            thrust::fill_n(lift::backend_policy<system>::execution_policy(), baq.scaling_index.begin(), 1, 0);
 
             // compute matrix sizes as the maximum size of each baq_stride groups of reads
             parallel<system>::for_each(thrust::make_counting_iterator(0u),
@@ -1238,12 +1238,12 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
 
 
         baq_state.resize(batch.device.qualities.size());
-        thrust::fill(baq_state.begin(), baq_state.end(), uint32(-1));
+        thrust::fill(lift::backend_policy<system>::execution_policy(), baq_state.begin(), baq_state.end(), uint32(-1));
 
         // initialize matrices and scaling factors
-        thrust::fill_n(baq.forward.begin(), baq.forward.size(), 0.0);
-        thrust::fill_n(baq.backward.begin(), baq.backward.size(), 0.0);
-        thrust::fill_n(baq.scaling.begin(), baq.scaling.size(), 0.0);
+        thrust::fill_n(lift::backend_policy<system>::execution_policy(), baq.forward.begin(), baq.forward.size(), 0.0);
+        thrust::fill_n(lift::backend_policy<system>::execution_policy(), baq.backward.begin(), baq.backward.size(), 0.0);
+        thrust::fill_n(lift::backend_policy<system>::execution_policy(), baq.scaling.begin(), baq.scaling.size(), 0.0);
 
         baq_setup.stop();
 

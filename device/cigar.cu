@@ -820,7 +820,7 @@ void expand_cigars(firepony_context<system>& context, const alignment_batch<syst
     ctx.cigar_offsets.resize(batch.device.cigars.size() + 1);
 
     // mark the first offset as 0
-    thrust::fill_n(ctx.cigar_offsets.begin(), 1, 0);
+    thrust::fill_n(lift::backend_policy<system>::execution_policy(), ctx.cigar_offsets.begin(), 1, 0);
     // do an inclusive scan to compute all offsets + the total size
     parallel<system>::inclusive_scan(thrust::make_transform_iterator(batch.device.cigars.begin(), cigar_op_len()),
                                      batch.device.cigars.size(),
@@ -849,11 +849,11 @@ void expand_cigars(firepony_context<system>& context, const alignment_batch<syst
     ctx.num_errors.resize(batch.device.num_reads);
 
     // initialize num_errors to zero
-    thrust::fill(ctx.num_errors.begin(), ctx.num_errors.end(), 0);
+    thrust::fill(lift::backend_policy<system>::execution_policy(), ctx.num_errors.begin(), ctx.num_errors.end(), 0);
 
     // cigar_events_read_index is initialized to -1; this means that all reads are considered inactive
     // it will be filled in during cigar coordinate expansion to mark active reads
-    thrust::fill(ctx.cigar_event_read_index.begin(), ctx.cigar_event_read_index.end(), uint32(-1));
+    thrust::fill(lift::backend_policy<system>::execution_policy(), ctx.cigar_event_read_index.begin(), ctx.cigar_event_read_index.end(), uint32(-1));
 
     // expand the cigar ops into temp storage (xxxnsubtil: same as above, active read list is ignored)
     parallel<system>::for_each(thrust::make_counting_iterator(0),
@@ -915,9 +915,9 @@ void expand_cigars(firepony_context<system>& context, const alignment_batch<syst
     pack_prepare_storage_1bit(del_error, len);
 
     // initialize temp storage to zero
-    thrust::fill(snp_error.begin(), snp_error.end(), 0);
-    thrust::fill(ins_error.begin(), ins_error.end(), 0);
-    thrust::fill(del_error.begin(), del_error.end(), 0);
+    thrust::fill(lift::backend_policy<system>::execution_policy(), snp_error.begin(), snp_error.end(), 0);
+    thrust::fill(lift::backend_policy<system>::execution_policy(), ins_error.begin(), ins_error.end(), 0);
+    thrust::fill(lift::backend_policy<system>::execution_policy(), del_error.begin(), del_error.end(), 0);
 
     // compute the error bit vectors into temp storage
     parallel<system>::for_each(context.active_read_list.begin(),

@@ -146,7 +146,8 @@ static void build_covariates_table(covariate_observation_table<system>& table, f
     scratch_table.resize(context.cigar.cigar_events.size() * 3);
 
     // mark all keys as invalid
-    thrust::fill(scratch_table.keys.begin(),
+    thrust::fill(lift::backend_policy<system>::execution_policy(),
+                 scratch_table.keys.begin(),
                  scratch_table.keys.end(),
                  covariate_key(-1));
 

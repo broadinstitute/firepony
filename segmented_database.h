@@ -34,12 +34,14 @@ namespace firepony {
 // represents a resident set for the segmented database
 struct resident_segment_map
 {
-    vector<host, bool> set;
+    persistent_allocation<host, bool> set;
 
     resident_segment_map()
+        : set()
     { }
 
     resident_segment_map(uint16 size)
+        : set()
     {
         resize(size);
         clear();
@@ -103,13 +105,14 @@ struct segmented_database_storage
     typedef typename chromosome_storage<system>::const_view chromosome_view;
 
     // per-chromosome data
-    vector<system, chromosome_storage<system> *> storage;
+    persistent_allocation<system, chromosome_storage<system> *> storage;
     // vector with views that are used for device code
-    vector<system, chromosome_view> views;
+    persistent_allocation<system, chromosome_view> views;
     // indicates whether the views need updating
     bool views_dirty;
 
     segmented_database_storage()
+        : storage(), views()
     {
         dirty();
     }
@@ -196,11 +199,11 @@ private:
         if (storage[i])
         {
             delete storage[i];
-            storage[i] = nullptr;
+            storage.poke(i, nullptr);
 
             // note: we update the views immediately to avoid setting the dirty bit
             // this prevents us from having to rebuild the views array every time
-            views[i] = chromosome_view(); // implicitly creates an invalid view (view.id == -1)
+            views.poke(i, chromosome_view()); // implicitly creates an invalid view (view.id == -1)
         }
     }
 
@@ -211,13 +214,13 @@ private:
         if (storage[i] == nullptr)
         {
             // alloc data
-            storage[i] = new chromosome_storage<system>();
+            storage.poke(i, new chromosome_storage<system>());
             // copy to device
             *storage[i] = *db.storage[i];
 
             // note: we update the views immediately to avoid setting the dirty bit
             // this prevents us from having to rebuild the views array every time
-            views[i] = *storage[i];
+            views.poke(i, *storage[i]);
         }
     }
 
@@ -242,8 +245,8 @@ public:
 
             for(size_t i = old_size; i < db.storage.size(); i++)
             {
-                storage[i] = nullptr;
-                views[i] = chromosome_view();
+                storage.poke(i, nullptr);
+                views.poke(i, chromosome_view());
             }
         }
 
@@ -260,7 +263,7 @@ public:
 
     struct const_view
     {
-        typename vector<system, chromosome_view>::const_view data;
+        persistent_allocation<system, chromosome_view> data;
 
         // grab a reference to a chromosome in the database
         CUDA_HOST_DEVICE

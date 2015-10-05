@@ -1,6 +1,9 @@
 /*
  * Firepony
- * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ *
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION
+ * Copyright (c) 2015, Nuno Subtil <subtil@gmail.com>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -9,20 +12,20 @@
  *    * Redistributions in binary form must reproduce the above copyright
  *      notice, this list of conditions and the following disclaimer in the
  *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of the NVIDIA CORPORATION nor the
- *      names of its contributors may be used to endorse or promote products
- *      derived from this software without specific prior written permission.
+ *    * Neither the name of the copyright holders nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL NVIDIA CORPORATION BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #pragma once
@@ -51,8 +54,8 @@ struct packed_vector
 
     typedef IndexType           index_type;
 
-    typedef typename vector<system, uint32>::pointer                                            pointer;
-    typedef typename vector<system, uint32>::const_pointer                                      const_pointer;
+    typedef typename persistent_allocation<system, uint32>::pointer_type                        pointer;
+    typedef typename persistent_allocation<system, uint32>::const_pointer_type                  const_pointer;
     typedef packed_stream<SYMBOL_SIZE, uint8, IS_BIG_ENDIAN,       pointer, index_type>         stream_type;
     typedef packed_stream<SYMBOL_SIZE, uint8, IS_BIG_ENDIAN, const_pointer, index_type>         const_stream_type;
     typedef typename stream_type::iterator                                                      iterator;
@@ -64,14 +67,22 @@ struct packed_vector
     typedef stream_type view;
     typedef const_stream_type const_view;
 
-    packed_vector(const index_type size = 0)
+    packed_vector()
+        : m_storage(), m_size(0)
+    { }
+
+    packed_vector(const index_type size)
         : m_storage(divide_ri(size, SYMBOLS_PER_WORD)), m_size(size)
     { }
 
     template <target_system OtherSystemTag>
     packed_vector(const packed_vector<OtherSystemTag, SYMBOL_SIZE, IS_BIG_ENDIAN, IndexType>& other)
-        : m_storage(other.m_storage), m_size(other.m_size)
-    { }
+        : m_storage(), m_size(other.m_size)
+    {
+        m_storage.copy(other.m_storage);
+    }
+
+    packed_vector operator=(const packed_vector& other) = delete;
 
     void reserve(const index_type size)
     {
@@ -138,40 +149,39 @@ struct packed_vector
     /// (only their plain view, which is a packed_stream)
     CUDA_HOST const typename stream_type::symbol_type operator[] (const index_type i) const
     {
-        const_stream_type stream(thrust::raw_pointer_cast(&m_storage.front()), m_size);
+        const_stream_type stream(m_storage.data(), m_size);
         return stream[i];
     }
 
     CUDA_HOST typename stream_type::reference operator[] (const index_type i)
     {
-        stream_type stream(thrust::raw_pointer_cast(&m_storage.front()), m_size);
+        stream_type stream(m_storage.data(), m_size);
         return stream[i];
     }
 
     operator view()
     {
-        return view(thrust::raw_pointer_cast(m_storage.data()), m_size);
+        return view(m_storage.data(), m_size);
     }
 
     operator const_view() const
     {
-        return const_view(thrust::raw_pointer_cast(m_storage.data()), m_size);
+        return const_view(m_storage.data(), m_size);
     }
 
     stream_type stream_at_index(const index_type i)
     {
-        return stream_type(thrust::raw_pointer_cast(&m_storage.front()), m_size, i);
+        return stream_type(m_storage.data(), m_size, i);
     }
 
-    // assignment from a host view
-    void copy_from_view(const typename packed_vector<host, SYMBOL_SIZE>::const_view& other)
+    template <target_system other_system>
+    void copy(const packed_vector<other_system, SYMBOL_SIZE_T, BIG_ENDIAN_T, IndexType>& other)
     {
-        m_storage.resize(divide_ri(other.size(), SYMBOLS_PER_WORD));
-        m_storage.assign((uint32 *)other.stream(), ((uint32 *)other.stream()) + divide_ri(other.size(), SYMBOLS_PER_WORD));
+        m_storage.copy(other.m_storage);
         m_size = other.size();
     }
 
-    vector<system, uint32> m_storage;
+    persistent_allocation<system, uint32> m_storage;
     index_type             m_size;
 };
 

@@ -45,11 +45,11 @@ template <target_system system>
 struct alignment_header_storage
 {
     // the length of each chromosome in the reference
-    vector<system, uint32> chromosome_lengths;
+    persistent_allocation<system, uint32> chromosome_lengths;
 
     struct const_view
     {
-        typename vector<system, uint32>::const_view chromosome_lengths;
+        persistent_allocation<system, uint32> chromosome_lengths;
     };
 
     operator const_view() const
@@ -144,43 +144,43 @@ struct alignment_batch_storage
     uint32 data_mask;
 
     // chromosome index of the read
-    vector<system, uint16> chromosome;
+    persistent_allocation<system, uint16> chromosome;
     // the reference position of the first base in the read
-    vector<system, uint32> alignment_start;
+    persistent_allocation<system, uint32> alignment_start;
     // (1-based and inclusive) alignment stop position
-    vector<system, uint32> alignment_stop;
+    persistent_allocation<system, uint32> alignment_stop;
     // integer representation of the mate's chromosome
-    vector<system, uint32> mate_chromosome;
+    persistent_allocation<system, uint32> mate_chromosome;
     // (1-based and inclusive) mate's alignment start position
-    vector<system, uint32> mate_alignment_start;
+    persistent_allocation<system, uint32> mate_alignment_start;
     // inferred insert size
-    vector<system, int32> inferred_insert_size;
+    persistent_allocation<system, int32> inferred_insert_size;
 
     // cigar ops
-    vector<system, cigar_op> cigars;
+    persistent_allocation<system, cigar_op> cigars;
     // cigar index vectors
-    vector<system, uint32> cigar_start;
-    vector<system, uint32> cigar_len;
+    persistent_allocation<system, uint32> cigar_start;
+    persistent_allocation<system, uint32> cigar_len;
 
     // read data (4 bits per base pair)
     packed_vector<system, 4> reads;
     // read index vectors
-    vector<system, uint32> read_start;
-    vector<system, uint32> read_len;
+    persistent_allocation<system, uint32> read_start;
+    persistent_allocation<system, uint32> read_len;
 
     // quality data
-    vector<system, uint8> qualities;
+    persistent_allocation<system, uint8> qualities;
     // quality index vectors
-    vector<system, uint32> qual_start;
-    vector<system, uint32> qual_len;
+    persistent_allocation<system, uint32> qual_start;
+    persistent_allocation<system, uint32> qual_len;
 
     // alignment flags
-    vector<system, uint16> flags;
+    persistent_allocation<system, uint16> flags;
     // mapping qualities
-    vector<system, uint8> mapq;
+    persistent_allocation<system, uint8> mapq;
 
     // read group ID
-    vector<system, uint32> read_group;
+    persistent_allocation<system, uint32> read_group;
 
     // prevent storage creation on the device
     CUDA_HOST alignment_batch_storage() { }

@@ -43,7 +43,7 @@ struct alignment_header_device : public alignment_header_storage<system>
 {
     void download(const alignment_header_host& host)
     {
-        this->chromosome_lengths = host.chromosome_lengths;
+        this->chromosome_lengths.copy(host.chromosome_lengths);
     }
 };
 
@@ -84,24 +84,24 @@ struct alignment_batch_device : public alignment_batch_storage<system>
         uint32 num_reads;
         uint32 max_read_size;
 
-        typename vector<system, uint16>::const_view chromosome;
-        typename vector<system, uint32>::const_view alignment_start;
-        typename vector<system, uint32>::const_view alignment_stop;
-        typename vector<system, uint32>::const_view mate_chromosome;
-        typename vector<system, uint32>::const_view mate_alignment_start;
-        typename vector<system, int32>::const_view inferred_insert_size;
-        typename vector<system, cigar_op>::const_view cigars;
-        typename vector<system, uint32>::const_view cigar_start;
-        typename vector<system, uint32>::const_view cigar_len;
+        const persistent_allocation<system, uint16> chromosome;
+        const persistent_allocation<system, uint32> alignment_start;
+        const persistent_allocation<system, uint32> alignment_stop;
+        const persistent_allocation<system, uint32> mate_chromosome;
+        const persistent_allocation<system, uint32> mate_alignment_start;
+        const persistent_allocation<system, int32> inferred_insert_size;
+        const persistent_allocation<system, cigar_op> cigars;
+        const persistent_allocation<system, uint32> cigar_start;
+        const persistent_allocation<system, uint32> cigar_len;
         typename packed_vector<system, 4>::const_view reads;
-        typename vector<system, uint32>::const_view read_start;
-        typename vector<system, uint32>::const_view read_len;
-        typename vector<system, uint8>::const_view qualities;
-        typename vector<system, uint32>::const_view qual_start;
-        typename vector<system, uint32>::const_view qual_len;
-        typename vector<system, uint16>::const_view flags;
-        typename vector<system, uint8>::const_view mapq;
-        typename vector<system, uint32>::const_view read_group;
+        const persistent_allocation<system, uint32> read_start;
+        const persistent_allocation<system, uint32> read_len;
+        const persistent_allocation<system, uint8> qualities;
+        const persistent_allocation<system, uint32> qual_start;
+        const persistent_allocation<system, uint32> qual_len;
+        const persistent_allocation<system, uint16> flags;
+        const persistent_allocation<system, uint8> mapq;
+        const persistent_allocation<system, uint32> read_group;
 
         CUDA_HOST_DEVICE const CRQ_index crq_index(uint32 read_id) const
         {
@@ -151,51 +151,51 @@ struct alignment_batch_device : public alignment_batch_storage<system>
 
         if (this->data_mask & AlignmentDataMask::CHROMOSOME)
         {
-            this->chromosome = host.chromosome;
+            this->chromosome.copy(host.chromosome);
         } else {
             this->chromosome.clear();
         }
 
         if (this->data_mask & AlignmentDataMask::ALIGNMENT_START)
         {
-            this->alignment_start = host.alignment_start;
+            this->alignment_start.copy(host.alignment_start);
         } else {
             this->alignment_start.clear();
         }
 
         if (this->data_mask & AlignmentDataMask::ALIGNMENT_STOP)
         {
-            this->alignment_stop = host.alignment_stop;
+            this->alignment_stop.copy(host.alignment_stop);
         } else {
             this->alignment_stop.clear();
         }
 
         if (this->data_mask & AlignmentDataMask::MATE_CHROMOSOME)
         {
-            this->mate_chromosome = host.mate_chromosome;
+            this->mate_chromosome.copy(host.mate_chromosome);
         } else {
             this->mate_chromosome.clear();
         }
 
         if (this->data_mask & AlignmentDataMask::MATE_ALIGNMENT_START)
         {
-            this->mate_alignment_start = host.mate_alignment_start;
+            this->mate_alignment_start.copy(host.mate_alignment_start);
         } else {
             this->mate_alignment_start.clear();
         }
 
         if (this->data_mask & AlignmentDataMask::INFERRED_INSERT_SIZE)
         {
-            this->inferred_insert_size = host.inferred_insert_size;
+            this->inferred_insert_size.copy(host.inferred_insert_size);
         } else {
             this->inferred_insert_size.clear();
         }
 
         if (this->data_mask & AlignmentDataMask::CIGAR)
         {
-            this->cigars = host.cigars;
-            this->cigar_start = host.cigar_start;
-            this->cigar_len = host.cigar_len;
+            this->cigars.copy(host.cigars);
+            this->cigar_start.copy(host.cigar_start);
+            this->cigar_len.copy(host.cigar_len);
         } else {
             this->cigars.clear();
             this->cigar_start.clear();
@@ -205,8 +205,8 @@ struct alignment_batch_device : public alignment_batch_storage<system>
         if (this->data_mask & AlignmentDataMask::READS)
         {
             this->reads.copy(host.reads);
-            this->read_start = host.read_start;
-            this->read_len = host.read_len;
+            this->read_start.copy(host.read_start);
+            this->read_len.copy(host.read_len);
         } else {
             this->reads.clear();
             this->read_start.clear();
@@ -215,9 +215,9 @@ struct alignment_batch_device : public alignment_batch_storage<system>
 
         if (this->data_mask & AlignmentDataMask::QUALITIES)
         {
-            this->qualities = host.qualities;
-            this->qual_start = host.qual_start;
-            this->qual_len = host.qual_len;
+            this->qualities.copy(host.qualities);
+            this->qual_start.copy(host.qual_start);
+            this->qual_len.copy(host.qual_len);
         } else {
             this->qualities.clear();
             this->qual_start.clear();
@@ -226,21 +226,21 @@ struct alignment_batch_device : public alignment_batch_storage<system>
 
         if (this->data_mask & AlignmentDataMask::FLAGS)
         {
-            this->flags = host.flags;
+            this->flags.copy(host.flags);
         } else {
             this->flags.clear();
         }
 
         if (this->data_mask & AlignmentDataMask::MAPQ)
         {
-            this->mapq = host.mapq;
+            this->mapq.copy(host.mapq);
         } else {
             this->mapq.clear();
         }
 
         if (this->data_mask & AlignmentDataMask::READ_GROUP)
         {
-            this->read_group = host.read_group;
+            this->read_group.copy(host.read_group);
         } else {
             this->read_group.clear();
         }

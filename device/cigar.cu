@@ -1,6 +1,9 @@
 /*
  * Firepony
- * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ *
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION
+ * Copyright (c) 2015, Nuno Subtil <subtil@gmail.com>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -9,20 +12,20 @@
  *    * Redistributions in binary form must reproduce the above copyright
  *      notice, this list of conditions and the following disclaimer in the
  *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of the NVIDIA CORPORATION nor the
- *      names of its contributors may be used to endorse or promote products
- *      derived from this software without specific prior written permission.
+ *    * Neither the name of the copyright holders nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL NVIDIA CORPORATION BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "from_nvbio/dna.h"
@@ -615,15 +618,15 @@ struct compute_error_vectors : public lambda<system>
 {
     LAMBDA_INHERIT_MEMBERS;
 
-    typename vector<system, uint8>::view snp_vector;
-    typename vector<system, uint8>::view ins_vector;
-    typename vector<system, uint8>::view del_vector;
+    pointer<system, uint8> snp_vector;
+    pointer<system, uint8> ins_vector;
+    pointer<system, uint8> del_vector;
 
     compute_error_vectors(typename firepony_context<system>::view ctx,
                           const typename alignment_batch_device<system>::const_view batch,
-                          typename vector<system, uint8>::view snp_vector,
-                          typename vector<system, uint8>::view ins_vector,
-                          typename vector<system, uint8>::view del_vector)
+                          pointer<system, uint8> snp_vector,
+                          pointer<system, uint8> ins_vector,
+                          pointer<system, uint8> del_vector)
         : lambda<system>(ctx, batch),
           snp_vector(snp_vector),
           ins_vector(ins_vector),
@@ -904,9 +907,9 @@ void expand_cigars(firepony_context<system>& context, const alignment_batch<syst
     // this also counts the number of errors in each read
     // note: we compute the error bit vectors into uint8 then pack these into 1-bit-per-bp vectors
     // this is to avoid RMW hazards across threads, as the number of symbols per word won't match that of the read vectors themselves
-    vector<system, uint8>& snp_error = context.temp_storage;
-    vector<system, uint8>& ins_error = context.temp_u8;
-    vector<system, uint8> del_error;
+    allocation<system, uint8>& snp_error = context.temp_storage;
+    allocation<system, uint8>& ins_error = context.temp_u8;
+    scoped_allocation<system, uint8> del_error;
 
     // set up the temp storage for packing into 1bit
     size_t len = batch.device.reads.size();

@@ -1,6 +1,9 @@
 /*
  * Firepony
- * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ *
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION
+ * Copyright (c) 2015, Nuno Subtil <subtil@gmail.com>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -9,20 +12,20 @@
  *    * Redistributions in binary form must reproduce the above copyright
  *      notice, this list of conditions and the following disclaimer in the
  *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of the NVIDIA CORPORATION nor the
- *      names of its contributors may be used to endorse or promote products
- *      derived from this software without specific prior written permission.
+ *    * Neither the name of the copyright holders nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL NVIDIA CORPORATION BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "../types.h"
@@ -38,9 +41,9 @@
 namespace firepony {
 
 template <target_system system, typename covariate_value>
-void covariate_table<system, covariate_value>::sort(vector<system, covariate_key>& temp_keys,
-                                                    vector<system, covariate_value>& temp_values,
-                                                    vector<system, uint8>& temp_storage,
+void covariate_table<system, covariate_value>::sort(allocation<system, covariate_key>& temp_keys,
+                                                    allocation<system, covariate_value>& temp_values,
+                                                    allocation<system, uint8>& temp_storage,
                                                     uint32 num_key_bits)
 {
     if (this->keys.size())
@@ -85,17 +88,20 @@ struct covariate_value_sum<covariate_empirical_value>
 };
 
 template <target_system system, typename covariate_value>
-void covariate_table<system, covariate_value>::pack(vector<system, covariate_key>& temp_keys,
-                                                    vector<system, covariate_value>& temp_values,
-                                                    vector<system,uint8>& temp_storage)
+void covariate_table<system, covariate_value>::pack(allocation<system, covariate_key>& temp_keys,
+                                                    allocation<system, covariate_value>& temp_values,
+                                                    allocation<system,uint8>& temp_storage)
 {
     temp_keys.resize(this->size());
     temp_values.resize(this->size());
 
-    uint32 new_size = parallel<system>::reduce_by_key(keys, values, temp_keys, temp_values, temp_storage, covariate_value_sum<covariate_value>());
+    uint32 new_size = parallel<system>::reduce_by_key(keys, values,
+                                                      temp_keys, temp_values,
+                                                      temp_storage,
+                                                      covariate_value_sum<covariate_value>());
 
-    this->keys = temp_keys;
-    this->values = temp_values;
+    this->keys.copy(temp_keys);
+    this->values.copy(temp_values);
 
     this->resize(new_size);
 }
@@ -122,7 +128,7 @@ void covariate_observation_to_empirical_table(firepony_context<system>& context,
     // resize the output table
     empirical_table.resize(observation_table.size());
     // copy the keys
-    empirical_table.keys = observation_table.keys;
+    empirical_table.keys.copy(observation_table.keys);
     // transform the values
     thrust::transform(lift::backend_policy<system>::execution_policy(),
                       observation_table.values.begin(),

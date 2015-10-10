@@ -136,25 +136,25 @@ struct firepony_context
     const sequence_database<system>& reference_db;
 
     // sorted list of active reads
-    vector<system, uint32> active_read_list;
+    persistent_allocation<system, uint32> active_read_list;
     // alignment windows for each read in chromosome coordinates
-    vector<system, uint2> alignment_windows;
+    persistent_allocation<system, uint2> alignment_windows;
 
     // list of active BP locations
     // we match the BP representation size to avoid RMW hazards at the edges of reads
     vector_dna16<system> active_location_list;
     // list of read offsets in the reference for each BP (relative to the alignment start position)
-    vector<system, uint16> read_offset_list;
+    persistent_allocation<system, uint16> read_offset_list;
 
     // temporary storage for CUB calls
-    vector<system, uint8> temp_storage;
+    persistent_allocation<system, uint8> temp_storage;
 
     // and more temporary storage
-    vector<system, uint32> temp_u32;
-    vector<system, uint32> temp_u32_2;
-    vector<system, uint32> temp_u32_3;
-    vector<system, uint32> temp_u32_4;
-    vector<system, uint8>  temp_u8;
+    persistent_allocation<system, uint32> temp_u32;
+    persistent_allocation<system, uint32> temp_u32_2;
+    persistent_allocation<system, uint32> temp_u32_3;
+    persistent_allocation<system, uint32> temp_u32_4;
+    persistent_allocation<system, uint8>  temp_u8;
 
     // various pipeline states go here
     snp_filter_context<system> snp_filter;
@@ -183,16 +183,16 @@ struct firepony_context
         typename alignment_header_device<system>::const_view    bam_header;
         typename variant_database_device<system>::const_view    variant_db;
         typename sequence_database_device<system>::const_view   reference_db;
-        typename vector<system, uint32>::view                   active_read_list;
-        typename vector<system, uint2>::view                    alignment_windows;
+        persistent_allocation<system, uint32>                   active_read_list;
+        persistent_allocation<system, uint2>                    alignment_windows;
         typename vector_dna16<system>::view                     active_location_list;
-        typename vector<system, uint16>::view                   read_offset_list;
-        typename vector<system, uint8>::view                    temp_storage;
-        typename vector<system, uint32>::view                   temp_u32;
-        typename vector<system, uint32>::view                   temp_u32_2;
-        typename vector<system, uint32>::view                   temp_u32_3;
-        typename vector<system, uint32>::view                   temp_u32_4;
-        typename vector<system, uint8>::view                    temp_u8;
+        persistent_allocation<system, uint16>                   read_offset_list;
+        persistent_allocation<system, uint8>                    temp_storage;
+        persistent_allocation<system, uint32>                   temp_u32;
+        persistent_allocation<system, uint32>                   temp_u32_2;
+        persistent_allocation<system, uint32>                   temp_u32_3;
+        persistent_allocation<system, uint32>                   temp_u32_4;
+        persistent_allocation<system, uint8>                    temp_u8;
         typename snp_filter_context<system>::view               snp_filter;
         typename cigar_context<system>::view                    cigar;
         typename baq_context<system>::view                      baq;

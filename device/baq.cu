@@ -213,11 +213,11 @@ typedef enum
 template <target_system system, uint32 phase>
 struct hmm_glocal : public lambda<system>
 {
-    typename vector<system, uint32>::view baq_state;
+    pointer<system, uint32> baq_state;
 
     hmm_glocal(typename firepony_context<system>::view ctx,
                const typename alignment_batch_device<system>::const_view batch,
-               typename vector<system, uint32>::view baq_state)
+               pointer<system, uint32> baq_state)
         : lambda<system>(ctx, batch), baq_state(baq_state)
     { }
 
@@ -714,13 +714,13 @@ struct compute_hmm_matrix_size_strided : public lambda<system>
 {
     LAMBDA_INHERIT_MEMBERS;
 
-    typename vector<system, uint32>::view active_read_list;
-    typename vector<system, uint32>::view matrix_size_output;
+    pointer<system, uint32> active_read_list;
+    pointer<system, uint32> matrix_size_output;
 
     compute_hmm_matrix_size_strided(typename firepony_context<system>::view ctx,
                                     const typename alignment_batch_device<system>::const_view batch,
-                                    typename vector<system, uint32>::view active_read_list,
-                                    typename vector<system, uint32>::view matrix_size_output)
+                                    pointer<system, uint32> active_read_list,
+                                    pointer<system, uint32> matrix_size_output)
         : lambda<system>(ctx, batch),
           active_read_list(active_read_list),
           matrix_size_output(matrix_size_output)
@@ -788,13 +788,13 @@ struct compute_hmm_scaling_factor_size_strided : public lambda<system>
 {
     LAMBDA_INHERIT;
 
-    typename vector<system, uint32>::const_view active_read_list;
-    typename vector<system, uint32>::view scaling_index_output;
+    const pointer<system, uint32> active_read_list;
+    pointer<system, uint32> scaling_index_output;
 
     compute_hmm_scaling_factor_size_strided(typename firepony_context<system>::view ctx,
                                             const typename alignment_batch_device<system>::const_view batch,
-                                            typename vector<system, uint32>::const_view active_read_list,
-                                            typename vector<system, uint32>::view scaling_index_output)
+                                            const pointer<system, uint32> active_read_list,
+                                            pointer<system, uint32> scaling_index_output)
         : lambda<system>(ctx, batch),
           active_read_list(active_read_list),
           scaling_index_output(scaling_index_output)
@@ -872,11 +872,11 @@ struct cap_baq_qualities : public lambda<system>
 {
     LAMBDA_INHERIT;
 
-    typename vector<system, uint32>::view baq_state;
+    const pointer<system, uint32> baq_state;
 
     cap_baq_qualities(typename firepony_context<system>::view ctx,
                       const typename alignment_batch_device<system>::const_view batch,
-                      typename vector<system, uint32>::view baq_state)
+                      const pointer<system, uint32> baq_state)
         : lambda<system>(ctx, batch), baq_state(baq_state)
     { }
 
@@ -1083,9 +1083,9 @@ template <target_system system>
 void baq_reads(firepony_context<system>& context, const alignment_batch<system>& batch)
 {
     struct baq_context<system>& baq = context.baq;
-    vector<system, uint32>& active_baq_read_list = context.temp_u32;
-    vector<system, uint32>& baq_state = context.temp_u32_2;
-    vector<system, uint32>& temp_active_list = context.temp_u32_3;
+    persistent_allocation<system, uint32>& active_baq_read_list = context.temp_u32;
+    persistent_allocation<system, uint32>& baq_state = context.temp_u32_2;
+    persistent_allocation<system, uint32>& temp_active_list = context.temp_u32_3;
     uint32 num_active;
 
     timer<system> baq_setup, baq_hmm, baq_postprocess;
@@ -1129,8 +1129,8 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
                                                hmm_window_valid<system>(context, batch.device),
                                                context.temp_storage);
 
-        active_baq_read_list = temp_active_list;
-        active_baq_read_list.resize(num_active);
+        temp_active_list.resize(num_active);
+        active_baq_read_list.copy(temp_active_list);
     }
 
     if (num_active)
@@ -1141,8 +1141,8 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
                                                            temp_active_list.begin(),
                                                            hmm_window_valid<system>(context, batch.device),
                                                            context.temp_storage);
-        context.active_read_list = temp_active_list;
-        context.active_read_list.resize(temp_num_active);
+        temp_active_list.resize(temp_num_active);
+        context.active_read_list.copy(temp_active_list);
 
         constexpr uint32 stride = baq_stride<system>::stride;
 

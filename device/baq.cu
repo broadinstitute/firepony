@@ -753,9 +753,9 @@ struct compute_hmm_matrix_size_strided : public lambda<system>
 template <target_system system>
 struct stride_hmm_index
 {
-    typename vector<system, uint32>::view index;
+    pointer<system, uint32> index;
 
-    stride_hmm_index(typename vector<system, uint32>::view index)
+    stride_hmm_index(pointer<system, uint32> index)
         : index(index)
     { }
 

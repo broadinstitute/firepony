@@ -34,15 +34,15 @@ namespace firepony {
 template <target_system system>
 struct fractional_error_context
 {
-    vector<system, double> snp_errors;
-    vector<system, double> insertion_errors;
-    vector<system, double> deletion_errors;
+    persistent_allocation<system, double> snp_errors;
+    persistent_allocation<system, double> insertion_errors;
+    persistent_allocation<system, double> deletion_errors;
 
     struct view
     {
-        typename vector<system, double>::view snp_errors;
-        typename vector<system, double>::view insertion_errors;
-        typename vector<system, double>::view deletion_errors;
+        persistent_allocation<system, double> snp_errors;
+        persistent_allocation<system, double> insertion_errors;
+        persistent_allocation<system, double> deletion_errors;
     };
 
     operator view()

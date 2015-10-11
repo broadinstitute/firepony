@@ -40,12 +40,12 @@ struct compute_fractional_errors : public lambda<system>
     LAMBDA_INHERIT_MEMBERS;
 
     typename packed_vector<system, 1>::const_view error_vector;
-    typename vector<system, double>::view output_vector;
+    pointer<system, double> output_vector;
 
     compute_fractional_errors(typename firepony_context<system>::view ctx,
                               const typename alignment_batch_device<system>::const_view batch,
                               const typename packed_vector<system, 1>::const_view error_vector,
-                              typename vector<system, double>::view output_vector)
+                              pointer<system, double> output_vector)
         : lambda<system>(ctx, batch), error_vector(error_vector), output_vector(output_vector)
     { }
 
@@ -139,4 +139,3 @@ void build_fractional_error_arrays(firepony_context<system>& context, const alig
 INSTANTIATE(build_fractional_error_arrays);
 
 } // namespace firepony
-

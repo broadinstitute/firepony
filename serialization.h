@@ -39,8 +39,6 @@ struct serialization
     template <typename T>
     static inline size_t serialized_size(const T&);
     template <typename T>
-    static inline size_t serialized_size(const vector<host, T>&);
-    template <typename T>
     static inline size_t serialized_size(const allocation<host, T>&);
     template <typename T>
     static inline size_t serialized_size(const persistent_allocation<host, T>&);
@@ -52,8 +50,6 @@ struct serialization
     template <typename T>
     static inline void *serialize(void *out, const T& in);
     template <typename T>
-    static inline void *serialize(void *out, const vector<host, T>&);
-    template <typename T>
     static inline void *serialize(void *out, const allocation<host, T>&);
     template <typename T>
     static inline void *serialize(void *out, const persistent_allocation<host, T>&);
@@ -64,8 +60,6 @@ struct serialization
 
     template <typename T>
     static inline void *unserialize(T *out, void *in);
-    template <typename T>
-    static inline void *unserialize(vector<host, T> *out, void *in);
     template <typename T>
     static inline void *unserialize(allocation<host, T> *out, void *in);
     template <typename T>
@@ -79,4 +73,3 @@ struct serialization
 } // namespace firepony
 
 #include "serialization_inl.h"
-

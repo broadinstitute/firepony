@@ -123,44 +123,6 @@ inline void *serialization::unserialize(std::vector<T> *out, void *in)
 }
 
 
-//// firepony host vector
-template <typename T>
-inline size_t serialization::serialized_size(const vector<host, T>& vec)
-{
-    return sizeof(size_t) + sizeof(T) * vec.size();
-}
-
-template <typename T>
-inline void *serialization::serialize(void *out, const vector<host, T>& in)
-{
-    size_t size = in.size();
-    out = serialize(out, size);
-
-    for(size_t i = 0; i < size; i++)
-    {
-        out = serialize(out, in[i]);
-    }
-
-    return out;
-}
-
-template <typename T>
-inline void *serialization::unserialize(vector<host, T> *out, void *in)
-{
-    size_t size;
-    in = unserialize(&size, in);
-
-    out->resize(size);
-
-    for(size_t i = 0; i < size; i++)
-    {
-        in = unserialize(&((*out)[i]), in);
-    }
-
-    return in;
-}
-
-
 //// lift allocation
 template <typename T>
 inline size_t serialization::serialized_size(const allocation<host, T>& vec)

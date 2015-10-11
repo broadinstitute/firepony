@@ -36,6 +36,7 @@
 #include <thrust/functional.h>
 
 #include <lift/parallel.h>
+#include <lift/memory/strided_iterator.h>
 
 #include <stdlib.h>
 #include <math.h>

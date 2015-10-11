@@ -43,7 +43,6 @@
 #include <lift/types.h>
 #include <lift/decorators.h>
 #include <lift/memory.h>
-#include <lift/vector.h>
 
 namespace firepony {
 using namespace lift;

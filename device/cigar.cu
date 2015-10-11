@@ -623,7 +623,7 @@ struct compute_error_vectors : public lambda<system>
     pointer<system, uint8> del_vector;
 
     compute_error_vectors(typename firepony_context<system>::view ctx,
-                          const typename alignment_batch_device<system>::const_view batch,
+                          const alignment_batch_device<system> batch,
                           pointer<system, uint8> snp_vector,
                           pointer<system, uint8> ins_vector,
                           pointer<system, uint8> del_vector)

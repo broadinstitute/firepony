@@ -43,7 +43,7 @@ struct compute_fractional_errors : public lambda<system>
     pointer<system, double> output_vector;
 
     compute_fractional_errors(typename firepony_context<system>::view ctx,
-                              const typename alignment_batch_device<system>::const_view batch,
+                              const alignment_batch_device<system> batch,
                               const typename packed_vector<system, 1>::const_view error_vector,
                               pointer<system, double> output_vector)
         : lambda<system>(ctx, batch), error_vector(error_vector), output_vector(output_vector)

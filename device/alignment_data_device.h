@@ -69,7 +69,7 @@ struct alignment_batch_device : public alignment_batch_storage<system>
 {
     typedef alignment_batch_storage<system> base;
 
-    CUDA_DEVICE const CRQ_index crq_index(uint32 read_id) const
+    LIFT_HOST_DEVICE const CRQ_index crq_index(uint32 read_id) const
     {
         return CRQ_index(this->cigar_start[read_id],
                          this->cigar_len[read_id],
@@ -77,70 +77,6 @@ struct alignment_batch_device : public alignment_batch_storage<system>
                          this->read_len[read_id],
                          this->qual_start[read_id],
                          this->qual_len[read_id]);
-    }
-
-    struct const_view
-    {
-        uint32 num_reads;
-        uint32 max_read_size;
-
-        const persistent_allocation<system, uint16> chromosome;
-        const persistent_allocation<system, uint32> alignment_start;
-        const persistent_allocation<system, uint32> alignment_stop;
-        const persistent_allocation<system, uint32> mate_chromosome;
-        const persistent_allocation<system, uint32> mate_alignment_start;
-        const persistent_allocation<system, int32> inferred_insert_size;
-        const persistent_allocation<system, cigar_op> cigars;
-        const persistent_allocation<system, uint32> cigar_start;
-        const persistent_allocation<system, uint32> cigar_len;
-        typename packed_vector<system, 4>::const_view reads;
-        const persistent_allocation<system, uint32> read_start;
-        const persistent_allocation<system, uint32> read_len;
-        const persistent_allocation<system, uint8> qualities;
-        const persistent_allocation<system, uint32> qual_start;
-        const persistent_allocation<system, uint32> qual_len;
-        const persistent_allocation<system, uint16> flags;
-        const persistent_allocation<system, uint8> mapq;
-        const persistent_allocation<system, uint32> read_group;
-
-        CUDA_HOST_DEVICE const CRQ_index crq_index(uint32 read_id) const
-        {
-            return CRQ_index(cigar_start[read_id],
-                             cigar_len[read_id],
-                             read_start[read_id],
-                             read_len[read_id],
-                             qual_start[read_id],
-                             qual_len[read_id]);
-        }
-    };
-
-    operator const_view() const
-    {
-        const_view v = {
-                base::num_reads,
-                base::max_read_size,
-
-                base::chromosome,
-                base::alignment_start,
-                base::alignment_stop,
-                base::mate_chromosome,
-                base::mate_alignment_start,
-                base::inferred_insert_size,
-                base::cigars,
-                base::cigar_start,
-                base::cigar_len,
-                base::reads,
-                base::read_start,
-                base::read_len,
-                base::qualities,
-                base::qual_start,
-                base::qual_len,
-                base::flags,
-                base::mapq,
-                base::read_group,
-        };
-
-        return v;
     }
 
     void download(const alignment_batch_host& host)

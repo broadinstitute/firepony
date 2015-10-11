@@ -46,20 +46,6 @@ struct alignment_header_storage
 {
     // the length of each chromosome in the reference
     persistent_allocation<system, uint32> chromosome_lengths;
-
-    struct const_view
-    {
-        persistent_allocation<system, uint32> chromosome_lengths;
-    };
-
-    operator const_view() const
-    {
-        const_view v = {
-            chromosome_lengths,
-        };
-
-        return v;
-    }
 };
 
 struct alignment_header_host : public alignment_header_storage<host>
@@ -124,7 +110,7 @@ struct CRQ_index
     const uint32 read_start, read_len;
     const uint32 qual_start, qual_len;
 
-    CUDA_HOST_DEVICE CRQ_index(const uint32 cigar_start, const uint32 cigar_len,
+    LIFT_HOST_DEVICE CRQ_index(const uint32 cigar_start, const uint32 cigar_len,
                                const uint32 read_start, const uint32 read_len,
                                const uint32 qual_start, const uint32 qual_len)
         : cigar_start(cigar_start),
@@ -183,7 +169,7 @@ struct alignment_batch_storage
     persistent_allocation<system, uint32> read_group;
 
     // prevent storage creation on the device
-    CUDA_HOST alignment_batch_storage() { }
+    LIFT_HOST alignment_batch_storage() { }
 };
 
 struct alignment_batch_host : public alignment_batch_storage<host>

@@ -103,32 +103,32 @@ struct packed_vector
         resize(0);
     }
 
-    index_type size() const
+    LIFT_HOST_DEVICE index_type size() const
     {
         return m_size;
     }
 
-    index_type capacity() const
+    LIFT_HOST_DEVICE index_type capacity() const
     {
         return m_storage.size();
     }
 
-    iterator begin()
+    LIFT_HOST_DEVICE iterator begin()
     {
         return stream_type(m_storage.data(), m_size).begin();
     }
 
-    const_iterator begin() const
+    LIFT_HOST_DEVICE const_iterator begin() const
     {
         return const_stream_type(m_storage.data(), m_size).begin();
     }
 
-    iterator end()
+    LIFT_HOST_DEVICE iterator end()
     {
         return stream_type(m_storage.data(), m_size).begin() + m_size;
     }
 
-    const_iterator end() const
+    LIFT_HOST_DEVICE const_iterator end() const
     {
         return const_stream_type(m_storage.data(), m_size).begin() + m_size;
     }
@@ -145,15 +145,13 @@ struct packed_vector
     }
 
     /// get the i-th symbol
-    /// note: no device implementation for this as packed_vectors are never used on device
-    /// (only their plain view, which is a packed_stream)
-    CUDA_HOST const typename stream_type::symbol_type operator[] (const index_type i) const
+    LIFT_HOST_DEVICE const typename stream_type::symbol_type operator[] (const index_type i) const
     {
         const_stream_type stream(m_storage.data(), m_size);
         return stream[i];
     }
 
-    CUDA_HOST typename stream_type::reference operator[] (const index_type i)
+    LIFT_HOST_DEVICE typename stream_type::reference operator[] (const index_type i)
     {
         stream_type stream(m_storage.data(), m_size);
         return stream[i];
@@ -169,9 +167,19 @@ struct packed_vector
         return const_view(m_storage.data(), m_size);
     }
 
-    stream_type stream_at_index(const index_type i)
+    LIFT_HOST_DEVICE stream_type stream_at_index(const index_type i)
     {
         return stream_type(m_storage.data(), m_size, i);
+    }
+
+    LIFT_HOST_DEVICE stream_type stream(void)
+    {
+        return stream_type(m_storage.data(), m_size, 0);
+    }
+
+    LIFT_HOST_DEVICE const_stream_type stream(void) const
+    {
+        return const_stream_type(m_storage.data(), m_size, 0);
     }
 
     template <target_system other_system>

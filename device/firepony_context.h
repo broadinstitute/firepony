@@ -180,7 +180,7 @@ struct firepony_context
 
     struct view
     {
-        typename alignment_header_device<system>::const_view    bam_header;
+        const alignment_header_device<system>                   bam_header;
         typename variant_database_device<system>::const_view    variant_db;
         typename sequence_database_device<system>::const_view   reference_db;
         persistent_allocation<system, uint32>                   active_read_list;
@@ -235,10 +235,10 @@ template <target_system system>
 struct lambda
 {
     typename firepony_context<system>::view ctx;
-    const typename alignment_batch_device<system>::const_view batch;
+    const alignment_batch_device<system> batch;
 
     lambda(typename firepony_context<system>::view ctx,
-           const typename alignment_batch_device<system>::const_view batch)
+           const alignment_batch_device<system> batch)
         : ctx(ctx),
           batch(batch)
     { }

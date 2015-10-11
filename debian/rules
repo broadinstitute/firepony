@@ -20,7 +20,7 @@ endif
 	dh $@
 
 override_dh_auto_configure:
-	dh_auto_configure $@ -- -DCMAKE_BUILD_TYPE=Release $(extra_cmake_configure_args)
+	env CC=gcc-4.9 CXX=g++-4.9 dh_auto_configure $@ -- -DCMAKE_BUILD_TYPE=Release $(extra_cmake_configure_args)
 
 override_dh_auto_build:
 	dh_auto_build --parallel $@

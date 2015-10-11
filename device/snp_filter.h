@@ -39,14 +39,14 @@ template <target_system system>
 struct snp_filter_context
 {
     // active reads for the VCF search
-    vector<system, uint32> active_read_ids;
+    persistent_allocation<system, uint32> active_read_ids;
     // active VCF range for each read
-    vector<system, uint2> active_vcf_ranges;
+    persistent_allocation<system, uint2> active_vcf_ranges;
 
     struct view
     {
-        typename vector<system, uint32>::view active_read_ids;
-        typename vector<system, uint2>::view active_vcf_ranges;
+        persistent_allocation<system, uint32> active_read_ids;
+        persistent_allocation<system, uint2> active_vcf_ranges;
     };
 
     operator view()

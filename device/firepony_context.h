@@ -196,7 +196,7 @@ struct firepony_context
         snp_filter_context<system>                              snp_filter;
         cigar_context<system>                                   cigar;
         baq_context<system>                                     baq;
-        typename covariates_context<system>::view               covariates;
+        covariates_context<system>                              covariates;
         typename fractional_error_context<system>::view         fractional_error;
     };
 

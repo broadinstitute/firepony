@@ -52,28 +52,6 @@ struct covariates_context
     covariate_empirical_table<system> empirical_context;
 
     covariate_empirical_table<system> read_group;
-
-    struct view
-    {
-        persistent_allocation<system, ushort2> high_quality_window;
-        typename covariate_observation_table<system>::view scratch_table_space;
-        typename covariate_observation_table<system>::view quality;
-        typename covariate_empirical_table<system>::view empirical_quality;
-        typename covariate_empirical_table<system>::view read_group;
-    };
-
-    operator view()
-    {
-        view v = {
-            high_quality_window,
-            scratch_table_space,
-            quality,
-            empirical_quality,
-            read_group,
-        };
-
-        return v;
-    }
 };
 
 template <target_system system> void gather_covariates(firepony_context<system>& context, const alignment_batch<system>& batch);

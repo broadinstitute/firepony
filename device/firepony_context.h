@@ -193,7 +193,7 @@ struct firepony_context
         persistent_allocation<system, uint32>                   temp_u32_3;
         persistent_allocation<system, uint32>                   temp_u32_4;
         persistent_allocation<system, uint8>                    temp_u8;
-        typename snp_filter_context<system>::view               snp_filter;
+        snp_filter_context<system>                              snp_filter;
         typename cigar_context<system>::view                    cigar;
         typename baq_context<system>::view                      baq;
         typename covariates_context<system>::view               covariates;

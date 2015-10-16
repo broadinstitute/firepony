@@ -181,8 +181,8 @@ struct firepony_context
     struct view
     {
         const alignment_header_device<system>                   bam_header;
-        typename variant_database_device<system>::const_view    variant_db;
-        typename sequence_database_device<system>::const_view   reference_db;
+        variant_database_device<system>                         variant_db;
+        sequence_database_device<system>                        reference_db;
         persistent_allocation<system, uint32>                   active_read_list;
         persistent_allocation<system, uint2>                    alignment_windows;
         typename vector_dna16<system>::view                     active_location_list;

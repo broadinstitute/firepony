@@ -1112,8 +1112,8 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
     }
     fprintf(stderr, "]\n");
 
-    auto reference = context.reference_db.host.view().get_sequence_data(h_batch.chromosome[read_index],
-                                                                        h_batch.alignment_start[read_index]);
+    auto reference = context.reference_db.host.get_sequence_data(h_batch.chromosome[read_index],
+                                                                 h_batch.alignment_start[read_index]);
 
     fprintf(stderr, "    reference sequence data     = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)

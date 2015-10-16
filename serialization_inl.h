@@ -188,6 +188,7 @@ inline void *serialization::unserialize(persistent_allocation<host, T> *out, voi
     size_t size;
     in = unserialize(&size, in);
 
+    new (out) persistent_allocation<host, T>();
     out->resize(size);
 
     for(size_t i = 0; i < size; i++)
@@ -290,8 +291,10 @@ inline size_t serialization::serialized_size(const sequence_database_host& db)
     ret += serialized_size(size);
     for(size_t i = 0; i < size; i++)
     {
-        ret += serialized_size(*(db.storage[i]));
+        ret += serialized_size(db.storage[i]);
     }
+
+    ret += serialized_size(db.storage_map);
 
     return ret;
 }
@@ -304,8 +307,10 @@ inline void *serialization::serialize(void *out, const sequence_database_host& d
     out = serialize(out, db.storage.size());
     for(size_t i = 0; i < db.storage.size(); i++)
     {
-        out = serialize(out, *(db.storage[i]));
+        out = serialize(out, db.storage[i]);
     }
+
+    out = serialize(out, db.storage_map);
 
     return out;
 }
@@ -315,7 +320,7 @@ inline void *serialization::unserialize(sequence_database_host *db, void *in)
 {
     in = unserialize(&db->sequence_names, in);
 
-    size_t size;
+    auto size = db->storage.size();
     in = unserialize(&size, in);
 
     for(size_t i = 0; i < size; i++)
@@ -323,6 +328,8 @@ inline void *serialization::unserialize(sequence_database_host *db, void *in)
         auto *seq = db->new_entry(i);
         in = unserialize(seq, in);
     }
+
+    in = unserialize(&db->storage_map, in);
 
     return in;
 }
@@ -371,8 +378,10 @@ inline size_t serialization::serialized_size(const variant_database_host& db)
     ret += serialized_size(db.storage.size());
     for(size_t i = 0; i < db.storage.size(); i++)
     {
-        ret += serialized_size(*(db.storage[i]));
+        ret += serialized_size(db.storage[i]);
     }
+
+    ret += serialized_size(db.storage_map);
 
     return ret;
 }
@@ -383,8 +392,10 @@ inline void *serialization::serialize(void *out, const variant_database_host& db
     out = serialize(out, db.storage.size());
     for(size_t i = 0; i < db.storage.size(); i++)
     {
-        out = serialize(out, *(db.storage[i]));
+        out = serialize(out, db.storage[i]);
     }
+
+    out = serialize(out, db.storage_map);
 
     return out;
 }
@@ -392,7 +403,7 @@ inline void *serialization::serialize(void *out, const variant_database_host& db
 template <>
 inline void *serialization::unserialize(variant_database_host *db, void *in)
 {
-    size_t size;
+    auto size = db->storage.size();
     in = unserialize(&size, in);
 
     for(size_t i = 0; i < size; i++)
@@ -400,6 +411,8 @@ inline void *serialization::unserialize(variant_database_host *db, void *in)
         auto *seq = db->new_entry(i);
         in = unserialize(seq, in);
     }
+
+    in = unserialize(&db->storage_map, in);
 
     return in;
 }

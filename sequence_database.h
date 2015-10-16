@@ -48,18 +48,15 @@ struct sequence_storage
         return *this;
     }
 
-    struct const_view
+    template <target_system other_system>
+    void copy(const sequence_storage<other_system>& other)
     {
-        typename packed_vector<system, 4>::const_view bases;
-    };
+        bases.copy(other.bases);
+    }
 
-    operator const_view() const
+    void free(void)
     {
-        const_view v = {
-            bases,
-        };
-
-        return v;
+        bases.free();
     }
 };
 
@@ -69,31 +66,13 @@ struct sequence_database_storage : public segmented_database_storage<system, seq
     // shorthand for base type
     typedef segmented_database_storage<system, sequence_storage> base;
     using base::storage;
-    using base::views;
 
-    struct const_view : public base::const_view
+    // grab a reference to the sequence stream at a given coordinate
+    LIFT_HOST_DEVICE
+    typename packed_vector<system, 4>::const_stream_type get_sequence_data(uint16 id, uint32 offset) const
     {
-        // grab a reference to the sequence stream at a given coordinate
-        CUDA_HOST_DEVICE
-        typename packed_vector<system, 4>::const_stream_type get_sequence_data(uint16 id, uint32 offset)
-        {
-            auto& d = base::const_view::get_chromosome(id);
-            return d.bases.offset(offset);
-        }
-    };
-
-    const_view view() const
-    {
-        base::update_views();
-
-        const_view v;
-        v.data = views;
-        return v;
-    }
-
-    operator const_view() const
-    {
-        return view();
+        const auto& d = base::get_sequence(id);
+        return d.bases.stream_at_index(offset);
     }
 };
 

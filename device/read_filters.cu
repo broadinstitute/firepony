@@ -106,7 +106,7 @@ struct filter_if_read_malformed : public lambda<system>
             }
 
             // ... but read is aligned to a point after the end of the contig (GATK: checkAlignmentDisagreesWithHeader)
-            auto& sequence = ctx.reference_db.get_chromosome(batch.chromosome[read_index]);
+            auto& sequence = ctx.reference_db.get_sequence(batch.chromosome[read_index]);
             if (ctx.alignment_windows[read_index].x >= sequence.bases.size())
             {
                 return false;

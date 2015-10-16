@@ -168,7 +168,7 @@ struct compute_vcf_ranges : public lambda<system>
     {
         // check if we know the chromosome for this read
         auto ch = batch.chromosome[read_index];
-        if (ch >= ctx.variant_db.data.size())
+        if (ch >= ctx.variant_db.size())
         {
             // dbsnp does not reference this chromosome
             // mark read as inactive for VCF search and exit
@@ -176,7 +176,7 @@ struct compute_vcf_ranges : public lambda<system>
             return;
         }
 
-        const auto& db = ctx.variant_db.get_chromosome(ch);
+        const auto& db = ctx.variant_db.get_sequence(ch);
 
         // figure out the genome alignment window for this read
         const ushort2& reference_window_clipped = ctx.cigar.reference_window_clipped[read_index];
@@ -244,7 +244,7 @@ struct filter_bps : public lambda<system>
 public:
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const auto& db = ctx.variant_db.get_chromosome(batch.chromosome[read_index]);
+        const auto& db = ctx.variant_db.get_sequence(batch.chromosome[read_index]);
 
         const CRQ_index& idx = batch.crq_index(read_index);
         const ushort2& read_window_clipped = ctx.cigar.read_window_clipped[read_index];

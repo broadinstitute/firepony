@@ -137,7 +137,7 @@ struct packed_vector
     {
         if (m_storage.size() < divide_ri(m_size + 1, SYMBOLS_PER_WORD))
         {
-            m_storage.resize(divide_ri(m_size + 1, SYMBOLS_PER_WORD));
+            m_storage.resize(divide_ri(m_size + 1, SYMBOLS_PER_WORD) * 2);
         }
 
         begin()[m_size] = s;
@@ -172,6 +172,11 @@ struct packed_vector
         return stream_type(m_storage.data(), m_size, i);
     }
 
+    LIFT_HOST_DEVICE const_stream_type stream_at_index(const index_type i) const
+    {
+        return const_stream_type(m_storage.data(), m_size, i);
+    }
+
     LIFT_HOST_DEVICE stream_type stream(void)
     {
         return stream_type(m_storage.data(), m_size, 0);
@@ -187,6 +192,12 @@ struct packed_vector
     {
         m_storage.copy(other.m_storage);
         m_size = other.size();
+    }
+
+    void free(void)
+    {
+        m_storage.free();
+        m_size = 0;
     }
 
     persistent_allocation<system, uint32> m_storage;

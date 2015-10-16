@@ -125,7 +125,7 @@ struct compute_hmm_windows : public lambda<system>
         hmm_reference_window.y = reference_window_clipped.y + right_insertion + offset;
 
         // figure out if the HMM window is contained inside the chromosome this read is aligned to
-        auto& reference = ctx.reference_db.get_chromosome(batch.chromosome[read_index]);
+        auto& reference = ctx.reference_db.get_sequence(batch.chromosome[read_index]);
 
         int left_window_shift = 0;
         if (hmm_reference_window.x < 0 && batch.alignment_start[read_index] < abs(hmm_reference_window.x))

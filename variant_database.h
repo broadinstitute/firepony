@@ -49,31 +49,20 @@ struct variant_storage
     // each element encodes the maximum end point of any feature to the left of it
     persistent_allocation<system, uint32> max_end_point_left;
 
-    variant_storage& operator=(const variant_storage<host>& other)
+    template <target_system other_system>
+    void copy(const variant_storage<other_system>& other)
     {
         feature_start.copy(other.feature_start);
         feature_stop.copy(other.feature_stop);
         // xxxnsubtil: recompute this instead of moving across PCIE?
         max_end_point_left.copy(other.max_end_point_left);
-        return *this;
     }
 
-    struct const_view
+    void free(void)
     {
-        persistent_allocation<system, uint32> feature_start;
-        persistent_allocation<system, uint32> feature_stop;
-        persistent_allocation<system, uint32> max_end_point_left;
-    };
-
-    operator const_view() const
-    {
-        const_view v = {
-            feature_start,
-            feature_stop,
-            max_end_point_left,
-        };
-
-        return v;
+        feature_start.free();
+        feature_stop.free();
+        max_end_point_left.free();
     }
 };
 

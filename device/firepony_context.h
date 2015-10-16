@@ -197,7 +197,7 @@ struct firepony_context
         cigar_context<system>                                   cigar;
         baq_context<system>                                     baq;
         covariates_context<system>                              covariates;
-        typename fractional_error_context<system>::view         fractional_error;
+        fractional_error_context<system>                        fractional_error;
     };
 
     operator view()

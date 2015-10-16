@@ -69,34 +69,6 @@ struct baq_context
     persistent_allocation<system, double> scaling;
     // index vector for scaling factors
     persistent_allocation<system, uint32> scaling_index;
-
-    struct view
-    {
-        persistent_allocation<system, short2> hmm_reference_windows;
-        persistent_allocation<system, uint16> bandwidth;
-        persistent_allocation<system, uint8> qualities;
-        persistent_allocation<system, double> forward;
-        persistent_allocation<system, double> backward;
-        persistent_allocation<system, uint32> matrix_index;
-        persistent_allocation<system, double> scaling;
-        persistent_allocation<system, uint32> scaling_index;
-    };
-
-    operator view()
-    {
-        view v = {
-                hmm_reference_windows,
-                bandwidth,
-                qualities,
-                forward,
-                backward,
-                matrix_index,
-                scaling,
-                scaling_index,
-        };
-
-        return v;
-    }
 };
 
 template <target_system system> void baq_reads(firepony_context<system>& context, const alignment_batch<system>& batch);

@@ -195,7 +195,7 @@ struct firepony_context
         persistent_allocation<system, uint8>                    temp_u8;
         snp_filter_context<system>                              snp_filter;
         cigar_context<system>                                   cigar;
-        typename baq_context<system>::view                      baq;
+        baq_context<system>                                     baq;
         typename covariates_context<system>::view               covariates;
         typename fractional_error_context<system>::view         fractional_error;
     };

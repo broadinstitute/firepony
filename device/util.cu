@@ -43,10 +43,10 @@ namespace firepony {
 template <target_system system, uint32 N>
 struct pack_uint8
 {
-    typename packed_vector<system, N>::view dest;
+    packed_vector<system, N> dest;
     pointer<system, uint8> src;
 
-    pack_uint8(typename packed_vector<system, N>::view dest,
+    pack_uint8(packed_vector<system, N> dest,
                pointer<system, uint8> src)
         : dest(dest), src(src)
     { }

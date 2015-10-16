@@ -64,9 +64,6 @@ struct packed_vector
     typedef packed_stream_reference<stream_type>                                                reference;
     typedef packed_stream_reference<const_stream_type>                                          const_reference;
 
-    typedef stream_type view;
-    typedef const_stream_type const_view;
-
     packed_vector()
         : m_storage(), m_size(0)
     { }
@@ -155,16 +152,6 @@ struct packed_vector
     {
         stream_type stream(m_storage.data(), m_size);
         return stream[i];
-    }
-
-    operator view()
-    {
-        return view(m_storage.data(), m_size);
-    }
-
-    operator const_view() const
-    {
-        return const_view(m_storage.data(), m_size);
     }
 
     LIFT_HOST_DEVICE stream_type stream_at_index(const index_type i)

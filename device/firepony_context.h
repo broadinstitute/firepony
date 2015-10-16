@@ -185,7 +185,7 @@ struct firepony_context
         sequence_database_device<system>                        reference_db;
         persistent_allocation<system, uint32>                   active_read_list;
         persistent_allocation<system, uint2>                    alignment_windows;
-        typename vector_dna16<system>::view                     active_location_list;
+        vector_dna16<system>                                    active_location_list;
         persistent_allocation<system, uint16>                   read_offset_list;
         persistent_allocation<system, uint8>                    temp_storage;
         persistent_allocation<system, uint32>                   temp_u32;

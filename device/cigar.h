@@ -99,42 +99,6 @@ struct cigar_context
 
     // number of errors for each read
     persistent_allocation<system, uint16> num_errors;
-
-    struct view
-    {
-        persistent_allocation<system, uint32> cigar_offsets;
-        typename packed_vector<system, 2>::view cigar_events;
-        persistent_allocation<system, uint32> cigar_event_read_index;
-        persistent_allocation<system, uint16> cigar_event_read_coordinates;
-        persistent_allocation<system, uint16> cigar_event_reference_coordinates;
-        persistent_allocation<system, ushort2> read_window_clipped;
-        persistent_allocation<system, ushort2> read_window_clipped_no_insertions;
-        persistent_allocation<system, ushort2> reference_window_clipped;
-        typename packed_vector<system, 1>::view is_snp;
-        typename packed_vector<system, 1>::view is_insertion;
-        typename packed_vector<system, 1>::view is_deletion;
-        persistent_allocation<system, uint16> num_errors;
-    };
-
-    operator view()
-    {
-        view v = {
-                cigar_offsets,
-                cigar_events,
-                cigar_event_read_index,
-                cigar_event_read_coordinates,
-                cigar_event_reference_coordinates,
-                read_window_clipped,
-                read_window_clipped_no_insertions,
-                reference_window_clipped,
-                is_snp,
-                is_insertion,
-                is_deletion,
-                num_errors,
-        };
-
-        return v;
-    }
 };
 
 template <target_system system> void expand_cigars(firepony_context<system>& context, const alignment_batch<system>& batch);

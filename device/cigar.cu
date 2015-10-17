@@ -622,7 +622,7 @@ struct compute_error_vectors : public lambda<system>
     pointer<system, uint8> ins_vector;
     pointer<system, uint8> del_vector;
 
-    compute_error_vectors(typename firepony_context<system>::view ctx,
+    compute_error_vectors(firepony_context<system> ctx,
                           const alignment_batch_device<system> batch,
                           pointer<system, uint8> snp_vector,
                           pointer<system, uint8> ins_vector,
@@ -1112,8 +1112,9 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
     }
     fprintf(stderr, "]\n");
 
-    auto reference = context.reference_db.host.get_sequence_data(h_batch.chromosome[read_index],
-                                                                 h_batch.alignment_start[read_index]);
+    const auto& reference_db = ((const sequence_database_storage<system>) context.reference_db);
+    const auto& reference = reference_db.get_sequence_data(h_batch.chromosome[read_index],
+                                                           h_batch.alignment_start[read_index]);
 
     fprintf(stderr, "    reference sequence data     = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)

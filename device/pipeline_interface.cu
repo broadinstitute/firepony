@@ -61,9 +61,12 @@ struct firepony_device_pipeline : public firepony_pipeline
 {
     uint32 consumer_id;
 
+    sequence_database_host *host_reference;
+    variant_database_host *host_dbsnp;
+
     alignment_header<system> *header;
-    sequence_database<system> *reference;
-    variant_database<system> *dbsnp;
+    sequence_database_storage<system> *reference;
+    variant_database_storage<system> *dbsnp;
 
     firepony_context<system> *context;
     alignment_batch<system> *batch;
@@ -102,8 +105,8 @@ struct firepony_device_pipeline : public firepony_pipeline
     virtual void setup(io_thread *reader,
                        const runtime_options *options,
                        alignment_header_host *h_header,
-                       sequence_database_host *h_reference,
-                       variant_database_host *h_dbsnp) override
+                       sequence_database_host *host_reference,
+                       variant_database_host *host_dbsnp) override
     {
 #if ENABLE_CUDA_BACKEND
         if (system == cuda)
@@ -113,14 +116,16 @@ struct firepony_device_pipeline : public firepony_pipeline
 #endif
 
         this->reader = reader;
+        this->host_reference = host_reference;
+        this->host_dbsnp = host_dbsnp;
 
         header = new alignment_header<system>(*h_header);
-        reference = new sequence_database<system>(*h_reference);
-        dbsnp = new variant_database<system>(*h_dbsnp);
+        reference = new sequence_database_storage<system>();
+        dbsnp = new variant_database_storage<system>();
 
         header->download();
 
-        context = new firepony_context<system>(compute_device, *options, *header, *reference, *dbsnp);
+        context = new firepony_context<system>(compute_device, *options, *header);
         batch = new alignment_batch<system>();
     }
 
@@ -223,11 +228,14 @@ private:
             }
 
             // download/evict reference and dbsnp segments
-            reference->update_resident_set(h_batch->chromosome_map);
-            dbsnp->update_resident_set(h_batch->chromosome_map);
+            reference->update_resident_set(*host_reference, h_batch->chromosome_map);
+            dbsnp->update_resident_set(*host_dbsnp, h_batch->chromosome_map);
 
             // download alignment data to the device
             batch->download(h_batch);
+
+            // update context database pointers
+            context->update_databases(*reference, *dbsnp);
 
             // process the batch
             firepony_process_batch(*context, *batch);

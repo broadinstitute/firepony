@@ -75,7 +75,4 @@ typedef variant_database_storage<host> variant_database_host;
 template <target_system system>
 using variant_database_device = variant_database_storage<system>;
 
-template <target_system system>
-using variant_database = segmented_database<system, variant_database_host, variant_database_device>;
-
 } // namespace firepony

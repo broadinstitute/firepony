@@ -79,8 +79,6 @@ struct packed_vector
         m_storage.copy(other.m_storage);
     }
 
-    packed_vector operator=(const packed_vector& other) = delete;
-
     void reserve(const index_type size)
     {
         if (m_storage.size() < divide_ri(m_size, SYMBOLS_PER_WORD))

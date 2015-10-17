@@ -131,9 +131,10 @@ struct firepony_context
 
     const runtime_options& options;
 
-    const alignment_header<system>& bam_header;
-    const variant_database<system>& variant_db;
-    const sequence_database<system>& reference_db;
+    const alignment_header<system> bam_header;
+    // note: these two are const but are expected to be updated in update_databases()
+    const sequence_database_storage<system> reference_db;
+    const variant_database_storage<system> variant_db;
 
     // sorted list of active reads
     persistent_allocation<system, uint32> active_read_list;
@@ -168,63 +169,16 @@ struct firepony_context
 
     firepony_context(const int compute_device,
                      const runtime_options& options,
-                     const alignment_header<system>& bam_header,
-                     const sequence_database<system>& reference_db,
-                     const variant_database<system>& variant_db)
+                     const alignment_header<system> bam_header)
         : compute_device(compute_device),
           options(options),
           bam_header(bam_header),
-          reference_db(reference_db),
-          variant_db(variant_db)
+          reference_db(),
+          variant_db()
     { }
 
-    struct view
-    {
-        const alignment_header_device<system>                   bam_header;
-        variant_database_device<system>                         variant_db;
-        sequence_database_device<system>                        reference_db;
-        persistent_allocation<system, uint32>                   active_read_list;
-        persistent_allocation<system, uint2>                    alignment_windows;
-        vector_dna16<system>                                    active_location_list;
-        persistent_allocation<system, uint16>                   read_offset_list;
-        persistent_allocation<system, uint8>                    temp_storage;
-        persistent_allocation<system, uint32>                   temp_u32;
-        persistent_allocation<system, uint32>                   temp_u32_2;
-        persistent_allocation<system, uint32>                   temp_u32_3;
-        persistent_allocation<system, uint32>                   temp_u32_4;
-        persistent_allocation<system, uint8>                    temp_u8;
-        snp_filter_context<system>                              snp_filter;
-        cigar_context<system>                                   cigar;
-        baq_context<system>                                     baq;
-        covariates_context<system>                              covariates;
-        fractional_error_context<system>                        fractional_error;
-    };
-
-    operator view()
-    {
-        view v = {
-            bam_header.device,
-            variant_db.device,
-            reference_db.device,
-            active_read_list,
-            alignment_windows,
-            active_location_list,
-            read_offset_list,
-            temp_storage,
-            temp_u32,
-            temp_u32_2,
-            temp_u32_3,
-            temp_u32_4,
-            temp_u8,
-            snp_filter,
-            cigar,
-            baq,
-            covariates,
-            fractional_error,
-        };
-
-        return v;
-    }
+    void update_databases(const sequence_database_storage<system>& reference_db,
+                          const variant_database_storage<system>& variant_db);
 
     void start_batch(const alignment_batch<system>& batch);
     void end_batch(const alignment_batch<system>& batch);
@@ -234,10 +188,10 @@ struct firepony_context
 template <target_system system>
 struct lambda
 {
-    typename firepony_context<system>::view ctx;
+    firepony_context<system> ctx;
     const alignment_batch_device<system> batch;
 
-    lambda(typename firepony_context<system>::view ctx,
+    lambda(firepony_context<system> ctx,
            const alignment_batch_device<system> batch)
         : ctx(ctx),
           batch(batch)
@@ -249,9 +203,9 @@ struct lambda
 template <target_system system>
 struct lambda_context
 {
-    typename firepony_context<system>::view ctx;
+    firepony_context<system> ctx;
 
-    lambda_context(typename firepony_context<system>::view ctx)
+    lambda_context(firepony_context<system> ctx)
         : ctx(ctx)
     { }
 };

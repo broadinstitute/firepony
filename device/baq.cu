@@ -216,7 +216,7 @@ struct hmm_glocal : public lambda<system>
 {
     pointer<system, uint32> baq_state;
 
-    hmm_glocal(typename firepony_context<system>::view ctx,
+    hmm_glocal(firepony_context<system> ctx,
                const alignment_batch_device<system> batch,
                pointer<system, uint32> baq_state)
         : lambda<system>(ctx, batch), baq_state(baq_state)
@@ -718,7 +718,7 @@ struct compute_hmm_matrix_size_strided : public lambda<system>
     pointer<system, uint32> active_read_list;
     pointer<system, uint32> matrix_size_output;
 
-    compute_hmm_matrix_size_strided(typename firepony_context<system>::view ctx,
+    compute_hmm_matrix_size_strided(firepony_context<system> ctx,
                                     const alignment_batch_device<system> batch,
                                     pointer<system, uint32> active_read_list,
                                     pointer<system, uint32> matrix_size_output)
@@ -792,7 +792,7 @@ struct compute_hmm_scaling_factor_size_strided : public lambda<system>
     const pointer<system, uint32> active_read_list;
     pointer<system, uint32> scaling_index_output;
 
-    compute_hmm_scaling_factor_size_strided(typename firepony_context<system>::view ctx,
+    compute_hmm_scaling_factor_size_strided(firepony_context<system> ctx,
                                             const alignment_batch_device<system> batch,
                                             const pointer<system, uint32> active_read_list,
                                             pointer<system, uint32> scaling_index_output)
@@ -875,7 +875,7 @@ struct cap_baq_qualities : public lambda<system>
 
     const pointer<system, uint32> baq_state;
 
-    cap_baq_qualities(typename firepony_context<system>::view ctx,
+    cap_baq_qualities(firepony_context<system> ctx,
                       const alignment_batch_device<system> batch,
                       const pointer<system, uint32> baq_state)
         : lambda<system>(ctx, batch), baq_state(baq_state)

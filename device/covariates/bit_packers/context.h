@@ -103,7 +103,7 @@ struct covariate_Context : public covariate<system, PreviousCovariate, 4 + const
 
     // context encoding (MSB to LSB): BB[bp_offset] BB[bp_offset-1] BB[bp_offset-2] ... SSSS
     // B = base pair bit, S = size bit
-    static CUDA_HOST_DEVICE covariate_key_set encode(typename firepony_context<system>::view ctx,
+    static CUDA_HOST_DEVICE covariate_key_set encode(firepony_context<system> ctx,
                                                      const alignment_batch_device<system> batch,
                                                      uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
                                                      covariate_key_set input_key = {0, 0, 0})

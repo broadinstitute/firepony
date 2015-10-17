@@ -257,12 +257,13 @@ void debug_read(firepony_context<system>& context, const alignment_batch<system>
     debug_cigar(context, batch, read_index);
     debug_baq(context, batch, read_index);
 
-    const uint2 alignment_window = context.alignment_windows[read_index];
-    fprintf(stderr, "  sequence name [%s]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
-            context.reference_db.host.sequence_names.lookup(h_batch.chromosome[read_index]).c_str(),
-            h_batch.alignment_start[read_index],
-            alignment_window.x,
-            alignment_window.y);
+// xxxnsubtil: this needs the sequence name database which isn't available right now!
+//    const uint2 alignment_window = context.alignment_windows[read_index];
+//    fprintf(stderr, "  sequence name [%s]\n  sequence offset [%u]\n  alignment window [%u, %u]\n",
+//            context.reference_db.sequence_names.lookup(h_batch.chromosome[read_index]).c_str(),
+//            h_batch.alignment_start[read_index],
+//            alignment_window.x,
+//            alignment_window.y);
 
     const uint2 vcf_range = context.snp_filter.active_vcf_ranges[read_index];
     fprintf(stderr, "  active VCF range: [%u, %u[\n", vcf_range.x, vcf_range.y);

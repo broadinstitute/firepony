@@ -42,12 +42,6 @@ struct sequence_storage
 {
     packed_vector<system, 4> bases;
 
-    sequence_storage<system>& operator=(const sequence_storage<host>& other)
-    {
-        bases.copy(other.bases);
-        return *this;
-    }
-
     template <target_system other_system>
     void copy(const sequence_storage<other_system>& other)
     {
@@ -85,9 +79,5 @@ struct sequence_database_host : public sequence_database_storage<host>
 // device storage is identical to the generic version
 template <target_system system>
 using sequence_database_device = sequence_database_storage<system>;
-
-// define the sequence_database type as a segmented_database for the storage types defined above
-template <target_system system>
-using sequence_database = segmented_database<system, sequence_database_host, sequence_database_device>;
 
 } // namespace firepony

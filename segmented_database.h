@@ -248,27 +248,4 @@ public:
     }
 };
 
-template <target_system system,
-          class host_storage,
-          template <target_system _unused> class device_storage>
-struct segmented_database
-{
-    const host_storage& host;
-    device_storage<system> device;
-
-    segmented_database(const host_storage& host)
-        : host(host)
-    { }
-
-    resident_segment_map empty_segment_map(void) const
-    {
-        return host.empty_segment_map();
-    }
-
-    void update_resident_set(const resident_segment_map& target_resident_set)
-    {
-        device.update_resident_set(host, target_resident_set);
-    }
-};
-
 } // namespace firepony

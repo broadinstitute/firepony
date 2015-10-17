@@ -31,6 +31,16 @@
 namespace firepony {
 
 template <target_system system>
+void firepony_context<system>::update_databases(const sequence_database_storage<system>& reference_db,
+                                                const variant_database_storage<system>& variant_db)
+{
+    // update our database pointers
+    const_cast<sequence_database_storage<system>&> (this->reference_db) = reference_db;
+    const_cast<variant_database_storage<system>&> (this->variant_db) = variant_db;
+}
+METHOD_INSTANTIATE(firepony_context, update_databases);
+
+template <target_system system>
 void firepony_context<system>::start_batch(const alignment_batch<system>& batch)
 {
     // initialize the read order with 0..N

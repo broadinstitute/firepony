@@ -100,10 +100,8 @@ void covariate_table<system, covariate_value>::pack(allocation<system, covariate
                                                       temp_storage,
                                                       covariate_value_sum<covariate_value>());
 
-    this->keys.copy(temp_keys);
-    this->values.copy(temp_values);
-
-    this->resize(new_size);
+    this->keys.copy(temp_keys.truncate(new_size));
+    this->values.copy(temp_values.truncate(new_size));
 }
 METHOD_INSTANTIATE(covariate_observation_table, pack);
 METHOD_INSTANTIATE(covariate_empirical_table, pack);

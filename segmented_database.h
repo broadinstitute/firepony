@@ -140,7 +140,8 @@ private:
     {
         if (storage_map.is_resident(i))
         {
-            storage[i].free();
+            storage.peek(i).free();
+            storage.poke(i, chromosome_storage<system>());
             storage_map.mark_evicted(i);
         }
     }
@@ -152,9 +153,9 @@ private:
         if (!storage_map.is_resident(i))
         {
             // copy data
-            // the song and dance below is required since storage[i] returns a *copy* for device vectors
+            // the song and dance below is required since storage.peek(i) returns a copy of the object
             // we need to grab the pointer, modify it, then poke it back into the array
-            auto container = storage[i];
+            auto container = storage.peek(i);
             container.copy(db.storage[i]);
             storage.poke(i, container);
 

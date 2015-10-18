@@ -831,7 +831,7 @@ void expand_cigars(firepony_context<system>& context, const alignment_batch<syst
                                      thrust::plus<uint32>());
 
     // read back the last element, which contains the size of the buffer required
-    uint32 expanded_cigar_len = ctx.cigar_offsets[batch.device.cigars.size()];
+    uint32 expanded_cigar_len = ctx.cigar_offsets.peek(batch.device.cigars.size());
 
     // make sure we have enough room for the expanded cigars
     // note: temporary storage must be padded to a multiple of the word size, since we'll pack whole words at a time

@@ -1211,8 +1211,8 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
                                        stride_hmm_index<system>(baq.scaling_index));
         }
 
-        uint32 matrix_len = baq.matrix_index[baq.matrix_index.size() - 1];
-        uint32 scaling_len = baq.scaling_index[baq.scaling_index.size() - 1];
+        uint32 matrix_len = baq.matrix_index.peek(baq.matrix_index.size() - 1);
+        uint32 scaling_len = baq.scaling_index.peek(baq.scaling_index.size() - 1);
 
         baq.forward.resize(matrix_len);
         baq.backward.resize(matrix_len);

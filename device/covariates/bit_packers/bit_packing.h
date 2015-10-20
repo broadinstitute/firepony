@@ -93,8 +93,8 @@ struct covariate
 
 protected:
     static CUDA_HOST_DEVICE covariate_key_set build_key(covariate_key_set input_key, covariate_key_set data,
-                                                        firepony_context<system> ctx,
-                                                        const alignment_batch_device<system> batch,
+                                                        firepony_context<system>& ctx,
+                                                        const alignment_batch_device<system>& batch,
                                                         uint32 read_index, uint16 bp_offset, uint32 cigar_event_index)
     {
         // add in our bits
@@ -146,8 +146,8 @@ struct covariate_null
         next_offset = 0
     };
 
-    static CUDA_HOST_DEVICE covariate_key_set encode(firepony_context<system> ctx,
-                                                     const alignment_batch_device<system> batch,
+    static CUDA_HOST_DEVICE covariate_key_set encode(firepony_context<system>& ctx,
+                                                     const alignment_batch_device<system>& batch,
                                                      uint32 read_index, uint16 bp_offset, uint32 cigar_event_index,
                                                      covariate_key_set input_key = {0, 0, 0})
     {

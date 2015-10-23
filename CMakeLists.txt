@@ -60,6 +60,7 @@ endif()
 
 # locate required packages
 # CUDA 7.0 is required to build
+# note: CUDA 7.5 causes hangs in Firepony!
 find_package(CUDA 7.0 REQUIRED)
 # enable C++11 support
 list(APPEND CUDA_NVCC_FLAGS "-std=c++11")

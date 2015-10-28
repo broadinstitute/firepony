@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "../types.h"
+#include "../../types.h"
 
 #include "util.h"
 #include "packed_stream.h"

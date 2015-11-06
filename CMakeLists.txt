@@ -60,11 +60,11 @@ endif()
 
 # locate required packages
 # CUDA 7.0 is required to build
-find_package(CUDA 7.5 REQUIRED)
+find_package(CUDA 7.0 REQUIRED)
 # enable C++11 support
 list(APPEND CUDA_NVCC_FLAGS "-std=c++11")
 # enable device lambda support
-list(APPEND CUDA_NVCC_FLAGS "--expt-extended-lambda")
+#list(APPEND CUDA_NVCC_FLAGS "--expt-extended-lambda")
 # build for Kepler
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -use_fast_math)
 

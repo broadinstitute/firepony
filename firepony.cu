@@ -264,6 +264,19 @@ int main(int argc, char **argv)
         }
     }
 
+    if (command_line_options.verbose)
+    {
+        fprintf(stderr, "original command line: ");
+        for(int i = 1; i < argc; i++)
+        {
+            fprintf(stderr, "%s ", argv[i]);
+        }
+        fprintf(stderr, "\n");
+
+        fprintf(stderr, "computed command line: %s\n", canonical_command_line().c_str());
+        fprintf(stderr, "\n");
+    }
+
     timer<host> data_io;
     data_io.start();
 

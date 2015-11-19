@@ -53,6 +53,7 @@ static void usage(void)
     fprintf(stderr, "  --disable-rounding                    Disable rounding on the output tables\n");
     fprintf(stderr, "  -b, --batch-size <n>                  Process input in batches of <n> reads\n");
     fprintf(stderr, "  --mmap                                Load reference/dbsnp from system shared memory if present\n");
+    fprintf(stderr, "  -v, --verbose                         Verbose logging\n");
     fprintf(stderr, "  -o, --output <output-file-name>       File to write tabulated output to (default is stdout)\n");
 #if ENABLE_CUDA_BACKEND
     fprintf(stderr, "  --gpu-only                            Use only the CUDA GPU-accelerated backend\n");
@@ -122,7 +123,7 @@ static void parse_env_vars(void)
 
 void parse_command_line(int argc, char **argv)
 {
-    static const char *options_short = "r:s:db:o:";
+    static const char *options_short = "r:s:db:o:v";
     static struct option options_long[] = {
             { "reference", required_argument, NULL, 'r' },
             { "snp-database", required_argument, NULL, 's' },
@@ -132,6 +133,7 @@ void parse_command_line(int argc, char **argv)
             { "disable-rounding", no_argument, NULL, 'n' },
             { "batch-size", required_argument, NULL, 'b' },
             { "mmap", no_argument, NULL, 'm' },
+            { "verbose", no_argument, NULL, 'v' },
             { "output", required_argument, NULL, 'o' },
 #if ENABLE_CUDA_BACKEND
             { "gpu-only", no_argument, NULL, 'g' },
@@ -195,6 +197,11 @@ void parse_command_line(int argc, char **argv)
         case 'm':
             // --mmap
             command_line_options.try_mmap = true;
+            break;
+
+        case 'v':
+            // -v, --verbose
+            command_line_options.verbose = true;
             break;
 
         case 'o':
@@ -264,6 +271,85 @@ void parse_command_line(int argc, char **argv)
     }
 
     command_line_options.input = argv[optind];
+}
+
+static void concat(std::string& out, const char *in)
+{
+    if (out.size())
+    {
+        out = out + std::string(" ");
+    }
+
+    out = out + std::string(in);
+}
+
+std::string canonical_command_line(void)
+{
+    std::string ret = "";
+    char buf[1024];
+
+    snprintf(buf, sizeof(buf), "-r %s", command_line_options.reference);
+    concat(ret, buf);
+
+    snprintf(buf, sizeof(buf), "-s %s", command_line_options.snp_database);
+    concat(ret, buf);
+
+    snprintf(buf, sizeof(buf), "-o %s", command_line_options.output ? command_line_options.output : "-");
+    concat(ret, buf);
+
+    if (command_line_options.batch_size != uint32(-1))
+    {
+        snprintf(buf, sizeof(buf), "--batch-size %d", command_line_options.batch_size);
+        concat(ret, buf);
+    }
+
+    if (command_line_options.debug)
+    {
+        concat(ret, "--debug");
+    }
+
+    if (command_line_options.disable_output_rounding)
+    {
+        concat(ret, "--disable-rounding");
+    }
+
+    if (!command_line_options.enable_cuda)
+    {
+        concat(ret, "--cpu-only");
+    }
+
+    if (!command_line_options.enable_tbb)
+    {
+        concat(ret, "--gpu-only");
+    }
+
+    if (command_line_options.cpu_threads != -1)
+    {
+        snprintf(buf, sizeof(buf), "--cpu-threads %d", command_line_options.cpu_threads);
+        concat(ret, buf);
+    }
+
+    if (command_line_options.try_mmap)
+    {
+        concat(ret, "--mmap");
+
+        if (!command_line_options.reference_use_mmap)
+        {
+            concat(ret, "--no-reference-mmap");
+        }
+
+        if (!command_line_options.snp_database_use_mmap)
+        {
+            concat(ret, "--no-snp-database-mmap");
+        }
+    }
+
+    if (command_line_options.verbose)
+    {
+        concat(ret, "--verbose");
+    }
+
+    return ret;
 }
 
 } // namespace firepony

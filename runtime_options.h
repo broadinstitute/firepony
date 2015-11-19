@@ -65,6 +65,9 @@ struct runtime_options
     // enable the shared memory reference/dbsnp loader
     bool try_mmap;
 
+    // verbose mode
+    bool verbose;
+
     void disable_all_backends(void)
     {
         enable_cuda = false;
@@ -91,6 +94,8 @@ struct runtime_options
         cpu_threads = -1;
 
         try_mmap = false;
+
+        verbose = false;
     }
 };
 

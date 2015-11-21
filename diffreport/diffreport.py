@@ -68,8 +68,8 @@ class Error (ErrorBase):
 
     # logic to decide whether a given error can be waived
     def can_waive(self):
-        # waive relative differences smaller than 0.01%
-        if self.relative_delta < 0.01:
+        # waive relative differences smaller than 0.5%
+        if self.relative_delta < 0.5:
             return True
 
         # the following is useful when tracking down errors in order to ignore off-by-one deltas in discretized values

@@ -1,6 +1,9 @@
 /*
  * Firepony
- * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ *
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION
+ * Copyright (c) 2015, Nuno Subtil <subtil@gmail.com>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -9,21 +12,23 @@
  *    * Redistributions in binary form must reproduce the above copyright
  *      notice, this list of conditions and the following disclaimer in the
  *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of the NVIDIA CORPORATION nor the
- *      names of its contributors may be used to endorse or promote products
- *      derived from this software without specific prior written permission.
+ *    * Neither the name of the copyright holders nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL NVIDIA CORPORATION BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <lift/parallel.h>
 
 #include "device_types.h"
 #include "firepony_context.h"
@@ -31,8 +36,6 @@
 #include "cigar.h"
 
 #include "primitives/algorithms.h"
-#include "primitives/cuda.h"
-#include "primitives/parallel.h"
 
 namespace firepony {
 
@@ -165,7 +168,7 @@ struct compute_vcf_ranges : public lambda<system>
     {
         // check if we know the chromosome for this read
         auto ch = batch.chromosome[read_index];
-        if (ch >= ctx.variant_db.data.size())
+        if (ch >= ctx.variant_db.size())
         {
             // dbsnp does not reference this chromosome
             // mark read as inactive for VCF search and exit
@@ -173,7 +176,7 @@ struct compute_vcf_ranges : public lambda<system>
             return;
         }
 
-        const auto& db = ctx.variant_db.get_chromosome(ch);
+        const auto& db = ctx.variant_db.get_sequence(ch);
 
         // figure out the genome alignment window for this read
         const ushort2& reference_window_clipped = ctx.cigar.reference_window_clipped[read_index];
@@ -221,9 +224,9 @@ struct compute_vcf_ranges : public lambda<system>
 template <target_system system>
 struct vcf_active_predicate
 {
-    typename vector<system, uint2>::view vcf_active;
+    pointer<system, uint2> vcf_active;
 
-    vcf_active_predicate(typename vector<system, uint2>::view vcf_active)
+    vcf_active_predicate(pointer<system, uint2> vcf_active)
         : vcf_active(vcf_active)
     { }
 
@@ -241,7 +244,7 @@ struct filter_bps : public lambda<system>
 public:
     CUDA_HOST_DEVICE void operator() (const uint32 read_index)
     {
-        const auto& db = ctx.variant_db.get_chromosome(batch.chromosome[read_index]);
+        const auto& db = ctx.variant_db.get_sequence(batch.chromosome[read_index]);
 
         const CRQ_index& idx = batch.crq_index(read_index);
         const ushort2& read_window_clipped = ctx.cigar.read_window_clipped[read_index];
@@ -406,7 +409,7 @@ void filter_known_snps(firepony_context<system>& context, const alignment_batch<
 
     // build a list of reads with active VCF ranges
     snp.active_read_ids.resize(context.active_read_list.size());
-    context.temp_u32 = context.active_read_list;
+    context.temp_u32.copy(context.active_read_list);
 
     uint32 num_active;
     num_active = parallel<system>::copy_if(context.temp_u32.begin(),

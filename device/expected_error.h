@@ -27,7 +27,8 @@
 
 #pragma once
 
-#include "primitives/parallel.h"
+#include <lift/parallel.h>
+
 #include "firepony_context.h"
 #include "covariate_table.h"
 

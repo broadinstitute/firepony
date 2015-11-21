@@ -35,6 +35,9 @@
 #include <thrust/tuple.h>
 #include <thrust/functional.h>
 
+#include <lift/parallel.h>
+#include <lift/memory/strided_iterator.h>
+
 #include <stdlib.h>
 #include <math.h>
 
@@ -44,7 +47,6 @@
 #include "firepony_context.h"
 
 #include "primitives/util.h"
-#include "primitives/parallel.h"
 #include "from_nvbio/dna.h"
 #include "from_nvbio/alphabet.h"
 
@@ -61,7 +63,7 @@ struct baq_stride<cuda>
 };
 
 template <>
-struct baq_stride<intel_tbb>
+struct baq_stride<host>
 {
     static constexpr uint32 stride = 1;
 };
@@ -123,7 +125,7 @@ struct compute_hmm_windows : public lambda<system>
         hmm_reference_window.y = reference_window_clipped.y + right_insertion + offset;
 
         // figure out if the HMM window is contained inside the chromosome this read is aligned to
-        auto& reference = ctx.reference_db.get_chromosome(batch.chromosome[read_index]);
+        auto& reference = ctx.reference_db.get_sequence(batch.chromosome[read_index]);
 
         int left_window_shift = 0;
         if (hmm_reference_window.x < 0 && batch.alignment_start[read_index] < abs(hmm_reference_window.x))
@@ -212,11 +214,11 @@ typedef enum
 template <target_system system, uint32 phase>
 struct hmm_glocal : public lambda<system>
 {
-    typename vector<system, uint32>::view baq_state;
+    pointer<system, uint32> baq_state;
 
-    hmm_glocal(typename firepony_context<system>::view ctx,
-               const typename alignment_batch_device<system>::const_view batch,
-               typename vector<system, uint32>::view baq_state)
+    hmm_glocal(firepony_context<system> ctx,
+               const alignment_batch_device<system> batch,
+               pointer<system, uint32> baq_state)
         : lambda<system>(ctx, batch), baq_state(baq_state)
     { }
 
@@ -298,7 +300,7 @@ struct hmm_glocal : public lambda<system>
 //        printf("referenceStart = %u\n", referenceStart);
 //        printf("queryStart = %u queryLen = %u\n", queryStart, queryLen);
 
-        queryBases = batch.reads + idx.read_start + queryStart;
+        queryBases = batch.reads.stream() + idx.read_start + queryStart;
 
         // compute the starting offset of the HMM window inside the reference
         // this handles the case where a read aligns to the start of a chromosome by clamping the resulting offset to zero
@@ -713,13 +715,13 @@ struct compute_hmm_matrix_size_strided : public lambda<system>
 {
     LAMBDA_INHERIT_MEMBERS;
 
-    typename vector<system, uint32>::view active_read_list;
-    typename vector<system, uint32>::view matrix_size_output;
+    pointer<system, uint32> active_read_list;
+    pointer<system, uint32> matrix_size_output;
 
-    compute_hmm_matrix_size_strided(typename firepony_context<system>::view ctx,
-                                    const typename alignment_batch_device<system>::const_view batch,
-                                    typename vector<system, uint32>::view active_read_list,
-                                    typename vector<system, uint32>::view matrix_size_output)
+    compute_hmm_matrix_size_strided(firepony_context<system> ctx,
+                                    const alignment_batch_device<system> batch,
+                                    pointer<system, uint32> active_read_list,
+                                    pointer<system, uint32> matrix_size_output)
         : lambda<system>(ctx, batch),
           active_read_list(active_read_list),
           matrix_size_output(matrix_size_output)
@@ -752,9 +754,9 @@ struct compute_hmm_matrix_size_strided : public lambda<system>
 template <target_system system>
 struct stride_hmm_index
 {
-    typename vector<system, uint32>::view index;
+    pointer<system, uint32> index;
 
-    stride_hmm_index(typename vector<system, uint32>::view index)
+    stride_hmm_index(pointer<system, uint32> index)
         : index(index)
     { }
 
@@ -787,13 +789,13 @@ struct compute_hmm_scaling_factor_size_strided : public lambda<system>
 {
     LAMBDA_INHERIT;
 
-    typename vector<system, uint32>::const_view active_read_list;
-    typename vector<system, uint32>::view scaling_index_output;
+    const pointer<system, uint32> active_read_list;
+    pointer<system, uint32> scaling_index_output;
 
-    compute_hmm_scaling_factor_size_strided(typename firepony_context<system>::view ctx,
-                                            const typename alignment_batch_device<system>::const_view batch,
-                                            typename vector<system, uint32>::const_view active_read_list,
-                                            typename vector<system, uint32>::view scaling_index_output)
+    compute_hmm_scaling_factor_size_strided(firepony_context<system> ctx,
+                                            const alignment_batch_device<system> batch,
+                                            const pointer<system, uint32> active_read_list,
+                                            pointer<system, uint32> scaling_index_output)
         : lambda<system>(ctx, batch),
           active_read_list(active_read_list),
           scaling_index_output(scaling_index_output)
@@ -871,11 +873,11 @@ struct cap_baq_qualities : public lambda<system>
 {
     LAMBDA_INHERIT;
 
-    typename vector<system, uint32>::view baq_state;
+    const pointer<system, uint32> baq_state;
 
-    cap_baq_qualities(typename firepony_context<system>::view ctx,
-                      const typename alignment_batch_device<system>::const_view batch,
-                      typename vector<system, uint32>::view baq_state)
+    cap_baq_qualities(firepony_context<system> ctx,
+                      const alignment_batch_device<system> batch,
+                      const pointer<system, uint32> baq_state)
         : lambda<system>(ctx, batch), baq_state(baq_state)
     { }
 
@@ -1082,9 +1084,9 @@ template <target_system system>
 void baq_reads(firepony_context<system>& context, const alignment_batch<system>& batch)
 {
     struct baq_context<system>& baq = context.baq;
-    vector<system, uint32>& active_baq_read_list = context.temp_u32;
-    vector<system, uint32>& baq_state = context.temp_u32_2;
-    vector<system, uint32>& temp_active_list = context.temp_u32_3;
+    persistent_allocation<system, uint32>& active_baq_read_list = context.temp_u32;
+    persistent_allocation<system, uint32>& baq_state = context.temp_u32_2;
+    persistent_allocation<system, uint32>& temp_active_list = context.temp_u32_3;
     uint32 num_active;
 
     timer<system> baq_setup, baq_hmm, baq_postprocess;
@@ -1096,7 +1098,7 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
 
     // allocate our output
     baq.qualities.resize(batch.device.qualities.size());
-    thrust::fill(baq.qualities.begin(), baq.qualities.end(), uint8(-1));
+    thrust::fill(lift::backend_policy<system>::execution_policy(), baq.qualities.begin(), baq.qualities.end(), uint8(-1));
 
     // collect the reads that we need to compute BAQ for
     active_baq_read_list.resize(context.active_read_list.size());
@@ -1128,8 +1130,8 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
                                                hmm_window_valid<system>(context, batch.device),
                                                context.temp_storage);
 
-        active_baq_read_list = temp_active_list;
-        active_baq_read_list.resize(num_active);
+        temp_active_list.resize(num_active);
+        active_baq_read_list.copy(temp_active_list);
     }
 
     if (num_active)
@@ -1140,8 +1142,8 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
                                                            temp_active_list.begin(),
                                                            hmm_window_valid<system>(context, batch.device),
                                                            context.temp_storage);
-        context.active_read_list = temp_active_list;
-        context.active_read_list.resize(temp_num_active);
+        temp_active_list.resize(temp_num_active);
+        context.active_read_list.copy(temp_active_list);
 
         constexpr uint32 stride = baq_stride<system>::stride;
 
@@ -1150,7 +1152,7 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
             // compute the index and size of the HMM matrices
             baq.matrix_index.resize(num_active + 1);
             // first offset is zero
-            thrust::fill_n(baq.matrix_index.begin(), 1, 0);
+            thrust::fill_n(lift::backend_policy<system>::execution_policy(), baq.matrix_index.begin(), 1, 0);
 
             // do an inclusive scan to compute all offsets + the total size
             parallel<system>::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
@@ -1162,7 +1164,7 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
             // compute the index and size of the HMM scaling factors
             baq.scaling_index.resize(num_active + 1);
             // first offset is zero
-            thrust::fill_n(baq.scaling_index.begin(), 1, 0);
+            thrust::fill_n(lift::backend_policy<system>::execution_policy(), baq.scaling_index.begin(), 1, 0);
             parallel<system>::inclusive_scan(thrust::make_transform_iterator(active_baq_read_list.begin(),
                                                                              compute_hmm_scaling_factor_size<system>(context, batch.device)),
                                              num_active,
@@ -1177,8 +1179,8 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
             baq.matrix_index.resize(num_matrices + 1);
             baq.scaling_index.resize(num_matrices + 1);
             // first offset is zero
-            thrust::fill_n(baq.matrix_index.begin(), 1, 0);
-            thrust::fill_n(baq.scaling_index.begin(), 1, 0);
+            thrust::fill_n(lift::backend_policy<system>::execution_policy(), baq.matrix_index.begin(), 1, 0);
+            thrust::fill_n(lift::backend_policy<system>::execution_policy(), baq.scaling_index.begin(), 1, 0);
 
             // compute matrix sizes as the maximum size of each baq_stride groups of reads
             parallel<system>::for_each(thrust::make_counting_iterator(0u),
@@ -1209,8 +1211,8 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
                                        stride_hmm_index<system>(baq.scaling_index));
         }
 
-        uint32 matrix_len = baq.matrix_index[baq.matrix_index.size() - 1];
-        uint32 scaling_len = baq.scaling_index[baq.scaling_index.size() - 1];
+        uint32 matrix_len = baq.matrix_index.peek(baq.matrix_index.size() - 1);
+        uint32 scaling_len = baq.scaling_index.peek(baq.scaling_index.size() - 1);
 
         baq.forward.resize(matrix_len);
         baq.backward.resize(matrix_len);
@@ -1237,12 +1239,12 @@ void baq_reads(firepony_context<system>& context, const alignment_batch<system>&
 
 
         baq_state.resize(batch.device.qualities.size());
-        thrust::fill(baq_state.begin(), baq_state.end(), uint32(-1));
+        thrust::fill(lift::backend_policy<system>::execution_policy(), baq_state.begin(), baq_state.end(), uint32(-1));
 
         // initialize matrices and scaling factors
-        thrust::fill_n(baq.forward.begin(), baq.forward.size(), 0.0);
-        thrust::fill_n(baq.backward.begin(), baq.backward.size(), 0.0);
-        thrust::fill_n(baq.scaling.begin(), baq.scaling.size(), 0.0);
+        thrust::fill_n(lift::backend_policy<system>::execution_policy(), baq.forward.begin(), baq.forward.size(), 0.0);
+        thrust::fill_n(lift::backend_policy<system>::execution_policy(), baq.backward.begin(), baq.backward.size(), 0.0);
+        thrust::fill_n(lift::backend_policy<system>::execution_policy(), baq.scaling.begin(), baq.scaling.size(), 0.0);
 
         baq_setup.stop();
 

@@ -42,14 +42,10 @@ from_nvbio/alphabet.h
 from_nvbio/dna.h
 
 primitives/algorithms.h
-primitives/backends.h
-primitives/cuda.h
 primitives/packed_stream_packer.h
 primitives/packed_stream.h
 primitives/packed_vector.h
-primitives/parallel.h
 primitives/util.h
-primitives/vector.h
 )
 
 cuda_add_library(firepony-device ${firepony_sources})

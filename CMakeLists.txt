@@ -22,10 +22,10 @@ option(FORCE_TSX_OFF
 
 # if the environment variable FIREPONY_GPU_ARCHITECTURE exists, take the list of architectures from it
 if (DEFINED ENV{FIREPONY_GPU_ARCHITECTURE})
-    set(GPU_ARCHITECTURE $ENV{FIREPONY_GPU_ARCHITECTURE} CACHE STRING "GPU architectures to generate code for (defaults to sm_30, sm_35, sm_37)")
+    set(GPU_ARCHITECTURE $ENV{FIREPONY_GPU_ARCHITECTURE} CACHE STRING "GPU architectures to generate code for (defaults to sm_30, sm_35, sm_52)")
 else ()
     # allow setting the list of GPU architectures on the command line
-    set(GPU_ARCHITECTURE "sm_30,sm_35,sm_37" CACHE STRING "GPU architectures to generate code for (defaults to sm_30, sm_35, sm_37)")
+    set(GPU_ARCHITECTURE "sm_30,sm_35,sm_52" CACHE STRING "GPU architectures to generate code for (defaults to sm_30, sm_35, sm_52)")
 endif ()
 
 if (ENABLE_CUDA_BACKEND)
@@ -62,13 +62,20 @@ endif()
 # CUDA 7.0 is required to build
 find_package(CUDA 7.0 REQUIRED)
 # enable C++11 support
-set(CUDA_NVCC_FLAGS "-std=c++11")
+list(APPEND CUDA_NVCC_FLAGS "-std=c++11")
+# enable device lambda support
+#list(APPEND CUDA_NVCC_FLAGS "--expt-extended-lambda")
 # build for Kepler
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -use_fast_math)
 
 # add nvcc flags to generate code for all enabled architectures
-# PTX is generated for compute_30 and included in the binary
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} --gpu-architecture=compute_30 --gpu-code=compute_30,${GPU_ARCHITECTURE})
+string(REPLACE "," ";" GPU_ARCHITECTURE ${GPU_ARCHITECTURE})
+foreach(ARCH IN LISTS GPU_ARCHITECTURE)
+    string(REPLACE "sm_" "compute_" COMPUTE ${ARCH})
+    set(CUDA_NVCC_FLAGS
+        ${CUDA_NVCC_FLAGS}
+        --generate-code arch=${COMPUTE},code=${ARCH})
+endforeach(ARCH)
 
 if (USE_EXTERNAL_THRUST)
     # inject our Thrust include path to override the CUDA toolkit include path
@@ -95,6 +102,7 @@ else()
 endif()
 
 include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/modules)
 
 add_subdirectory(device)
 

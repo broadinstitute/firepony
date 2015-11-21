@@ -43,7 +43,7 @@
 #include "fractional_errors.h"
 #include "util.h"
 
-#include "device/primitives/timer.h"
+#include <lift/timer.h>
 
 namespace firepony {
 
@@ -131,30 +131,31 @@ struct firepony_context
 
     const runtime_options& options;
 
-    const alignment_header<system>& bam_header;
-    const variant_database<system>& variant_db;
-    const sequence_database<system>& reference_db;
+    const alignment_header<system> bam_header;
+    // note: these two are const but are expected to be updated in update_databases()
+    const sequence_database_storage<system> reference_db;
+    const variant_database_storage<system> variant_db;
 
     // sorted list of active reads
-    vector<system, uint32> active_read_list;
+    persistent_allocation<system, uint32> active_read_list;
     // alignment windows for each read in chromosome coordinates
-    vector<system, uint2> alignment_windows;
+    persistent_allocation<system, uint2> alignment_windows;
 
     // list of active BP locations
     // we match the BP representation size to avoid RMW hazards at the edges of reads
     vector_dna16<system> active_location_list;
     // list of read offsets in the reference for each BP (relative to the alignment start position)
-    vector<system, uint16> read_offset_list;
+    persistent_allocation<system, uint16> read_offset_list;
 
     // temporary storage for CUB calls
-    vector<system, uint8> temp_storage;
+    persistent_allocation<system, uint8> temp_storage;
 
     // and more temporary storage
-    vector<system, uint32> temp_u32;
-    vector<system, uint32> temp_u32_2;
-    vector<system, uint32> temp_u32_3;
-    vector<system, uint32> temp_u32_4;
-    vector<system, uint8>  temp_u8;
+    persistent_allocation<system, uint32> temp_u32;
+    persistent_allocation<system, uint32> temp_u32_2;
+    persistent_allocation<system, uint32> temp_u32_3;
+    persistent_allocation<system, uint32> temp_u32_4;
+    persistent_allocation<system, uint8>  temp_u8;
 
     // various pipeline states go here
     snp_filter_context<system> snp_filter;
@@ -168,63 +169,16 @@ struct firepony_context
 
     firepony_context(const int compute_device,
                      const runtime_options& options,
-                     const alignment_header<system>& bam_header,
-                     const sequence_database<system>& reference_db,
-                     const variant_database<system>& variant_db)
+                     const alignment_header<system> bam_header)
         : compute_device(compute_device),
           options(options),
           bam_header(bam_header),
-          reference_db(reference_db),
-          variant_db(variant_db)
+          reference_db(),
+          variant_db()
     { }
 
-    struct view
-    {
-        typename alignment_header_device<system>::const_view    bam_header;
-        typename variant_database_device<system>::const_view    variant_db;
-        typename sequence_database_device<system>::const_view   reference_db;
-        typename vector<system, uint32>::view                   active_read_list;
-        typename vector<system, uint2>::view                    alignment_windows;
-        typename vector_dna16<system>::view                     active_location_list;
-        typename vector<system, uint16>::view                   read_offset_list;
-        typename vector<system, uint8>::view                    temp_storage;
-        typename vector<system, uint32>::view                   temp_u32;
-        typename vector<system, uint32>::view                   temp_u32_2;
-        typename vector<system, uint32>::view                   temp_u32_3;
-        typename vector<system, uint32>::view                   temp_u32_4;
-        typename vector<system, uint8>::view                    temp_u8;
-        typename snp_filter_context<system>::view               snp_filter;
-        typename cigar_context<system>::view                    cigar;
-        typename baq_context<system>::view                      baq;
-        typename covariates_context<system>::view               covariates;
-        typename fractional_error_context<system>::view         fractional_error;
-    };
-
-    operator view()
-    {
-        view v = {
-            bam_header.device,
-            variant_db.device,
-            reference_db.device,
-            active_read_list,
-            alignment_windows,
-            active_location_list,
-            read_offset_list,
-            temp_storage,
-            temp_u32,
-            temp_u32_2,
-            temp_u32_3,
-            temp_u32_4,
-            temp_u8,
-            snp_filter,
-            cigar,
-            baq,
-            covariates,
-            fractional_error,
-        };
-
-        return v;
-    }
+    void update_databases(const sequence_database_storage<system>& reference_db,
+                          const variant_database_storage<system>& variant_db);
 
     void start_batch(const alignment_batch<system>& batch);
     void end_batch(const alignment_batch<system>& batch);
@@ -234,11 +188,11 @@ struct firepony_context
 template <target_system system>
 struct lambda
 {
-    typename firepony_context<system>::view ctx;
-    const typename alignment_batch_device<system>::const_view batch;
+    firepony_context<system> ctx;
+    const alignment_batch_device<system> batch;
 
-    lambda(typename firepony_context<system>::view ctx,
-           const typename alignment_batch_device<system>::const_view batch)
+    lambda(firepony_context<system> ctx,
+           const alignment_batch_device<system> batch)
         : ctx(ctx),
           batch(batch)
     { }
@@ -249,9 +203,9 @@ struct lambda
 template <target_system system>
 struct lambda_context
 {
-    typename firepony_context<system>::view ctx;
+    firepony_context<system> ctx;
 
-    lambda_context(typename firepony_context<system>::view ctx)
+    lambda_context(firepony_context<system> ctx)
         : ctx(ctx)
     { }
 };

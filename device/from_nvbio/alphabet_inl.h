@@ -29,7 +29,6 @@
 
 #include "../../types.h"
 #include "dna.h"
-#include "../primitives/cuda.h"
 
 namespace firepony {
 

@@ -109,7 +109,7 @@ static void enumerate_gpus(std::vector<firepony_pipeline *>& ret)
         if (prop.totalGlobalMem < size_t(4095) * 1024 * 1024)
             continue;
 
-        firepony_pipeline *pipeline = firepony_pipeline::create(firepony::cuda, dev);
+        firepony_pipeline *pipeline = firepony_pipeline::create(lift::cuda, dev);
         ret.push_back(pipeline);
     }
 }
@@ -129,7 +129,7 @@ static std::vector<firepony_pipeline *> enumerate_compute_devices(void)
     if (command_line_options.enable_tbb)
     {
         firepony_pipeline *dev;
-        dev = firepony_pipeline::create(firepony::intel_tbb, compute_device_count + 1);
+        dev = firepony_pipeline::create(lift::host, compute_device_count + 1);
         ret.push_back(dev);
     }
 #endif
@@ -262,6 +262,19 @@ int main(int argc, char **argv)
         {
             exit(1);
         }
+    }
+
+    if (command_line_options.verbose)
+    {
+        fprintf(stderr, "original command line: ");
+        for(int i = 1; i < argc; i++)
+        {
+            fprintf(stderr, "%s ", argv[i]);
+        }
+        fprintf(stderr, "\n");
+
+        fprintf(stderr, "computed command line: %s\n", canonical_command_line().c_str());
+        fprintf(stderr, "\n");
     }
 
     timer<host> data_io;

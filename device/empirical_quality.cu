@@ -25,7 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "primitives/parallel.h"
+#include <lift/parallel.h>
+
 #include "firepony_context.h"
 #include "covariate_table.h"
 

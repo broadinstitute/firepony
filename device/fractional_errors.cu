@@ -1,6 +1,9 @@
 /*
  * Firepony
- * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ *
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION
+ * Copyright (c) 2015, Nuno Subtil <subtil@gmail.com>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -9,26 +12,27 @@
  *    * Redistributions in binary form must reproduce the above copyright
  *      notice, this list of conditions and the following disclaimer in the
  *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of the NVIDIA CORPORATION nor the
- *      names of its contributors may be used to endorse or promote products
- *      derived from this software without specific prior written permission.
+ *    * Neither the name of the copyright holders nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL NVIDIA CORPORATION BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <lift/parallel.h>
 
 #include "firepony_context.h"
 #include "util.h"
 #include "baq.h"
-#include "primitives/parallel.h"
 
 namespace firepony {
 
@@ -38,19 +42,19 @@ struct compute_fractional_errors : public lambda<system>
 {
     LAMBDA_INHERIT_MEMBERS;
 
-    typename packed_vector<system, 1>::const_view error_vector;
-    typename vector<system, double>::view output_vector;
+    const packed_vector<system, 1> error_vector;
+    pointer<system, double> output_vector;
 
-    compute_fractional_errors(typename firepony_context<system>::view ctx,
-                              const typename alignment_batch_device<system>::const_view batch,
-                              const typename packed_vector<system, 1>::const_view error_vector,
-                              typename vector<system, double>::view output_vector)
+    compute_fractional_errors(firepony_context<system> ctx,
+                              const alignment_batch_device<system> batch,
+                              const packed_vector<system, 1> error_vector,
+                              pointer<system, double> output_vector)
         : lambda<system>(ctx, batch), error_vector(error_vector), output_vector(output_vector)
     { }
 
     CUDA_HOST_DEVICE void calculateAndStoreErrorsInBlock(const int iii,
                                                          const int blockStartIndex,
-                                                         const typename packed_vector<system, 1>::const_view errorArray,
+                                                         const typename packed_vector<system, 1>::const_stream_type errorArray,
                                                          double *fractionalErrors)
     {
         int totalErrors = 0;
@@ -72,7 +76,7 @@ struct compute_fractional_errors : public lambda<system>
         const uint8 *baqArray = &ctx.baq.qualities[idx.qual_start] + read_window.x;
 
         // offset the error array by read_window.x to simulate hard clipping of soft clipped bases
-        auto errorArray = error_vector + (idx.read_start + read_window.x);
+        auto errorArray = error_vector.stream() + (idx.read_start + read_window.x);
 
         constexpr int BLOCK_START_UNSET = -1;
 
@@ -121,9 +125,9 @@ void build_fractional_error_arrays(firepony_context<system>& context, const alig
     frac.insertion_errors.resize(context.baq.qualities.size());
     frac.deletion_errors.resize(context.baq.qualities.size());
 
-    thrust::fill(frac.snp_errors.begin(), frac.snp_errors.end(), 0.0);
-    thrust::fill(frac.insertion_errors.begin(), frac.insertion_errors.end(), 0.0);
-    thrust::fill(frac.deletion_errors.begin(), frac.deletion_errors.end(), 0.0);
+    thrust::fill(lift::backend_policy<system>::execution_policy(), frac.snp_errors.begin(), frac.snp_errors.end(), 0.0);
+    thrust::fill(lift::backend_policy<system>::execution_policy(), frac.insertion_errors.begin(), frac.insertion_errors.end(), 0.0);
+    thrust::fill(lift::backend_policy<system>::execution_policy(), frac.deletion_errors.begin(), frac.deletion_errors.end(), 0.0);
 
     parallel<system>::for_each(context.active_read_list.begin(),
                                context.active_read_list.end(),
@@ -138,4 +142,3 @@ void build_fractional_error_arrays(firepony_context<system>& context, const alig
 INSTANTIATE(build_fractional_error_arrays);
 
 } // namespace firepony
-

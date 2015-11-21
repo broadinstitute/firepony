@@ -1,6 +1,9 @@
 /*
  * Firepony
- * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ *
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION
+ * Copyright (c) 2015, Nuno Subtil <subtil@gmail.com>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -9,20 +12,20 @@
  *    * Redistributions in binary form must reproduce the above copyright
  *      notice, this list of conditions and the following disclaimer in the
  *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of the NVIDIA CORPORATION nor the
- *      names of its contributors may be used to endorse or promote products
- *      derived from this software without specific prior written permission.
+ *    * Neither the name of the copyright holders nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL NVIDIA CORPORATION BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "from_nvbio/dna.h"
@@ -30,14 +33,13 @@
 #include <thrust/iterator/transform_iterator.h>
 #include <thrust/functional.h>
 
+#include <lift/parallel.h>
+
 #include "cigar.h"
 #include "device_types.h"
 #include "firepony_context.h"
 #include "alignment_data_device.h"
 #include "util.h"
-
-#include "primitives/cuda.h"
-#include "primitives/parallel.h"
 
 namespace firepony {
 
@@ -616,15 +618,15 @@ struct compute_error_vectors : public lambda<system>
 {
     LAMBDA_INHERIT_MEMBERS;
 
-    typename vector<system, uint8>::view snp_vector;
-    typename vector<system, uint8>::view ins_vector;
-    typename vector<system, uint8>::view del_vector;
+    pointer<system, uint8> snp_vector;
+    pointer<system, uint8> ins_vector;
+    pointer<system, uint8> del_vector;
 
-    compute_error_vectors(typename firepony_context<system>::view ctx,
-                          const typename alignment_batch_device<system>::const_view batch,
-                          typename vector<system, uint8>::view snp_vector,
-                          typename vector<system, uint8>::view ins_vector,
-                          typename vector<system, uint8>::view del_vector)
+    compute_error_vectors(firepony_context<system> ctx,
+                          const alignment_batch_device<system> batch,
+                          pointer<system, uint8> snp_vector,
+                          pointer<system, uint8> ins_vector,
+                          pointer<system, uint8> del_vector)
         : lambda<system>(ctx, batch),
           snp_vector(snp_vector),
           ins_vector(ins_vector),
@@ -821,7 +823,7 @@ void expand_cigars(firepony_context<system>& context, const alignment_batch<syst
     ctx.cigar_offsets.resize(batch.device.cigars.size() + 1);
 
     // mark the first offset as 0
-    thrust::fill_n(ctx.cigar_offsets.begin(), 1, 0);
+    thrust::fill_n(lift::backend_policy<system>::execution_policy(), ctx.cigar_offsets.begin(), 1, 0);
     // do an inclusive scan to compute all offsets + the total size
     parallel<system>::inclusive_scan(thrust::make_transform_iterator(batch.device.cigars.begin(), cigar_op_len()),
                                      batch.device.cigars.size(),
@@ -829,7 +831,7 @@ void expand_cigars(firepony_context<system>& context, const alignment_batch<syst
                                      thrust::plus<uint32>());
 
     // read back the last element, which contains the size of the buffer required
-    uint32 expanded_cigar_len = ctx.cigar_offsets[batch.device.cigars.size()];
+    uint32 expanded_cigar_len = ctx.cigar_offsets.peek(batch.device.cigars.size());
 
     // make sure we have enough room for the expanded cigars
     // note: temporary storage must be padded to a multiple of the word size, since we'll pack whole words at a time
@@ -850,11 +852,11 @@ void expand_cigars(firepony_context<system>& context, const alignment_batch<syst
     ctx.num_errors.resize(batch.device.num_reads);
 
     // initialize num_errors to zero
-    thrust::fill(ctx.num_errors.begin(), ctx.num_errors.end(), 0);
+    thrust::fill(lift::backend_policy<system>::execution_policy(), ctx.num_errors.begin(), ctx.num_errors.end(), 0);
 
     // cigar_events_read_index is initialized to -1; this means that all reads are considered inactive
     // it will be filled in during cigar coordinate expansion to mark active reads
-    thrust::fill(ctx.cigar_event_read_index.begin(), ctx.cigar_event_read_index.end(), uint32(-1));
+    thrust::fill(lift::backend_policy<system>::execution_policy(), ctx.cigar_event_read_index.begin(), ctx.cigar_event_read_index.end(), uint32(-1));
 
     // expand the cigar ops into temp storage (xxxnsubtil: same as above, active read list is ignored)
     parallel<system>::for_each(thrust::make_counting_iterator(0),
@@ -905,9 +907,9 @@ void expand_cigars(firepony_context<system>& context, const alignment_batch<syst
     // this also counts the number of errors in each read
     // note: we compute the error bit vectors into uint8 then pack these into 1-bit-per-bp vectors
     // this is to avoid RMW hazards across threads, as the number of symbols per word won't match that of the read vectors themselves
-    vector<system, uint8>& snp_error = context.temp_storage;
-    vector<system, uint8>& ins_error = context.temp_u8;
-    vector<system, uint8> del_error;
+    allocation<system, uint8>& snp_error = context.temp_storage;
+    allocation<system, uint8>& ins_error = context.temp_u8;
+    scoped_allocation<system, uint8> del_error;
 
     // set up the temp storage for packing into 1bit
     size_t len = batch.device.reads.size();
@@ -916,9 +918,9 @@ void expand_cigars(firepony_context<system>& context, const alignment_batch<syst
     pack_prepare_storage_1bit(del_error, len);
 
     // initialize temp storage to zero
-    thrust::fill(snp_error.begin(), snp_error.end(), 0);
-    thrust::fill(ins_error.begin(), ins_error.end(), 0);
-    thrust::fill(del_error.begin(), del_error.end(), 0);
+    thrust::fill(lift::backend_policy<system>::execution_policy(), snp_error.begin(), snp_error.end(), 0);
+    thrust::fill(lift::backend_policy<system>::execution_policy(), ins_error.begin(), ins_error.end(), 0);
+    thrust::fill(lift::backend_policy<system>::execution_policy(), del_error.begin(), del_error.end(), 0);
 
     // compute the error bit vectors into temp storage
     parallel<system>::for_each(context.active_read_list.begin(),
@@ -1110,8 +1112,9 @@ void debug_cigar(firepony_context<system>& context, const alignment_batch<system
     }
     fprintf(stderr, "]\n");
 
-    auto reference = context.reference_db.host.view().get_sequence_data(h_batch.chromosome[read_index],
-                                                                        h_batch.alignment_start[read_index]);
+    const auto& reference_db = ((const sequence_database_storage<system>) context.reference_db);
+    const auto& reference = reference_db.get_sequence_data(h_batch.chromosome[read_index],
+                                                           h_batch.alignment_start[read_index]);
 
     fprintf(stderr, "    reference sequence data     = [ ");
     for(uint32 i = cigar_start; i < cigar_end; i++)

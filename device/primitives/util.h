@@ -1,6 +1,9 @@
 /*
  * Firepony
- * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ *
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION
+ * Copyright (c) 2015, Nuno Subtil <subtil@gmail.com>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -9,20 +12,20 @@
  *    * Redistributions in binary form must reproduce the above copyright
  *      notice, this list of conditions and the following disclaimer in the
  *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of the NVIDIA CORPORATION nor the
- *      names of its contributors may be used to endorse or promote products
- *      derived from this software without specific prior written permission.
+ *    * Neither the name of the copyright holders nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL NVIDIA CORPORATION BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #pragma once
@@ -75,6 +78,26 @@ template <typename T>
 inline CUDA_HOST_DEVICE T max(const T a, const T b)
 {
     return (a > b ? a : b);
+}
+
+template <target_system sys_dest, target_system sys_source, typename T>
+inline void cross_device_copy(int dest_device, allocation<sys_dest, T>& dest, size_t dest_offset,
+                              int source_device, allocation<sys_source, T>& source, size_t source_offset,
+                              size_t len)
+{
+#if ENABLE_CUDA_BACKEND
+    if (sys_dest == cuda && sys_source == cuda)
+    {
+        T *ptr_src;
+        T *ptr_dest;
+
+        ptr_src = source.data() + source_offset;
+        ptr_dest = dest.data() + dest_offset;
+
+        cudaMemcpyPeer(ptr_dest, dest_device, ptr_src, source_device, len * sizeof(T));
+    } else
+#endif
+        thrust::copy_n(source.t_begin() + source_offset, len, dest.t_begin() + dest_offset);
 }
 
 } // namespace firepony

@@ -1,0 +1,3 @@
+[submodule "modules/lift"]
+	path = modules/lift
+	url = https://github.com/nsubtil/lift.git

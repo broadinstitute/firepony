@@ -32,6 +32,10 @@
 namespace firepony {
 
 extern runtime_options command_line_options;
+
+// parse argc, argv into command_line_options
 void parse_command_line(int argc, char **argv);
+// reconstruct a canonical command line from command_line_options
+std::string canonical_command_line(void);
 
 } // namespace firepony

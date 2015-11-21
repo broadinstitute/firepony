@@ -31,18 +31,30 @@
 namespace firepony {
 
 template <target_system system>
+void firepony_context<system>::update_databases(const sequence_database_storage<system>& reference_db,
+                                                const variant_database_storage<system>& variant_db)
+{
+    // update our database pointers
+    const_cast<sequence_database_storage<system>&> (this->reference_db) = reference_db;
+    const_cast<variant_database_storage<system>&> (this->variant_db) = variant_db;
+}
+METHOD_INSTANTIATE(firepony_context, update_databases);
+
+template <target_system system>
 void firepony_context<system>::start_batch(const alignment_batch<system>& batch)
 {
     // initialize the read order with 0..N
     active_read_list.resize(batch.host->num_reads);
-    thrust::copy(thrust::make_counting_iterator(0),
+    thrust::copy(lift::backend_policy<system>::execution_policy(),
+                 thrust::make_counting_iterator(0),
                  thrust::make_counting_iterator(0) + batch.host->num_reads,
                  active_read_list.begin());
 
     // set up the active location list to cover all of the current batch
     active_location_list.resize(batch.host->reads.size());
     // mark all BPs as active
-    thrust::fill(active_location_list.m_storage.begin(),
+    thrust::fill(lift::backend_policy<system>::execution_policy(),
+                 active_location_list.m_storage.begin(),
                  active_location_list.m_storage.end(),
                  0xffffffff);
 }

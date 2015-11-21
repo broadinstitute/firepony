@@ -1,6 +1,9 @@
 /*
  * Firepony
- * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ *
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION
+ * Copyright (c) 2015, Nuno Subtil <subtil@gmail.com>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -9,20 +12,20 @@
  *    * Redistributions in binary form must reproduce the above copyright
  *      notice, this list of conditions and the following disclaimer in the
  *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of the NVIDIA CORPORATION nor the
- *      names of its contributors may be used to endorse or promote products
- *      derived from this software without specific prior written permission.
+ *    * Neither the name of the copyright holders nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL NVIDIA CORPORATION BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #pragma once
@@ -58,14 +61,8 @@ struct covariate_table
 {
     typedef covariate_value value_type;
 
-    vector<system, covariate_key> keys;
-    vector<system, covariate_value> values;
-
-    covariate_table()
-    {
-        keys.resize(0);
-        values.resize(0);
-    }
+    persistent_allocation<system, covariate_key> keys;
+    persistent_allocation<system, covariate_value> values;
 
     void resize(size_t size)
     {
@@ -85,8 +82,8 @@ struct covariate_table
         keys.resize(other.keys.size());
         values.resize(other.values.size());
 
-        thrust::copy(other.keys.begin(), other.keys.end(), keys.begin());
-        thrust::copy(other.values.begin(), other.values.end(), values.begin());
+        thrust::copy(other.keys.t_begin(), other.keys.t_end(), keys.t_begin());
+        thrust::copy(other.values.t_begin(), other.values.t_end(), values.t_begin());
     }
 
     // cross-device table concatenation
@@ -106,19 +103,19 @@ struct covariate_table
                           other.values.size());
     }
 
-    void sort(vector<system, covariate_key>& temp_keys,
-              vector<system, covariate_value>& temp_values,
-              vector<system, uint8>& temp_storage,
+    void sort(allocation<system, covariate_key>& temp_keys,
+              allocation<system, covariate_value>& temp_values,
+              allocation<system, uint8>& temp_storage,
               uint32 num_key_bits);
 
-    void pack(vector<system, covariate_key>& temp_keys,
-              vector<system, covariate_value>& temp_values,
-              vector<system, uint8>& temp_storage);
+    void pack(allocation<system, covariate_key>& temp_keys,
+              allocation<system, covariate_value>& temp_values,
+              allocation<system, uint8>& temp_storage);
 
     struct view
     {
-        typename vector<system, uint32>::view keys;
-        typename vector<system, covariate_value>::view values;
+        pointer<system, uint32> keys;
+        pointer<system, covariate_value> values;
     };
 
     operator view()

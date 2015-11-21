@@ -1,6 +1,9 @@
 /*
  * Firepony
- * Copyright (c) 2014-2015, NVIDIA CORPORATION. All rights reserved.
+ *
+ * Copyright (c) 2014-2015, NVIDIA CORPORATION
+ * Copyright (c) 2015, Nuno Subtil <subtil@gmail.com>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -9,20 +12,20 @@
  *    * Redistributions in binary form must reproduce the above copyright
  *      notice, this list of conditions and the following disclaimer in the
  *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of the NVIDIA CORPORATION nor the
- *      names of its contributors may be used to endorse or promote products
- *      derived from this software without specific prior written permission.
+ *    * Neither the name of the copyright holders nor the names of its
+ *      contributors may be used to endorse or promote products derived from
+ *      this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL NVIDIA CORPORATION BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "../types.h"
@@ -37,7 +40,6 @@
 #include "covariates/packer_quality_score.h"
 
 #include "primitives/util.h"
-#include "primitives/parallel.h"
 
 #include "../table_formatter.h"
 
@@ -136,8 +138,8 @@ static void build_covariates_table(covariate_observation_table<system>& table, f
     auto& cv = context.covariates;
     auto& scratch_table = cv.scratch_table_space;
 
-    firepony::vector<system, covariate_observation_value> temp_values;
-    firepony::vector<system, covariate_key> temp_keys;
+    scoped_allocation<system, covariate_observation_value> temp_values;
+    scoped_allocation<system, covariate_key> temp_keys;
 
     timer<system> covariates_gather, covariates_filter, covariates_sort, covariates_pack;
 
@@ -147,7 +149,8 @@ static void build_covariates_table(covariate_observation_table<system>& table, f
     scratch_table.resize(context.cigar.cigar_events.size() * 3);
 
     // mark all keys as invalid
-    thrust::fill(scratch_table.keys.begin(),
+    thrust::fill(lift::backend_policy<system>::execution_policy(),
+                 scratch_table.keys.begin(),
                  scratch_table.keys.end(),
                  covariate_key(-1));
 
@@ -265,8 +268,8 @@ template <target_system system> void postprocess_covariates(firepony_context<sys
 
     // sort and pack all tables
     // this is required because we may have collected results from different devices
-    vector<system, covariate_observation_value> temp_values;
-    vector<system, covariate_key> temp_keys;
+    scoped_allocation<system, covariate_observation_value> temp_values;
+    scoped_allocation<system, covariate_key> temp_keys;
 
     cv.quality.sort(temp_keys, temp_values, context.temp_storage, covariate_packer_quality_score<system>::chain::bits_used);
     cv.quality.pack(temp_keys, temp_values, context.temp_storage);

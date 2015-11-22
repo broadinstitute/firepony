@@ -191,7 +191,7 @@ static uint32 choose_batch_size(const std::vector<firepony_pipeline *>& devices)
     return batch_size;
 }
 
-static void print_statistics(const timer<host>& wall_clock, const pipeline_statistics& stats, int num_devices = 1)
+static void print_statistics(timer<host>& wall_clock, const pipeline_statistics& stats, int num_devices = 1)
 {
     fprintf(stderr, "   blocked on io: %.4f (%.2f%%)\n", stats.io.elapsed_time, stats.io.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
     fprintf(stderr, "   read filtering: %.4f (%.2f%%)\n", stats.read_filter.elapsed_time, stats.read_filter.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);

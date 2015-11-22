@@ -139,15 +139,17 @@ static std::vector<firepony_pipeline *> enumerate_compute_devices(void)
 
 static uint32 choose_batch_size(const std::vector<firepony_pipeline *>& devices)
 {
-    size_t min_gpu_memory = std::numeric_limits<uint32>::max();
+    size_t min_gpu_memory = std::numeric_limits<size_t>::max();
     // max batch is 20k
     uint32 batch_size = 20000;
+    uint32 num_gpus = 0;
 
 #if ENABLE_CUDA_BACKEND
     for(const auto dev : devices)
     {
         if (dev->get_system() == firepony::cuda)
         {
+            num_gpus++;
             min_gpu_memory = std::min(min_gpu_memory, dev->get_total_memory());
         }
     }
@@ -178,6 +180,13 @@ static uint32 choose_batch_size(const std::vector<firepony_pipeline *>& devices)
 #undef GBYTES
 
 #endif // if ENABLE_CUDA_BACKEND
+
+    if (num_gpus == 0)
+    {
+        // CPUs strongly prefer small batches
+        // override the batch size to 1000 for CPU-only runs
+        batch_size = 1000;
+    }
 
     return batch_size;
 }

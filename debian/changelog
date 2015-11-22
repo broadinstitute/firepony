@@ -1,3 +1,12 @@
+firepony (1.1.0-1) unstable; urgency=medium
+
+  * Fix batch size selection. This improves performance on most
+    configurations.
+  * Added 'verbose' mode which logs runtime parameters
+  * Internal rewrite on top of Lift primitives (not user visible)
+
+ -- Nuno Subtil <subtil@gmail;.com>  Sat, 21 Nov 2015 17:58:37 -0800
+
 firepony (1.0.1-1) unstable; urgency=medium
 
   * BAQ phase performance improvements

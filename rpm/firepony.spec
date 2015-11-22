@@ -47,6 +47,11 @@ make VERBOSE=1 %{?_smp_mflags}
 /usr/bin/firepony-loader
 
 %changelog
+* Sat Nov 21 2015 Nuno Subtil <subtil at gmail.com> - 1.1.0
+- Fix batch size selection, improving performance on most configurations
+- Added 'verbose' mode which logs runtime parameters
+- Internal rewrite on top of Lift primitives (not user visible)
+
 * Sun Oct 10 2015 Nuno Subtil <subtil at gmail.com> - 1.0.1
 - BAQ phase performance improvements
 

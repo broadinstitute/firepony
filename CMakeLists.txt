@@ -69,6 +69,8 @@ else()
     set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -O3 -lineinfo -g")
 endif()
 
+include("cmake-local/build_info.cmake")
+
 include_directories(${CMAKE_SOURCE_DIR})
 
 add_subdirectory(device)

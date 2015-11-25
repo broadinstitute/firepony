@@ -52,6 +52,18 @@
 
 using namespace firepony;
 
+#include <build_info.h>
+
+static void output_build_info(void)
+{
+    fprintf(stderr, "  Build host: %s (%s)\n", build_info::host, build_info::host_system);
+    fprintf(stderr, "  C compiler: %s %s\n", build_info::c_compiler, build_info::c_compiler_version);
+    fprintf(stderr, "  C++ compiler: %s %s\n", build_info::cxx_compiler, build_info::cxx_compiler_version);
+    fprintf(stderr, "  CUDA toolkit version: %s (%s)\n", build_info::cuda_version, build_info::cuda_toolkit);
+    fprintf(stderr, "  Firepony commit: %s\n", build_info::build_commit);
+    fprintf(stderr, "\n");
+}
+
 static bool cuda_runtime_init(std::string& ret)
 {
     cudaError_t err;
@@ -220,6 +232,11 @@ int main(int argc, char **argv)
 
     fprintf(stderr, "Firepony v%d.%d.%d\n", FIREPONY_VERSION_MAJOR, FIREPONY_VERSION_MINOR, FIREPONY_VERSION_REV);
     parse_command_line(argc, argv);
+
+    if (command_line_options.verbose)
+    {
+        output_build_info();
+    }
 
     if (command_line_options.enable_cuda)
     {

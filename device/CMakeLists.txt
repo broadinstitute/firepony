@@ -49,14 +49,4 @@ primitives/util.h
 )
 
 cuda_add_library(firepony-device ${firepony_sources})
-add_dependencies(firepony-device zlib htslib)
-if (ENABLE_CPU_BACKEND)
-    add_dependencies(firepony-device tbb)
-endif()
-
-if (ENABLE_CUDA_BACKEND)
-    add_dependencies(firepony-device cub)
-    if (USE_EXTERNAL_THRUST)
-        add_dependencies(firepony-device thrust)
-    endif()
-endif()
+add_dependencies(firepony-device zlib htslib lift)

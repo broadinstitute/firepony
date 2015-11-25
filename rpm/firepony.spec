@@ -1,6 +1,6 @@
 Summary:            Quality score recalibrator for DNA sequencing data
 Name:               firepony
-Version:            1.0.1
+Version:            1.1.1
 Release:            21%{?dist}
 License:            BSD
 Group:              Engineering and Scientific
@@ -47,6 +47,10 @@ make VERBOSE=1 %{?_smp_mflags}
 /usr/bin/firepony-loader
 
 %changelog
+* Wed Nov 25 2015 Nuno Subtil <subtil at gmail.com> - 1.1.1
+- Lift updates. No user visible changes apart from more accurate CPU detection.
+- Added build information to the binary.
+
 * Sat Nov 21 2015 Nuno Subtil <subtil at gmail.com> - 1.1.0
 - Fix batch size selection, improving performance on most configurations
 - Added 'verbose' mode which logs runtime parameters

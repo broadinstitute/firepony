@@ -36,12 +36,13 @@
 #include "../command_line.h"
 
 #include <lift/backends.h>
+#include <lift/sys/compute_device.h>
 
 #include <thread>
 
-#if ENABLE_TBB_BACKEND
+#include <lift/sys/cuda/compute_device_cuda.h>
+#include <lift/sys/host/compute_device_host.h>
 #include <tbb/task_scheduler_init.h>
-#endif
 
 namespace firepony {
 
@@ -59,6 +60,8 @@ void firepony_gather_intermediates(firepony_context<system_dst>& context, firepo
 template <target_system system>
 struct firepony_device_pipeline : public firepony_pipeline
 {
+    lift::compute_device *device;
+
     uint32 consumer_id;
 
     sequence_database_host *host_reference;
@@ -74,22 +77,19 @@ struct firepony_device_pipeline : public firepony_pipeline
     io_thread *reader;
 
     std::thread thread;
-    uint32 compute_device;
 
-    firepony_device_pipeline(uint32 consumer_id, uint32 compute_device)
-        : consumer_id(consumer_id), compute_device(compute_device)
+    firepony_device_pipeline(uint32 consumer_id, lift::compute_device *device)
+        : consumer_id(consumer_id), device(device)
     { }
 
-    virtual std::string get_name(void) override;
+    virtual std::string get_name(void) override
+    {
+        return std::string(device->get_name());
+    }
 
     virtual target_system get_system(void) override
     {
-        return system;
-    }
-
-    virtual int get_compute_device(void) override
-    {
-        return compute_device;
+        return device->get_system();
     }
 
     virtual size_t get_total_memory(void) override
@@ -108,12 +108,7 @@ struct firepony_device_pipeline : public firepony_pipeline
                        sequence_database_host *host_reference,
                        variant_database_host *host_dbsnp) override
     {
-#if ENABLE_CUDA_BACKEND
-        if (system == cuda)
-        {
-            cudaSetDevice(compute_device);
-        }
-#endif
+        device->enable();
 
         this->reader = reader;
         this->host_reference = host_reference;
@@ -125,7 +120,7 @@ struct firepony_device_pipeline : public firepony_pipeline
 
         header->download();
 
-        context = new firepony_context<system>(compute_device, *options, *header);
+        context = new firepony_context<system>(*device, *options, *header);
         batch = new alignment_batch<system>();
     }
 
@@ -143,25 +138,21 @@ struct firepony_device_pipeline : public firepony_pipeline
     {
         switch(other->get_system())
         {
-#if ENABLE_CUDA_BACKEND
         case lift::cuda:
         {
-            cudaSetDevice(compute_device);
+            device->enable();
 
             firepony_device_pipeline<lift::cuda> *other_cuda = (firepony_device_pipeline<lift::cuda> *) other;
             firepony_gather_intermediates(*context, *other_cuda->context);
             break;
         }
-#endif
 
-#if ENABLE_TBB_BACKEND
         case lift::host:
         {
             firepony_device_pipeline<lift::host> *other_tbb = (firepony_device_pipeline<lift::host> *) other;
             firepony_gather_intermediates(*context, *other_tbb->context);
             break;
         }
-#endif
 
         default:
             assert(!"can't happen");
@@ -170,22 +161,16 @@ struct firepony_device_pipeline : public firepony_pipeline
 
     virtual void postprocess(void) override
     {
-#if ENABLE_CUDA_BACKEND
-        if (system == cuda)
-        {
-            cudaSetDevice(compute_device);
-        }
-#endif
+        device->enable();
 
-#if ENABLE_TBB_BACKEND
         // this object must stay alive on the stack for the scheduler to work
         // this means we have to declare it even for the GPU path
         tbb::task_scheduler_init init(tbb::task_scheduler_init::deferred);
         if (system == host)
         {
-            init.initialize(compute_device);
+            lift::compute_device_host& d = (lift::compute_device_host&)*device;
+            init.initialize(d.num_threads);
         }
-#endif
 
         firepony_postprocess(*context);
     }
@@ -193,22 +178,16 @@ struct firepony_device_pipeline : public firepony_pipeline
 private:
     void run(void)
     {
-#if ENABLE_CUDA_BACKEND
-        if (system == cuda)
-        {
-            cudaSetDevice(compute_device);
-        }
-#endif
+        device->enable();
 
-#if ENABLE_TBB_BACKEND
         // this object must stay alive on the stack for the scheduler to work
         // this means we have to declare it even for the GPU path
         tbb::task_scheduler_init init(tbb::task_scheduler_init::deferred);
         if (system == host)
         {
-            init.initialize(compute_device);
+            lift::compute_device_host& d = (lift::compute_device_host&)*device;
+            init.initialize(d.num_threads);
         }
-#endif
 
         timer<host> io_timer;
         alignment_batch_host *h_batch;
@@ -246,72 +225,38 @@ private:
     }
 };
 
-#if ENABLE_CUDA_BACKEND
 template <>
-std::string firepony_device_pipeline<lift::cuda>::get_name(void)
+std::string firepony_device_pipeline<lift::host>::get_name(void)
 {
-    cudaDeviceProp prop;
-
-    cudaSetDevice(compute_device);
-    cudaGetDeviceProperties(&prop, compute_device);
+    lift::compute_device_host& d = (lift::compute_device_host&)(*device);
 
     char buf[1024];
-    snprintf(buf, sizeof(buf),
-             "%s (%lu MB, CUDA device %d)",
-             prop.name, prop.totalGlobalMem / (1024 * 1024), compute_device);
+    snprintf(buf, sizeof(buf), " (%d threads)", d.num_threads);
 
-    return std::string(buf);
+    return device->get_name() + std::string(buf);
 }
 
 template <>
 size_t firepony_device_pipeline<lift::cuda>::get_total_memory(void)
 {
-    cudaDeviceProp prop;
-
-    cudaSetDevice(compute_device);
-    cudaGetDeviceProperties(&prop, compute_device);
-
-    return prop.totalGlobalMem;
+    lift::compute_device_cuda& d = (lift::compute_device_cuda&)(*device);
+    return size_t(d.config.total_memory);
 }
-#endif
 
-#if ENABLE_TBB_BACKEND
-static int num_tbb_threads = -1;
-
-template<>
-std::string firepony_device_pipeline<lift::host>::get_name(void)
-{
-    char buf[256];
-    snprintf(buf, sizeof(buf), "CPU (Intel Threading Building Blocks, %d threads)", num_tbb_threads);
-    return std::string(buf);
-}
-#endif
-
-firepony_pipeline *firepony_pipeline::create(target_system system, uint32 device)
+firepony_pipeline *firepony_pipeline::create(lift::compute_device *device)
 {
     static uint32 current_consumer_id = 0;
     uint32 consumer_id = current_consumer_id;
     current_consumer_id++;
+    const auto system = device->get_system();
 
     switch(system)
     {
-#if ENABLE_CUDA_BACKEND
     case lift::cuda:
         return new firepony_device_pipeline<lift::cuda>(consumer_id, device);
-#endif
 
-#if ENABLE_TBB_BACKEND
     case lift::host:
-        // reserve device threads for other devices and I/O
-        if (command_line_options.cpu_threads == -1)
-        {
-            num_tbb_threads = tbb::task_scheduler_init::default_num_threads() - device;
-        } else {
-            num_tbb_threads = command_line_options.cpu_threads;
-        }
-
-        return new firepony_device_pipeline<lift::host>(consumer_id, num_tbb_threads);
-#endif
+        return new firepony_device_pipeline<lift::host>(consumer_id, device);
 
     default:
         current_consumer_id--;  // we didn't actually create anything

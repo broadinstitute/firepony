@@ -4,22 +4,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake-local")
 
 include(ExternalProject)
 
-option(USE_EXTERNAL_THRUST
-       "Build using Thrust from Github (do not use the CUDA toolkit version)"
-       ON)
-
-option(ENABLE_CUDA_BACKEND
-       "Enable the GPU-accelerated CUDA backend"
-       ON)
-
-option(ENABLE_CPU_BACKEND
-       "Enable the CPU backend based on Intel Threading Building Blocks"
-       ON)
-
-option(FORCE_TSX_OFF
-       "Forcibly disable TSX instruction set support for TBB (useful for building on older systems)"
-       OFF)
-
 # if the environment variable FIREPONY_GPU_ARCHITECTURE exists, take the list of architectures from it
 if (DEFINED ENV{FIREPONY_GPU_ARCHITECTURE})
     set(GPU_ARCHITECTURE $ENV{FIREPONY_GPU_ARCHITECTURE} CACHE STRING "GPU architectures to generate code for (defaults to sm_30, sm_35, sm_52)")
@@ -28,13 +12,10 @@ else ()
     set(GPU_ARCHITECTURE "sm_30,sm_35,sm_52" CACHE STRING "GPU architectures to generate code for (defaults to sm_30, sm_35, sm_52)")
 endif ()
 
-if (ENABLE_CUDA_BACKEND)
-    add_definitions(-DENABLE_CUDA_BACKEND=1)
-endif()
-
-if (ENABLE_CPU_BACKEND)
-    add_definitions(-DENABLE_TBB_BACKEND=1)
-endif()
+# build lift and grab propagated build parameters
+# this has to be done early to avoid conflicts with CUDA command line flags
+add_subdirectory(modules/lift)
+include_directories(${LIFT_INCLUDE_DIRS})
 
 # default to debug builds
 if (NOT CMAKE_BUILD_TYPE)
@@ -44,19 +25,9 @@ endif()
 # grab gcc flags
 include("gcc.cmake")
 
-# build dependencies
-if (USE_EXTERNAL_THRUST)
-    include("contrib/thrust.cmake")
-endif()
-
+# build our external projects
 include("contrib/zlib.cmake")
-include("contrib/cub.cmake")
 include("contrib/htslib.cmake")
-
-if (ENABLE_CPU_BACKEND)
-    include("contrib/tbb.cmake")
-    set(SYSTEM_LINK_LIBRARIES ${SYSTEM_LINK_LIBRARIES} ${tbb_LIB})
-endif()
 
 # locate required packages
 # CUDA 7.0 is required to build
@@ -65,8 +36,10 @@ find_package(CUDA 7.0 REQUIRED)
 # enable C++11 support
 list(APPEND CUDA_NVCC_FLAGS "-std=c++11")
 # enable device lambda support
+# xxxnsubtil: not usable yet
 #list(APPEND CUDA_NVCC_FLAGS "--expt-extended-lambda")
-# build for Kepler
+
+# set optimization flags
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -use_fast_math)
 
 # add nvcc flags to generate code for all enabled architectures
@@ -77,12 +50,6 @@ foreach(ARCH IN LISTS GPU_ARCHITECTURE)
         ${CUDA_NVCC_FLAGS}
         --generate-code arch=${COMPUTE},code=${ARCH})
 endforeach(ARCH)
-
-if (USE_EXTERNAL_THRUST)
-    # inject our Thrust include path to override the CUDA toolkit include path
-    # (this is a bit of a hack)
-    set(CUDA_INCLUDE_DIRS ${thrust_INCLUDE} -I${CUDA_INCLUDE_DIRS})
-endif()
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
@@ -102,8 +69,9 @@ else()
     set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -O3 -lineinfo -g")
 endif()
 
+include("cmake-local/build_info.cmake")
+
 include_directories(${CMAKE_SOURCE_DIR})
-include_directories(${CMAKE_SOURCE_DIR}/modules)
 
 add_subdirectory(device)
 
@@ -138,23 +106,16 @@ set(firepony_common_sources
     )
 
 cuda_add_library(firepony-common ${firepony_common_sources})
-add_dependencies(firepony-common htslib zlib)
-if (ENABLE_CPU_BACKEND)
-    add_dependencies(firepony-common tbb)
-endif()
-if (USE_EXTERNAL_THRUST)
-    add_dependencies(firepony-common thrust)
-endif()
+add_dependencies(firepony-common htslib zlib lift)
 
 cuda_add_executable(firepony firepony.cu)
-target_link_libraries(firepony firepony-device firepony-common ${tbb_LIB} ${htslib_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+target_link_libraries(firepony firepony-device firepony-common ${htslib_LIB} ${zlib_LIB} ${LIFT_LINK_LIBRARIES})
 
 cuda_add_executable(firepony-loader firepony-loader.cu)
-target_link_libraries(firepony-loader firepony-common ${htslib_LIB} ${zlib_LIB} ${SYSTEM_LINK_LIBRARIES})
+target_link_libraries(firepony-loader firepony-common ${htslib_LIB} ${zlib_LIB} ${LIFT_LINK_LIBRARIES})
 add_dependencies(firepony-loader zlib htslib)
 
 cuda_build_clean_target()
 
 install(TARGETS firepony firepony-loader
         RUNTIME DESTINATION bin)
-

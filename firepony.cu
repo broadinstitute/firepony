@@ -30,6 +30,9 @@
 
 #include <map>
 
+#include <lift/sys/host/compute_device_host.h>
+#include <lift/sys/cuda/compute_device_cuda.h>
+
 #include "alignment_data.h"
 #include "sequence_database.h"
 #include "types.h"
@@ -49,7 +52,18 @@
 
 using namespace firepony;
 
-#if ENABLE_CUDA_BACKEND
+#include <build_info.h>
+
+static void output_build_info(void)
+{
+    fprintf(stderr, "  Build host: %s (%s)\n", build_info::host, build_info::host_system);
+    fprintf(stderr, "  C compiler: %s %s\n", build_info::c_compiler, build_info::c_compiler_version);
+    fprintf(stderr, "  C++ compiler: %s %s\n", build_info::cxx_compiler, build_info::cxx_compiler_version);
+    fprintf(stderr, "  CUDA toolkit version: %s (%s)\n", build_info::cuda_version, build_info::cuda_toolkit);
+    fprintf(stderr, "  Firepony commit: %s\n", build_info::build_commit);
+    fprintf(stderr, "\n");
+}
+
 static bool cuda_runtime_init(std::string& ret)
 {
     cudaError_t err;
@@ -78,61 +92,51 @@ static bool cuda_runtime_init(std::string& ret)
     return true;
 }
 
-static void enumerate_gpus(std::vector<firepony_pipeline *>& ret)
+static void enumerate_gpus(std::vector<firepony_pipeline *>& out)
 {
     std::vector<firepony_pipeline *> gpus;
 
     if (!command_line_options.enable_cuda)
         return;
 
-    cudaError_t err;
-    int gpu_count;
+    cuda_device_config requirements;
+    // sm 3.x or above is required
+    requirements.compute_capability_major = 3;
 
-    err = cudaGetDeviceCount(&gpu_count);
-    if (err != cudaSuccess)
+    std::vector<cuda_device_config> enumerated_gpus;
+    std::string enum_error;
+    bool ret;
+
+    ret = cuda_device_config::enumerate_gpus(enumerated_gpus, enum_error, requirements);
+    if (!ret)
     {
-        fprintf(stderr, "error enumerating CUDA devices: %s\n", cudaGetErrorString(err));
+        fprintf(stderr, "error enumerating CUDA devices: %s\n", enum_error.c_str());
         return;
     }
 
-    for(int dev = 0; dev < gpu_count; dev++)
+    for(const auto gpu : enumerated_gpus)
     {
-        cudaDeviceProp prop;
-        cudaGetDeviceProperties(&prop, dev);
-
-        // sm 3.x or above is required
-        if (prop.major < 3)
-            continue;
-
-        // minimum of 4GB of memory required
-        // (CUDA reports 4095MB for a K5000, so we use that instead of the full 4GB as the limit)
-        if (prop.totalGlobalMem < size_t(4095) * 1024 * 1024)
-            continue;
-
-        firepony_pipeline *pipeline = firepony_pipeline::create(lift::cuda, dev);
-        ret.push_back(pipeline);
+        firepony_pipeline *pipeline = firepony_pipeline::create(new lift::compute_device_cuda(gpu));
+        out.push_back(pipeline);
     }
 }
-#endif
 
 static std::vector<firepony_pipeline *> enumerate_compute_devices(void)
 {
     std::vector<firepony_pipeline *> ret;
     int compute_device_count = 0;
 
-#if ENABLE_CUDA_BACKEND
     enumerate_gpus(ret);
-#endif
 
-#if ENABLE_TBB_BACKEND
     compute_device_count = ret.size();
     if (command_line_options.enable_tbb)
     {
+        uint32 num_threads = lift::compute_device_host::available_threads() - (compute_device_count + 1);
+
         firepony_pipeline *dev;
-        dev = firepony_pipeline::create(lift::host, compute_device_count + 1);
+        dev = firepony_pipeline::create(new lift::compute_device_host(num_threads));
         ret.push_back(dev);
     }
-#endif
 
     return ret;
 }
@@ -144,7 +148,6 @@ static uint32 choose_batch_size(const std::vector<firepony_pipeline *>& devices)
     uint32 batch_size = 20000;
     uint32 num_gpus = 0;
 
-#if ENABLE_CUDA_BACKEND
     for(const auto dev : devices)
     {
         if (dev->get_system() == firepony::cuda)
@@ -179,8 +182,6 @@ static uint32 choose_batch_size(const std::vector<firepony_pipeline *>& devices)
     }
 #undef GBYTES
 
-#endif // if ENABLE_CUDA_BACKEND
-
     if (num_gpus == 0)
     {
         // CPUs strongly prefer small batches
@@ -191,7 +192,7 @@ static uint32 choose_batch_size(const std::vector<firepony_pipeline *>& devices)
     return batch_size;
 }
 
-static void print_statistics(const timer<host>& wall_clock, const pipeline_statistics& stats, int num_devices = 1)
+static void print_statistics(timer<host>& wall_clock, const pipeline_statistics& stats, int num_devices = 1)
 {
     fprintf(stderr, "   blocked on io: %.4f (%.2f%%)\n", stats.io.elapsed_time, stats.io.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
     fprintf(stderr, "   read filtering: %.4f (%.2f%%)\n", stats.read_filter.elapsed_time, stats.read_filter.elapsed_time / wall_clock.elapsed_time() * 100.0 / num_devices);
@@ -232,7 +233,11 @@ int main(int argc, char **argv)
     fprintf(stderr, "Firepony v%d.%d.%d\n", FIREPONY_VERSION_MAJOR, FIREPONY_VERSION_MINOR, FIREPONY_VERSION_REV);
     parse_command_line(argc, argv);
 
-#if ENABLE_CUDA_BACKEND
+    if (command_line_options.verbose)
+    {
+        output_build_info();
+    }
+
     if (command_line_options.enable_cuda)
     {
         std::string runtime_version;
@@ -241,7 +246,6 @@ int main(int argc, char **argv)
             fprintf(stderr, "CUDA runtime version %s\n", runtime_version.c_str());
         }
     }
-#endif
 
     compute_devices = enumerate_compute_devices();
 

@@ -88,7 +88,7 @@ struct covariate_table
 
     // cross-device table concatenation
     template <target_system other_system>
-    void concat(int my_device, int other_device, covariate_table<other_system, covariate_value>& other)
+    void concat(const lift::compute_device& my_device, const lift::compute_device& other_device, covariate_table<other_system, covariate_value>& other)
     {
         size_t off = size();
 

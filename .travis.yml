@@ -8,9 +8,10 @@ env:
   - BUILD_TYPE=Release FIREPONY_GPU_ARCHITECTURE=sm_52
 
 before_install:
+  - git submodule update --init --recursive
   - travis_retry sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-  - travis_retry wget -nv "http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1404/x86_64/cuda-repo-ubuntu1404_7.5-18_amd64.deb"
-  - sudo dpkg -i cuda-repo-ubuntu1404_7.5-18_amd64.deb
+  - travis_retry wget -nv "http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1404/x86_64/cuda-repo-ubuntu1404_7.0-28_amd64.deb"
+  - sudo dpkg -i cuda-repo-ubuntu1404_7.0-28_amd64.deb
   - travis_retry sudo apt-get update -qq
 
 install:

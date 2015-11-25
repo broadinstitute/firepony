@@ -55,13 +55,9 @@ static void usage(void)
     fprintf(stderr, "  --mmap                                Load reference/dbsnp from system shared memory if present\n");
     fprintf(stderr, "  -v, --verbose                         Verbose logging\n");
     fprintf(stderr, "  -o, --output <output-file-name>       File to write tabulated output to (default is stdout)\n");
-#if ENABLE_CUDA_BACKEND
     fprintf(stderr, "  --gpu-only                            Use only the CUDA GPU-accelerated backend\n");
-#endif
-#if ENABLE_TBB_BACKEND
     fprintf(stderr, "  --cpu-only                            Use only the CPU backend\n");
     fprintf(stderr, "  --cpu-threads                         Number of CPU worker threads to run\n");
-#endif
     fprintf(stderr, "\n");
 
     fprintf(stderr, "  http://github.com/broadinstitute/firepony\n");
@@ -89,24 +85,19 @@ static void parse_env_vars(void)
     char *backend = getenv("FIREPONY_BACKEND");
     if (backend)
     {
-#if ENABLE_CUDA_BACKEND
         if (!strcmp(backend, "cuda"))
         {
             command_line_options.disable_all_backends();
             command_line_options.enable_cuda = true;
         }
-#endif
 
-#if ENABLE_TBB_BACKEND
         if (!strcmp(backend, "cpu"))
         {
             command_line_options.disable_all_backends();
             command_line_options.enable_tbb = true;
         }
-#endif
     }
 
-#if ENABLE_TBB_BACKEND
     char *cpu_threads = getenv("FIREPONY_CPU_THREADS");
     if (cpu_threads)
     {
@@ -118,7 +109,6 @@ static void parse_env_vars(void)
             command_line_options.cpu_threads = -1;
         }
     }
-#endif
 }
 
 void parse_command_line(int argc, char **argv)
@@ -135,13 +125,9 @@ void parse_command_line(int argc, char **argv)
             { "mmap", no_argument, NULL, 'm' },
             { "verbose", no_argument, NULL, 'v' },
             { "output", required_argument, NULL, 'o' },
-#if ENABLE_CUDA_BACKEND
             { "gpu-only", no_argument, NULL, 'g' },
-#endif
-#if ENABLE_TBB_BACKEND
             { "cpu-only", no_argument, NULL, 'c' },
             { "cpu-threads", required_argument, NULL, 't' },
-#endif
             { 0 },
     };
 
@@ -209,15 +195,12 @@ void parse_command_line(int argc, char **argv)
             command_line_options.output = strdup(optarg);
             break;
 
-#if ENABLE_CUDA_BACKEND
         case 'g':
             // --gpu-only
             command_line_options.disable_all_backends();
             command_line_options.enable_cuda = true;
             break;
-#endif
 
-#if ENABLE_TBB_BACKEND
         case 'c':
             // --cpu-only
             command_line_options.disable_all_backends();
@@ -235,7 +218,6 @@ void parse_command_line(int argc, char **argv)
             }
 
             break;
-#endif
 
         case '?':
         case ':':

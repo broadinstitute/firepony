@@ -36,8 +36,6 @@
 #define __constant__
 #define __const__
 #define __restrict__
-#define ENABLE_CUDA_BACKEND 1
-#define ENABLE_TBB_BACKEND 1
 #endif
 
 #include <lift/types.h>

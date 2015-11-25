@@ -4,14 +4,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake-local")
 
 include(ExternalProject)
 
-option(ENABLE_CUDA_BACKEND
-       "Enable the GPU-accelerated CUDA backend"
-       ON)
-
-option(ENABLE_CPU_BACKEND
-       "Enable the CPU backend based on Intel Threading Building Blocks"
-       ON)
-
 # if the environment variable FIREPONY_GPU_ARCHITECTURE exists, take the list of architectures from it
 if (DEFINED ENV{FIREPONY_GPU_ARCHITECTURE})
     set(GPU_ARCHITECTURE $ENV{FIREPONY_GPU_ARCHITECTURE} CACHE STRING "GPU architectures to generate code for (defaults to sm_30, sm_35, sm_52)")
@@ -24,14 +16,6 @@ endif ()
 # this has to be done early to avoid conflicts with CUDA command line flags
 add_subdirectory(modules/lift)
 include_directories(${LIFT_INCLUDE_DIRS})
-
-if (ENABLE_CUDA_BACKEND)
-    add_definitions(-DENABLE_CUDA_BACKEND=1)
-endif()
-
-if (ENABLE_CPU_BACKEND)
-    add_definitions(-DENABLE_TBB_BACKEND=1)
-endif()
 
 # default to debug builds
 if (NOT CMAKE_BUILD_TYPE)

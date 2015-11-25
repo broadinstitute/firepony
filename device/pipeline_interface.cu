@@ -40,14 +40,9 @@
 
 #include <thread>
 
-#if ENABLE_CUDA_BACKEND
 #include <lift/sys/cuda/compute_device_cuda.h>
-#endif
-
-#if ENABLE_TBB_BACKEND
 #include <lift/sys/host/compute_device_host.h>
 #include <tbb/task_scheduler_init.h>
-#endif
 
 namespace firepony {
 
@@ -143,7 +138,6 @@ struct firepony_device_pipeline : public firepony_pipeline
     {
         switch(other->get_system())
         {
-#if ENABLE_CUDA_BACKEND
         case lift::cuda:
         {
             device->enable();
@@ -152,16 +146,13 @@ struct firepony_device_pipeline : public firepony_pipeline
             firepony_gather_intermediates(*context, *other_cuda->context);
             break;
         }
-#endif
 
-#if ENABLE_TBB_BACKEND
         case lift::host:
         {
             firepony_device_pipeline<lift::host> *other_tbb = (firepony_device_pipeline<lift::host> *) other;
             firepony_gather_intermediates(*context, *other_tbb->context);
             break;
         }
-#endif
 
         default:
             assert(!"can't happen");
@@ -172,7 +163,6 @@ struct firepony_device_pipeline : public firepony_pipeline
     {
         device->enable();
 
-#if ENABLE_TBB_BACKEND
         // this object must stay alive on the stack for the scheduler to work
         // this means we have to declare it even for the GPU path
         tbb::task_scheduler_init init(tbb::task_scheduler_init::deferred);
@@ -181,7 +171,6 @@ struct firepony_device_pipeline : public firepony_pipeline
             lift::compute_device_host& d = (lift::compute_device_host&)*device;
             init.initialize(d.num_threads);
         }
-#endif
 
         firepony_postprocess(*context);
     }
@@ -191,7 +180,6 @@ private:
     {
         device->enable();
 
-#if ENABLE_TBB_BACKEND
         // this object must stay alive on the stack for the scheduler to work
         // this means we have to declare it even for the GPU path
         tbb::task_scheduler_init init(tbb::task_scheduler_init::deferred);
@@ -200,7 +188,6 @@ private:
             lift::compute_device_host& d = (lift::compute_device_host&)*device;
             init.initialize(d.num_threads);
         }
-#endif
 
         timer<host> io_timer;
         alignment_batch_host *h_batch;
@@ -238,7 +225,6 @@ private:
     }
 };
 
-#if ENABLE_TBB_BACKEND
 template <>
 std::string firepony_device_pipeline<lift::host>::get_name(void)
 {
@@ -249,14 +235,6 @@ std::string firepony_device_pipeline<lift::host>::get_name(void)
 
     return device->get_name() + std::string(buf);
 }
-#endif
-
-#if ENABLE_CUDA_BACKEND
-// template <>
-// size_t firepony_device_pipeline<lift::cuda>::get_name(void)
-// {
-//     return device->get_name();
-// }
 
 template <>
 size_t firepony_device_pipeline<lift::cuda>::get_total_memory(void)
@@ -264,7 +242,6 @@ size_t firepony_device_pipeline<lift::cuda>::get_total_memory(void)
     lift::compute_device_cuda& d = (lift::compute_device_cuda&)(*device);
     return size_t(d.config.total_memory);
 }
-#endif
 
 firepony_pipeline *firepony_pipeline::create(lift::compute_device *device)
 {
@@ -275,15 +252,11 @@ firepony_pipeline *firepony_pipeline::create(lift::compute_device *device)
 
     switch(system)
     {
-#if ENABLE_CUDA_BACKEND
     case lift::cuda:
         return new firepony_device_pipeline<lift::cuda>(consumer_id, device);
-#endif
 
-#if ENABLE_TBB_BACKEND
     case lift::host:
         return new firepony_device_pipeline<lift::host>(consumer_id, device);
-#endif
 
     default:
         current_consumer_id--;  // we didn't actually create anything

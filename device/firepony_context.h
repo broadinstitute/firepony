@@ -45,12 +45,8 @@
 
 #include <lift/timer.h>
 #include <lift/sys/compute_device.h>
-#if ENABLE_TBB_BACKEND
 #include <lift/sys/host/compute_device_host.h>
-#endif
-#if ENABLE_CUDA_BACKEND
 #include <lift/sys/cuda/compute_device_cuda.h>
-#endif
 
 namespace firepony {
 
@@ -220,4 +216,3 @@ struct lambda_context
 #define LAMBDA_CONTEXT_INHERIT using lambda_context<system>::lambda_context; LAMBDA_CONTEXT_INHERIT_MEMBERS
 
 } // namespace firepony
-

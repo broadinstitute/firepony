@@ -88,7 +88,6 @@ inline void cross_device_copy(const lift::compute_device& dest_device, allocatio
                               const lift::compute_device& source_device, allocation<sys_source, T>& source, size_t source_offset,
                               size_t len)
 {
-#if ENABLE_CUDA_BACKEND
     if (sys_dest == cuda && sys_source == cuda)
     {
         const auto& dst = (const lift::compute_device_cuda&)dest_device;
@@ -101,9 +100,9 @@ inline void cross_device_copy(const lift::compute_device& dest_device, allocatio
         ptr_dest = dest.data() + dest_offset;
 
         cudaMemcpyPeer(ptr_dest, dst.config.device, ptr_src, src.config.device, len * sizeof(T));
-    } else
-#endif
+    } else {
         thrust::copy_n(source.t_begin() + source_offset, len, dest.t_begin() + dest_offset);
+    }
 }
 
 } // namespace firepony

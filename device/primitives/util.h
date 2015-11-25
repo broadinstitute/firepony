@@ -30,6 +30,9 @@
 
 #pragma once
 
+#include <lift/sys/compute_device.h>
+#include <lift/sys/cuda/compute_device_cuda.h>
+
 namespace firepony {
 
 /// a meta-function to convert a type to const
@@ -81,20 +84,23 @@ inline CUDA_HOST_DEVICE T max(const T a, const T b)
 }
 
 template <target_system sys_dest, target_system sys_source, typename T>
-inline void cross_device_copy(int dest_device, allocation<sys_dest, T>& dest, size_t dest_offset,
-                              int source_device, allocation<sys_source, T>& source, size_t source_offset,
+inline void cross_device_copy(const lift::compute_device& dest_device, allocation<sys_dest, T>& dest, size_t dest_offset,
+                              const lift::compute_device& source_device, allocation<sys_source, T>& source, size_t source_offset,
                               size_t len)
 {
 #if ENABLE_CUDA_BACKEND
     if (sys_dest == cuda && sys_source == cuda)
     {
+        const auto& dst = (const lift::compute_device_cuda&)dest_device;
+        const auto& src = (const lift::compute_device_cuda&)source_device;
+
         T *ptr_src;
         T *ptr_dest;
 
         ptr_src = source.data() + source_offset;
         ptr_dest = dest.data() + dest_offset;
 
-        cudaMemcpyPeer(ptr_dest, dest_device, ptr_src, source_device, len * sizeof(T));
+        cudaMemcpyPeer(ptr_dest, dst.config.device, ptr_src, src.config.device, len * sizeof(T));
     } else
 #endif
         thrust::copy_n(source.t_begin() + source_offset, len, dest.t_begin() + dest_offset);

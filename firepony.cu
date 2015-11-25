@@ -49,7 +49,13 @@
 
 using namespace firepony;
 
+#if ENABLE_TBB_BACKEND
+#include <lift/sys/host/compute_device_host.h>
+#endif
+
 #if ENABLE_CUDA_BACKEND
+#include <lift/sys/cuda/compute_device_cuda.h>
+
 static bool cuda_runtime_init(std::string& ret)
 {
     cudaError_t err;
@@ -78,39 +84,32 @@ static bool cuda_runtime_init(std::string& ret)
     return true;
 }
 
-static void enumerate_gpus(std::vector<firepony_pipeline *>& ret)
+static void enumerate_gpus(std::vector<firepony_pipeline *>& out)
 {
     std::vector<firepony_pipeline *> gpus;
 
     if (!command_line_options.enable_cuda)
         return;
 
-    cudaError_t err;
-    int gpu_count;
+    cuda_device_config requirements;
+    // sm 3.x or above is required
+    requirements.compute_capability_major = 3;
 
-    err = cudaGetDeviceCount(&gpu_count);
-    if (err != cudaSuccess)
+    std::vector<cuda_device_config> enumerated_gpus;
+    std::string enum_error;
+    bool ret;
+
+    ret = cuda_device_config::enumerate_gpus(enumerated_gpus, enum_error, requirements);
+    if (!ret)
     {
-        fprintf(stderr, "error enumerating CUDA devices: %s\n", cudaGetErrorString(err));
+        fprintf(stderr, "error enumerating CUDA devices: %s\n", enum_error.c_str());
         return;
     }
 
-    for(int dev = 0; dev < gpu_count; dev++)
+    for(const auto gpu : enumerated_gpus)
     {
-        cudaDeviceProp prop;
-        cudaGetDeviceProperties(&prop, dev);
-
-        // sm 3.x or above is required
-        if (prop.major < 3)
-            continue;
-
-        // minimum of 4GB of memory required
-        // (CUDA reports 4095MB for a K5000, so we use that instead of the full 4GB as the limit)
-        if (prop.totalGlobalMem < size_t(4095) * 1024 * 1024)
-            continue;
-
-        firepony_pipeline *pipeline = firepony_pipeline::create(lift::cuda, dev);
-        ret.push_back(pipeline);
+        firepony_pipeline *pipeline = firepony_pipeline::create(new lift::compute_device_cuda(gpu));
+        out.push_back(pipeline);
     }
 }
 #endif
@@ -128,8 +127,10 @@ static std::vector<firepony_pipeline *> enumerate_compute_devices(void)
     compute_device_count = ret.size();
     if (command_line_options.enable_tbb)
     {
+        uint32 num_threads = lift::compute_device_host::available_threads() - (compute_device_count + 1);
+
         firepony_pipeline *dev;
-        dev = firepony_pipeline::create(lift::host, compute_device_count + 1);
+        dev = firepony_pipeline::create(new lift::compute_device_host(num_threads));
         ret.push_back(dev);
     }
 #endif

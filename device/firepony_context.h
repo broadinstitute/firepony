@@ -44,6 +44,13 @@
 #include "util.h"
 
 #include <lift/timer.h>
+#include <lift/sys/compute_device.h>
+#if ENABLE_TBB_BACKEND
+#include <lift/sys/host/compute_device_host.h>
+#endif
+#if ENABLE_CUDA_BACKEND
+#include <lift/sys/cuda/compute_device_cuda.h>
+#endif
 
 namespace firepony {
 
@@ -127,7 +134,7 @@ struct firepony_context
 {
     // identifies the compute device we're using on this context
     // note that the meaning depends on the target system
-    const int compute_device;
+    const lift::compute_device& compute_device;
 
     const runtime_options& options;
 
@@ -167,7 +174,7 @@ struct firepony_context
     // --- everything below this line is host-only and not available on the device
     pipeline_statistics stats;
 
-    firepony_context(const int compute_device,
+    firepony_context(const lift::compute_device& compute_device,
                      const runtime_options& options,
                      const alignment_header<system> bam_header)
         : compute_device(compute_device),

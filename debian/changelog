@@ -1,3 +1,11 @@
+firepony (1.1.1-1) unstable; urgency=medium
+
+  * Lift updates. No user visible changes apart from more accurate CPU
+    detection.
+  * Added build information to the binary.
+
+ -- Nuno Subtil <subtil@gmail.com>  Wed, 25 Nov 2015 09:15:48 -0800
+
 firepony (1.1.0-1) unstable; urgency=medium
 
   * Fix batch size selection. This improves performance on most
